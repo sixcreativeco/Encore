@@ -18,7 +18,7 @@ struct StyledButtonV2: View {
             }
             .padding()
             .frame(maxWidth: fullWidth ? .infinity : width)
-            .background(Color(hex: "#EEEEEE"))
+            .background(Color(red: 238/255, green: 238/255, blue: 238/255))
             .foregroundColor(.black)
             .cornerRadius(12)
         }

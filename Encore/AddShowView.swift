@@ -34,6 +34,7 @@ struct AddShowView: View {
         var soundCheck = defaultTime(hour: 16)
         var setTime = defaultTime(hour: 18)
         var changeoverMinutes = 15
+        var suggestion = ""
     }
 
     var body: some View {
@@ -102,13 +103,33 @@ struct AddShowView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 16) {
                         VStack(alignment: .leading) {
-                            StyledInputField(placeholder: "Name", text: $sa.name)
-                            if !sa.name.isEmpty {
-                                ForEach(allSupportActs.filter { $0.lowercased().hasPrefix(sa.name.lowercased()) }, id: \.self) { suggestion in
-                                    Button(action: { sa.name = suggestion }) {
-                                        Text(suggestion).font(.caption)
+                            ZStack(alignment: .leading) {
+                                TextField("Name", text: $sa.name)
+                                    .textFieldStyle(PlainTextFieldStyle())
+                                    .padding(12)
+                                    .background(Color.gray.opacity(0.06))
+                                    .cornerRadius(10)
+                                    .font(.body)
+                                    .onChange(of: sa.name) { newValue in
+                                        if let match = allSupportActs.first(where: { $0.lowercased().hasPrefix(newValue.lowercased()) }) {
+                                            sa.suggestion = match
+                                        } else {
+                                            sa.suggestion = ""
+                                        }
                                     }
-                                    .buttonStyle(.plain)
+                                    .onSubmit {
+                                        if !sa.suggestion.isEmpty {
+                                            sa.name = sa.suggestion
+                                        }
+                                    }
+
+                                if !sa.suggestion.isEmpty && sa.suggestion.lowercased().hasPrefix(sa.name.lowercased()) && sa.name != sa.suggestion {
+                                    let remaining = String(sa.suggestion.dropFirst(sa.name.count))
+                                    HStack(spacing: 0) {
+                                        Text(sa.name)
+                                        Text(remaining).foregroundColor(.gray.opacity(0.5))
+                                    }
+                                    .padding(12)
                                 }
                             }
                         }
@@ -123,6 +144,7 @@ struct AddShowView: View {
                 }
                 Divider()
             }
+
             StyledButtonV2(title: "+ Add Support Act", action: { supportActs.append(SupportActInput()) }, showArrow: false, width: 200)
         }
     }
@@ -143,8 +165,10 @@ struct AddShowView: View {
             Text("Pack Out").font(.headline)
             HStack(spacing: 16) {
                 StyledTimePicker(label: "Time", time: $packOut)
-                Toggle(isOn: $packOutNextDay) { Text("Next Day") }
-                    .toggleStyle(.checkbox)
+                Toggle(isOn: $packOutNextDay) {
+                    Text("Next Day")
+                }
+                .toggleStyle(.checkbox)
             }
         }
     }
@@ -164,17 +188,6 @@ struct AddShowView: View {
     private func saveShow() {
         let db = Firestore.firestore()
 
-        // Prepare embedded supportActs for show document
-        let supportActsArray: [[String: Any]] = supportActs.map { sa in
-            [
-                "name": sa.name,
-                "type": sa.type,
-                "soundCheck": Timestamp(date: sa.soundCheck),
-                "setTime": Timestamp(date: sa.setTime),
-                "changeoverMinutes": sa.changeoverMinutes
-            ]
-        }
-
         let showData: [String: Any] = [
             "city": city,
             "country": country,
@@ -189,25 +202,29 @@ struct AddShowView: View {
             "headlinerSetDurationMinutes": headlinerSetDurationMinutes,
             "packOut": Timestamp(date: packOut),
             "packOutNextDay": packOutNextDay,
-            "createdAt": FieldValue.serverTimestamp(),
-            "supportActs": supportActsArray
+            "createdAt": FieldValue.serverTimestamp()
         ]
 
         let showRef = db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").document()
         showRef.setData(showData)
 
-        // Write support acts to master collection under tour
         for sa in supportActs {
-            let supportActsRef = db.collection("users").document(userID).collection("tours").document(tourID).collection("supportActs")
-            supportActsRef.whereField("name", isEqualTo: sa.name).getDocuments { snapshot, _ in
-                if snapshot?.isEmpty ?? true {
-                    supportActsRef.addDocument(data: [
-                        "name": sa.name,
-                        "type": sa.type,
-                        "createdAt": FieldValue.serverTimestamp()
-                    ])
-                }
-            }
+            let saData: [String: Any] = [
+                "name": sa.name,
+                "type": sa.type,
+                "soundCheck": Timestamp(date: sa.soundCheck),
+                "setTime": Timestamp(date: sa.setTime),
+                "changeoverMinutes": sa.changeoverMinutes,
+                "createdAt": FieldValue.serverTimestamp()
+            ]
+            showRef.collection("supportActs").addDocument(data: saData)
+
+            // ✅ Also save into tour-level supportActs collection for typeahead
+            db.collection("users").document(userID).collection("tours").document(tourID).collection("supportActs").document(sa.name).setData([
+                "name": sa.name,
+                "type": sa.type,
+                "createdAt": FieldValue.serverTimestamp()
+            ])
         }
 
         onSave()
