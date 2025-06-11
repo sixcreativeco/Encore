@@ -123,7 +123,6 @@ struct AddShowView: View {
                 }
                 Divider()
             }
-
             StyledButtonV2(title: "+ Add Support Act", action: { supportActs.append(SupportActInput()) }, showArrow: false, width: 200)
         }
     }
@@ -144,10 +143,8 @@ struct AddShowView: View {
             Text("Pack Out").font(.headline)
             HStack(spacing: 16) {
                 StyledTimePicker(label: "Time", time: $packOut)
-                Toggle(isOn: $packOutNextDay) {
-                    Text("Next Day")
-                }
-                .toggleStyle(.checkbox)
+                Toggle(isOn: $packOutNextDay) { Text("Next Day") }
+                    .toggleStyle(.checkbox)
             }
         }
     }
@@ -167,6 +164,17 @@ struct AddShowView: View {
     private func saveShow() {
         let db = Firestore.firestore()
 
+        // Prepare embedded supportActs for show document
+        let supportActsArray: [[String: Any]] = supportActs.map { sa in
+            [
+                "name": sa.name,
+                "type": sa.type,
+                "soundCheck": Timestamp(date: sa.soundCheck),
+                "setTime": Timestamp(date: sa.setTime),
+                "changeoverMinutes": sa.changeoverMinutes
+            ]
+        }
+
         let showData: [String: Any] = [
             "city": city,
             "country": country,
@@ -181,22 +189,25 @@ struct AddShowView: View {
             "headlinerSetDurationMinutes": headlinerSetDurationMinutes,
             "packOut": Timestamp(date: packOut),
             "packOutNextDay": packOutNextDay,
-            "createdAt": FieldValue.serverTimestamp()
+            "createdAt": FieldValue.serverTimestamp(),
+            "supportActs": supportActsArray
         ]
 
         let showRef = db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").document()
         showRef.setData(showData)
 
+        // Write support acts to master collection under tour
         for sa in supportActs {
-            let saData: [String: Any] = [
-                "name": sa.name,
-                "type": sa.type,
-                "soundCheck": Timestamp(date: sa.soundCheck),
-                "setTime": Timestamp(date: sa.setTime),
-                "changeoverMinutes": sa.changeoverMinutes,
-                "createdAt": FieldValue.serverTimestamp()
-            ]
-            showRef.collection("supportActs").addDocument(data: saData)
+            let supportActsRef = db.collection("users").document(userID).collection("tours").document(tourID).collection("supportActs")
+            supportActsRef.whereField("name", isEqualTo: sa.name).getDocuments { snapshot, _ in
+                if snapshot?.isEmpty ?? true {
+                    supportActsRef.addDocument(data: [
+                        "name": sa.name,
+                        "type": sa.type,
+                        "createdAt": FieldValue.serverTimestamp()
+                    ])
+                }
+            }
         }
 
         onSave()
