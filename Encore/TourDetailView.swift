@@ -68,10 +68,9 @@ struct TourDetailView: View {
             AddShowView(
                 tourID: tour.id,
                 userID: appState.userID ?? "",
-                artistName: tour.artist
-            ) {
-                loadShows()
-            }
+                artistName: tour.artist, // <-- 🔧 PATCHED: using artist name now
+                onSave: { loadShows() }
+            )
         }
         .sheet(isPresented: $showingAddItinerary) {
             NewItineraryDayView(

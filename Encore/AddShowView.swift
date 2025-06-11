@@ -72,6 +72,7 @@ struct AddShowView: View {
             HStack {
                 StyledDateField(date: $date)
                     .frame(width: 200)
+                    .padding(.leading, -40)
                 Spacer()
             }
             HStack(spacing: 16) {
@@ -219,7 +220,6 @@ struct AddShowView: View {
             ]
             showRef.collection("supportActs").addDocument(data: saData)
 
-            // ✅ Also save into tour-level supportActs collection for typeahead
             db.collection("users").document(userID).collection("tours").document(tourID).collection("supportActs").document(sa.name).setData([
                 "name": sa.name,
                 "type": sa.type,
