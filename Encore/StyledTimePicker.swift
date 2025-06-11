@@ -7,7 +7,9 @@ struct StyledTimePicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if !label.isEmpty {
-                Text(label).font(.subheadline.bold())
+                Text(label)
+                    .font(.subheadline.bold())
+                    .foregroundColor(.gray)
             }
             DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
                 .labelsHidden()

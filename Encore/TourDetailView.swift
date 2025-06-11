@@ -13,6 +13,7 @@ struct TourDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
             Text(tour.name).font(.largeTitle.bold())
+
             Divider()
 
             VStack(alignment: .leading, spacing: 16) {
@@ -21,6 +22,7 @@ struct TourDetailView: View {
                     Spacer()
                     Button("+ Add Show") { showingAddShow = true }
                 }
+
                 if shows.isEmpty {
                     Text("No shows yet.").foregroundColor(.gray)
                 } else {
@@ -42,6 +44,7 @@ struct TourDetailView: View {
                     Spacer()
                     Button("+ Add Day") { showingAddItinerary = true }
                 }
+
                 if itineraries.isEmpty {
                     Text("No itineraries yet.").foregroundColor(.gray)
                 } else {
@@ -62,10 +65,20 @@ struct TourDetailView: View {
             loadItineraries()
         }
         .sheet(isPresented: $showingAddShow) {
-            AddShowView(tourID: tour.id, userID: appState.userID ?? "", onSave: { loadShows() })
+            AddShowView(
+                tourID: tour.id,
+                userID: appState.userID ?? "",
+                artistName: tour.artist
+            ) {
+                loadShows()
+            }
         }
         .sheet(isPresented: $showingAddItinerary) {
-            NewItineraryDayView(tourID: tour.id, userID: appState.userID ?? "", onSave: { loadItineraries() })
+            NewItineraryDayView(
+                tourID: tour.id,
+                userID: appState.userID ?? "",
+                onSave: { loadItineraries() }
+            )
         }
     }
 
@@ -73,7 +86,8 @@ struct TourDetailView: View {
         guard let userID = appState.userID else { return }
         let db = Firestore.firestore()
         db.collection("users").document(userID).collection("tours").document(tour.id).collection("shows")
-            .order(by: "date").getDocuments { snapshot, _ in
+            .order(by: "date")
+            .getDocuments { snapshot, _ in
                 self.shows = snapshot?.documents.compactMap { ShowModel(from: $0) } ?? []
             }
     }
@@ -82,7 +96,8 @@ struct TourDetailView: View {
         guard let userID = appState.userID else { return }
         let db = Firestore.firestore()
         db.collection("users").document(userID).collection("tours").document(tour.id).collection("itineraries")
-            .order(by: "date").getDocuments { snapshot, _ in
+            .order(by: "date")
+            .getDocuments { snapshot, _ in
                 self.itineraries = snapshot?.documents.compactMap { ItineraryDayModel(from: $0) } ?? []
             }
     }

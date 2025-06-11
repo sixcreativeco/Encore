@@ -4,6 +4,8 @@ import FirebaseFirestore
 struct ShowGridView: View {
     var tourID: String
     var userID: String
+    var artistName: String
+
     @State private var shows: [ShowModel] = []
     @State private var isShowingAddShowView = false
 
@@ -15,7 +17,9 @@ struct ShowGridView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Shows").font(.title2.bold()).padding(.horizontal)
+            Text("Shows")
+                .font(.title2.bold())
+                .padding(.horizontal)
 
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 20) {
@@ -38,7 +42,8 @@ struct ShowGridView: View {
 
                     Button(action: { isShowingAddShowView = true }) {
                         VStack(spacing: 12) {
-                            Image(systemName: "plus").font(.system(size: 24, weight: .medium))
+                            Image(systemName: "plus")
+                                .font(.system(size: 24, weight: .medium))
                             Text("Add Show").font(.headline)
                         }
                         .frame(maxWidth: .infinity, minHeight: 160)
@@ -52,7 +57,11 @@ struct ShowGridView: View {
             }
         }
         .sheet(isPresented: $isShowingAddShowView) {
-            AddShowView(tourID: tourID, userID: userID) {
+            AddShowView(
+                tourID: tourID,
+                userID: userID,
+                artistName: artistName
+            ) {
                 loadShows()
             }
         }

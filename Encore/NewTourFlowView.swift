@@ -87,7 +87,7 @@ struct NewTourFlowView: View {
                 if let tourID = newTourID, let userID = appState.userID {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Add Shows").font(.headline)
-                        ShowGridView(tourID: tourID, userID: userID)
+                        ShowGridView(tourID: tourID, userID: userID, artistName: tourName)
                     }
                 }
 
