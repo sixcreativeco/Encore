@@ -1,0 +1,28 @@
+import Foundation
+import FirebaseFirestore
+
+struct ShowModel: Identifiable, Codable, Hashable {
+    var id: String
+    var city: String
+    var country: String?
+    var venue: String
+    var address: String
+    var date: Date
+
+    init?(from document: DocumentSnapshot) {
+        let data = document.data()
+        guard
+            let city = data?["city"] as? String,
+            let venue = data?["venue"] as? String,
+            let address = data?["address"] as? String,
+            let dateTS = data?["date"] as? Timestamp
+        else { return nil }
+
+        self.id = document.documentID
+        self.city = city
+        self.country = data?["country"] as? String
+        self.venue = venue
+        self.address = address
+        self.date = dateTS.dateValue()
+    }
+}
