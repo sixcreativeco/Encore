@@ -29,11 +29,12 @@ class AuthManager: ObservableObject {
         do {
             let authResult = try await Auth.auth().signIn(with: credential)
             self.user = authResult.user
+            
             DispatchQueue.main.async {
                 appState.isLoggedIn = true
+                appState.userID = authResult.user.uid
             }
             
-            // Create user Firestore document if needed
             await self.createUserDocumentIfNeeded(userID: authResult.user.uid)
             
         } catch {
@@ -47,19 +48,17 @@ class AuthManager: ObservableObject {
         
         do {
             let document = try await ref.getDocument()
-            if document.exists {
-                return // user document already exists
-            } else {
-                let userData: [String: Any] = [
-                    "uid": userID,
-                    "email": self.user?.email ?? "",
-                    "displayName": self.user?.displayName ?? "",
-                    "createdAt": Timestamp(date: Date())
-                ]
-                
-                try await ref.setData(userData)
-                print("✅ User document created in Firestore")
-            }
+            if document.exists { return }
+            
+            let userData: [String: Any] = [
+                "uid": userID,
+                "email": self.user?.email ?? "",
+                "displayName": self.user?.displayName ?? "",
+                "createdAt": Timestamp(date: Date())
+            ]
+            try await ref.setData(userData)
+            print("✅ User document created")
+            
         } catch {
             print("❌ Failed creating user document: \(error.localizedDescription)")
         }
@@ -71,6 +70,7 @@ class AuthManager: ObservableObject {
             self.user = nil
             DispatchQueue.main.async {
                 appState.isLoggedIn = false
+                appState.userID = nil
             }
         } catch {
             print("❌ Sign out failed: \(error.localizedDescription)")

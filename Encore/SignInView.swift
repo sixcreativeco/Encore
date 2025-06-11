@@ -3,10 +3,10 @@ import GoogleSignInSwift
 import AuthenticationServices
 
 struct SignInView: View {
+    @EnvironmentObject var appState: AppState
     @Environment(\.colorScheme) var colorScheme
     @State private var email: String = ""
     @State private var showSignUp: Bool = false
-    @ObservedObject var appState: AppState
 
     var body: some View {
         VStack(spacing: 40) {

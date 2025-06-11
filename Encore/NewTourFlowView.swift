@@ -5,6 +5,7 @@ import AppKit
 import UniformTypeIdentifiers
 
 struct NewTourFlowView: View {
+    @EnvironmentObject var appState: AppState
     @State private var tourName: String = ""
     @State private var artistName: String = ""
     @State private var startDate: Date = Date()
@@ -13,51 +14,35 @@ struct NewTourFlowView: View {
     @State private var posterImage: NSImage? = nil
     @State private var isPickingPoster = false
     @State private var posterFileURL: URL? = nil
-
     @State private var newTourID: String? = nil
     @State private var isSaving = false
-
-    @State private var crewMembers: [CrewMember] = []
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
                 HStack(alignment: .top, spacing: 32) {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Create New Tour")
-                            .font(.system(size: 24, weight: .bold))
-
+                        Text("Create New Tour").font(.system(size: 24, weight: .bold))
                         CustomTextField(placeholder: "Tour Name", text: $tourName)
                         CustomTextField(placeholder: "Artist Name", text: $artistName)
-
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Start Date").font(.subheadline).foregroundColor(.gray)
                                 CustomDateField(date: $startDate)
                             }
-
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("End Date").font(.subheadline).foregroundColor(.gray)
                                 CustomDateField(date: $endDate)
                             }
                         }
-
-                        Text("Including Travel/Extra Days")
-                            .font(.footnote)
-                            .foregroundColor(.gray)
-
+                        Text("Including Travel/Extra Days").font(.footnote).foregroundColor(.gray)
                         Picker("", selection: $tourScope) {
                             Text("National").tag("national")
                             Text("International").tag("international")
                         }
                         .pickerStyle(SegmentedPickerStyle())
                         .frame(height: 44)
-
-                        Button(action: {
-                            Task {
-                                await saveTour()
-                            }
-                        }) {
+                        Button(action: { Task { await saveTour() } }) {
                             Text(isSaving ? "Saving..." : "Continue")
                                 .fontWeight(.semibold)
                                 .frame(width: 200, height: 44)
@@ -74,7 +59,6 @@ struct NewTourFlowView: View {
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color.gray.opacity(0.05))
                                 .frame(width: 200, height: 240)
-
                             if let img = posterImage {
                                 Image(nsImage: img)
                                     .resizable()
@@ -93,25 +77,18 @@ struct NewTourFlowView: View {
                                 }
                             }
                         }
-                        .onTapGesture {
-                            selectPoster()
-                        }
+                        .onTapGesture { selectPoster() }
                     }
                     .padding(.top, 40)
                 }
 
                 Divider()
 
-                if let tourID = newTourID {
+                if let tourID = newTourID, let userID = appState.userID {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Add Shows")
-                            .font(.headline)
-                        ShowGridView(tourID: tourID)
+                        Text("Add Shows").font(.headline)
+                        ShowGridView(tourID: tourID, userID: userID)
                     }
-
-                    Divider()
-
-                    AddCrewSectionView(crewMembers: $crewMembers)
                 }
 
                 Spacer()
@@ -134,8 +111,10 @@ struct NewTourFlowView: View {
     }
 
     func saveTour() async {
+        guard let userID = appState.userID else { return }
         isSaving = true
         let db = Firestore.firestore()
+
         var tourData: [String: Any] = [
             "tourName": tourName,
             "artist": artistName,
@@ -155,20 +134,9 @@ struct NewTourFlowView: View {
                 tourData["posterURL"] = posterURL
             }
 
-            let ref = try await db.collection("tours").addDocument(data: tourData)
+            let ref = try await db.collection("users").document(userID).collection("tours").addDocument(data: tourData)
             newTourID = ref.documentID
 
-            let model = TourModel(
-                id: ref.documentID,
-                name: tourName,
-                artist: artistName,
-                startDate: startDate,
-                endDate: endDate,
-                createdAt: Date(),
-                posterURL: posterURL
-            )
-
-            OfflineSyncManager.shared.upsertTour(model)
         } catch {
             print("❌ Error saving tour: \(error.localizedDescription)")
         }
@@ -176,28 +144,3 @@ struct NewTourFlowView: View {
         isSaving = false
     }
 }
-
-struct CustomTextField: View {
-    var placeholder: String
-    @Binding var text: String
-
-    var body: some View {
-        ZStack(alignment: .leading) {
-            if text.isEmpty {
-                Text(placeholder)
-                    .foregroundColor(.gray)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 12)
-            }
-
-            TextField("", text: $text)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
-                .background(Color.clear)
-                .textFieldStyle(PlainTextFieldStyle())
-        }
-        .background(Color.gray.opacity(0.05))
-        .cornerRadius(8)
-    }
-}
-

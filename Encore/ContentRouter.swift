@@ -5,9 +5,9 @@ struct ContentRouter: View {
 
     var body: some View {
         if appState.isLoggedIn {
-            SidebarContainerView(appState: appState)
+            SidebarContainerView()
         } else {
-            SignInView(appState: appState)
+            SignInView()
         }
     }
 }

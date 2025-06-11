@@ -7,16 +7,12 @@ struct EncoreApp: App {
 
     init() {
         FirebaseApp.configure()
-        print("✅ Firebase initialized.")
     }
 
     var body: some Scene {
         WindowGroup {
-            if appState.isLoggedIn {
-                SidebarContainerView(appState: appState)
-            } else {
-                SignInView(appState: appState)
-            }
+            ContentRouter()
+                .environmentObject(appState)
         }
     }
 }

@@ -3,8 +3,9 @@ import FirebaseFirestore
 
 struct ShowGridView: View {
     var tourID: String
+    var userID: String
     @State private var shows: [ShowModel] = []
-    @State private var isShowingAddShow = false
+    @State private var isShowingAddShowView = false
 
     let columns = [
         GridItem(.flexible(), spacing: 20),
@@ -20,9 +21,14 @@ struct ShowGridView: View {
                 LazyVGrid(columns: columns, spacing: 20) {
                     ForEach(shows) { show in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(show.city).font(.headline)
+                            if let country = show.country, !country.isEmpty {
+                                Text(country).font(.headline)
+                            } else {
+                                Text(show.city).font(.headline)
+                            }
                             Text(show.venue).font(.subheadline).foregroundColor(.secondary)
-                            Text(show.date.formatted(date: .abbreviated, time: .omitted)).font(.body)
+                            Text(show.date.formatted(date: .abbreviated, time: .omitted))
+                                .font(.body).foregroundColor(.primary)
                         }
                         .frame(maxWidth: .infinity, minHeight: 160)
                         .padding()
@@ -30,7 +36,7 @@ struct ShowGridView: View {
                         .cornerRadius(12)
                     }
 
-                    Button(action: { isShowingAddShow = true }) {
+                    Button(action: { isShowingAddShowView = true }) {
                         VStack(spacing: 12) {
                             Image(systemName: "plus").font(.system(size: 24, weight: .medium))
                             Text("Add Show").font(.headline)
@@ -45,18 +51,21 @@ struct ShowGridView: View {
                 .padding(.horizontal)
             }
         }
-        .sheet(isPresented: $isShowingAddShow) {
-            AddShowView(tourID: tourID, onSave: loadShows)
+        .sheet(isPresented: $isShowingAddShowView) {
+            AddShowView(tourID: tourID, userID: userID) {
+                loadShows()
+            }
         }
         .onAppear { loadShows() }
     }
 
-    func loadShows() {
+    private func loadShows() {
         let db = Firestore.firestore()
-        db.collection("tours").document(tourID).collection("shows").order(by: "date").getDocuments { snapshot, error in
-            if let docs = snapshot?.documents {
-                self.shows = docs.compactMap { ShowModel(from: $0) }
+        db.collection("users").document(userID).collection("tours").document(tourID).collection("shows")
+            .order(by: "date").getDocuments { snapshot, error in
+                if let docs = snapshot?.documents {
+                    self.shows = docs.compactMap { ShowModel(from: $0) }
+                }
             }
-        }
     }
 }

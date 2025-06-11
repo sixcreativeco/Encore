@@ -2,6 +2,7 @@ import SwiftUI
 import FirebaseFirestore
 
 struct TourDetailView: View {
+    @EnvironmentObject var appState: AppState
     var tour: TourModel
 
     @State private var shows: [ShowModel] = []
@@ -12,7 +13,6 @@ struct TourDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
             Text(tour.name).font(.largeTitle.bold())
-
             Divider()
 
             VStack(alignment: .leading, spacing: 16) {
@@ -21,7 +21,6 @@ struct TourDetailView: View {
                     Spacer()
                     Button("+ Add Show") { showingAddShow = true }
                 }
-
                 if shows.isEmpty {
                     Text("No shows yet.").foregroundColor(.gray)
                 } else {
@@ -43,14 +42,12 @@ struct TourDetailView: View {
                     Spacer()
                     Button("+ Add Day") { showingAddItinerary = true }
                 }
-
                 if itineraries.isEmpty {
                     Text("No itineraries yet.").foregroundColor(.gray)
                 } else {
                     ForEach(itineraries) { day in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(day.date.formatted(date: .abbreviated, time: .omitted))
-                                .font(.headline)
+                            Text(day.date.formatted(date: .abbreviated, time: .omitted)).font(.headline)
                         }
                         .padding(.vertical, 4)
                     }
@@ -65,24 +62,28 @@ struct TourDetailView: View {
             loadItineraries()
         }
         .sheet(isPresented: $showingAddShow) {
-            AddShowView(tourID: tour.id) { loadShows() }
+            AddShowView(tourID: tour.id, userID: appState.userID ?? "", onSave: { loadShows() })
         }
         .sheet(isPresented: $showingAddItinerary) {
-            NewItineraryDayView(tourID: tour.id) { loadItineraries() }
+            NewItineraryDayView(tourID: tour.id, userID: appState.userID ?? "", onSave: { loadItineraries() })
         }
     }
 
     private func loadShows() {
+        guard let userID = appState.userID else { return }
         let db = Firestore.firestore()
-        db.collection("tours").document(tour.id).collection("shows").order(by: "date").getDocuments { snapshot, _ in
-            self.shows = snapshot?.documents.compactMap { ShowModel(from: $0) } ?? []
-        }
+        db.collection("users").document(userID).collection("tours").document(tour.id).collection("shows")
+            .order(by: "date").getDocuments { snapshot, _ in
+                self.shows = snapshot?.documents.compactMap { ShowModel(from: $0) } ?? []
+            }
     }
 
     private func loadItineraries() {
+        guard let userID = appState.userID else { return }
         let db = Firestore.firestore()
-        db.collection("tours").document(tour.id).collection("itineraries").order(by: "date").getDocuments { snapshot, _ in
-            self.itineraries = snapshot?.documents.compactMap { ItineraryDayModel(from: $0) } ?? []
-        }
+        db.collection("users").document(userID).collection("tours").document(tour.id).collection("itineraries")
+            .order(by: "date").getDocuments { snapshot, _ in
+                self.itineraries = snapshot?.documents.compactMap { ItineraryDayModel(from: $0) } ?? []
+            }
     }
 }
