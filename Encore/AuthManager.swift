@@ -6,7 +6,7 @@ import GoogleSignIn
 import AppKit
 
 class AuthManager: ObservableObject {
-    
+
     static let shared = AuthManager()
     private init() {
         if FirebaseApp.app() == nil {
@@ -14,42 +14,41 @@ class AuthManager: ObservableObject {
         }
         self.user = Auth.auth().currentUser
     }
-    
+
     @Published var user: User?
-    
+
     func handleGoogleSignIn(presentingWindow: NSWindow, appState: AppState) async {
         let config = GIDConfiguration(clientID: FirebaseApp.app()?.options.clientID ?? "")
         GIDSignIn.sharedInstance.configuration = config
-        
+
         guard let result = try? await GIDSignIn.sharedInstance.signIn(withPresenting: presentingWindow) else { return }
         guard let idToken = result.user.idToken?.tokenString else { return }
-        
+
         let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: result.user.accessToken.tokenString)
-        
+
         do {
             let authResult = try await Auth.auth().signIn(with: credential)
             self.user = authResult.user
-            
+
             DispatchQueue.main.async {
-                appState.isLoggedIn = true
                 appState.userID = authResult.user.uid
             }
-            
+
             await self.createUserDocumentIfNeeded(userID: authResult.user.uid)
-            
+
         } catch {
             print("❌ Firebase Sign In Failed: \(error.localizedDescription)")
         }
     }
-    
+
     private func createUserDocumentIfNeeded(userID: String) async {
         let db = Firestore.firestore()
         let ref = db.collection("users").document(userID)
-        
+
         do {
             let document = try await ref.getDocument()
             if document.exists { return }
-            
+
             let userData: [String: Any] = [
                 "uid": userID,
                 "email": self.user?.email ?? "",
@@ -58,18 +57,17 @@ class AuthManager: ObservableObject {
             ]
             try await ref.setData(userData)
             print("✅ User document created")
-            
+
         } catch {
             print("❌ Failed creating user document: \(error.localizedDescription)")
         }
     }
-    
+
     func signOut(appState: AppState) {
         do {
             try Auth.auth().signOut()
             self.user = nil
             DispatchQueue.main.async {
-                appState.isLoggedIn = false
                 appState.userID = nil
             }
         } catch {

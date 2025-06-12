@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		EF21B63E2DF9479600C9C916 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = EF21B63D2DF9479600C9C916 /* GoogleSignIn */; };
 		EF21B6402DF9479600C9C916 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = EF21B63F2DF9479600C9C916 /* GoogleSignInSwift */; };
+		EF56FFD52DFA150A00AA14F3 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */; };
 		EFA43B892DEC9A11004781D4 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = EFA43B882DEC9A11004781D4 /* FirebaseAuth */; };
 		EFA43B8B2DEC9A11004781D4 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = EFA43B8A2DEC9A11004781D4 /* FirebaseCore */; };
 		EFA43B8D2DEC9A11004781D4 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = EFA43B8C2DEC9A11004781D4 /* FirebaseFirestore */; };
@@ -74,6 +75,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EF56FFD52DFA150A00AA14F3 /* SDWebImageSwiftUI in Frameworks */,
 				EF21B63E2DF9479600C9C916 /* GoogleSignIn in Frameworks */,
 				EFA43B8B2DEC9A11004781D4 /* FirebaseCore in Frameworks */,
 				EFA43BA82DEEB572004781D4 /* FirebaseStorage in Frameworks */,
@@ -146,6 +148,7 @@
 				EFA43BA72DEEB572004781D4 /* FirebaseStorage */,
 				EF21B63D2DF9479600C9C916 /* GoogleSignIn */,
 				EF21B63F2DF9479600C9C916 /* GoogleSignInSwift */,
+				EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */,
 			);
 			productName = Encore;
 			productReference = EFA43B5C2DEC967E004781D4 /* Encore.app */;
@@ -232,6 +235,7 @@
 			packageReferences = (
 				EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				EF21B63C2DF9479600C9C916 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				EF56FFD32DFA150A00AA14F3 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EFA43B5D2DEC967E004781D4 /* Products */;
@@ -597,6 +601,14 @@
 				minimumVersion = 8.0.0;
 			};
 		};
+		EF56FFD32DFA150A00AA14F3 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SDWebImage/SDWebImageSwiftUI";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.1.3;
+			};
+		};
 		EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -617,6 +629,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EF21B63C2DF9479600C9C916 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EF56FFD32DFA150A00AA14F3 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
+			productName = SDWebImageSwiftUI;
 		};
 		EFA43B882DEC9A11004781D4 /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;

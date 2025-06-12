@@ -4,10 +4,11 @@ struct ContentRouter: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        if appState.isLoggedIn {
-            SidebarContainerView()
+        if appState.userID == nil {
+            SignInView(appState: _appState)
         } else {
-            SignInView()
+            TourListView()
+                .environmentObject(appState)
         }
     }
 }

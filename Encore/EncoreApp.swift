@@ -11,8 +11,13 @@ struct EncoreApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentRouter()
-                .environmentObject(appState)
+            if appState.userID == nil {
+                SignInView()
+                    .environmentObject(appState)
+            } else {
+                SidebarContainerView()
+                    .environmentObject(appState)
+            }
         }
     }
 }

@@ -9,72 +9,65 @@ struct ShowGridView: View {
     @State private var shows: [ShowModel] = []
     @State private var isShowingAddShowView = false
 
-    let columns = [
+    private let columns = [
         GridItem(.flexible(), spacing: 20),
         GridItem(.flexible(), spacing: 20),
         GridItem(.flexible(), spacing: 20)
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Shows")
-                .font(.title2.bold())
-                .padding(.horizontal)
+                .font(.headline)
 
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 20) {
-                    ForEach(shows) { show in
-                        VStack(alignment: .leading, spacing: 6) {
-                            if let country = show.country, !country.isEmpty {
-                                Text(country).font(.headline)
-                            } else {
-                                Text(show.city).font(.headline)
-                            }
-                            Text(show.venue).font(.subheadline).foregroundColor(.secondary)
-                            Text(show.date.formatted(date: .abbreviated, time: .omitted))
-                                .font(.body).foregroundColor(.primary)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 160)
-                        .padding()
-                        .background(Color.gray.opacity(0.05))
-                        .cornerRadius(12)
+            LazyVGrid(columns: columns, spacing: 20) {
+                ForEach(shows) { show in
+                    VStack {
+                        Text(show.city)
+                            .font(.headline)
+                        Text(show.venue)
+                            .font(.subheadline)
+                        Text(show.date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption)
                     }
-
-                    Button(action: { isShowingAddShowView = true }) {
-                        VStack(spacing: 12) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 24, weight: .medium))
-                            Text("Add Show").font(.headline)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 160)
-                        .padding()
-                        .background(Color.gray.opacity(0.05))
-                        .cornerRadius(12)
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.gray.opacity(0.15))
+                    .cornerRadius(12)
                 }
-                .padding(.horizontal)
+
+                Button(action: {
+                    isShowingAddShowView = true
+                }) {
+                    VStack {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 40))
+                        Text("Add Show")
+                    }
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.gray.opacity(0.10))
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal)
         }
         .sheet(isPresented: $isShowingAddShowView) {
-            AddShowView(
-                tourID: tourID,
-                userID: userID,
-                artistName: artistName
-            ) {
+            AddShowView(tourID: tourID, userID: userID, artistName: artistName) {
                 loadShows()
             }
         }
-        .onAppear { loadShows() }
+        .onAppear {
+            loadShows()
+        }
     }
 
     private func loadShows() {
         let db = Firestore.firestore()
         db.collection("users").document(userID).collection("tours").document(tourID).collection("shows")
-            .order(by: "date").getDocuments { snapshot, error in
-                if let docs = snapshot?.documents {
-                    self.shows = docs.compactMap { ShowModel(from: $0) }
-                }
+            .order(by: "date")
+            .getDocuments { snapshot, _ in
+                self.shows = snapshot?.documents.compactMap { ShowModel(from: $0) } ?? []
             }
     }
 }

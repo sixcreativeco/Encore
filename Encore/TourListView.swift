@@ -14,7 +14,8 @@ struct TourListView: View {
                         Text("Upcoming").font(.title2.bold()).padding(.horizontal)
                         LazyHGrid(rows: [GridItem(.fixed(260))], spacing: 16) {
                             ForEach(upcomingTours) { tour in
-                                TourCard(tour: tour).onTapGesture { selectedTour = tour }
+                                TourCard(tour: tour)
+                                    .onTapGesture { selectedTour = tour }
                             }
                         }
                         .frame(height: 300)
@@ -25,7 +26,8 @@ struct TourListView: View {
                         Text("Past Tours").font(.title2.bold()).padding(.horizontal)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
                             ForEach(pastTours) { tour in
-                                TourCard(tour: tour).onTapGesture { selectedTour = tour }
+                                TourCard(tour: tour)
+                                    .onTapGesture { selectedTour = tour }
                             }
                         }
                         .padding(.horizontal)
@@ -35,7 +37,7 @@ struct TourListView: View {
             .navigationDestination(item: $selectedTour) { tour in
                 TourDetailView(tour: tour)
             }
-            .onAppear(perform: loadTours)
+            .onAppear { loadTours() }
         }
     }
 
@@ -50,10 +52,9 @@ struct TourListView: View {
     func loadTours() {
         guard let userID = appState.userID else { return }
         let db = Firestore.firestore()
-        db.collection("users").document(userID).collection("tours").getDocuments { snapshot, error in
-            if let documents = snapshot?.documents {
-                self.tours = documents.compactMap { TourModel(from: $0) }
+        db.collection("users").document(userID).collection("tours")
+            .order(by: "startDate").getDocuments { snapshot, _ in
+                self.tours = snapshot?.documents.compactMap { TourModel(from: $0) } ?? []
             }
-        }
     }
 }
