@@ -17,18 +17,14 @@ struct ShowGridView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Shows")
-                .font(.headline)
+            Text("Shows").font(.headline)
 
             LazyVGrid(columns: columns, spacing: 20) {
                 ForEach(shows) { show in
                     VStack {
-                        Text(show.city)
-                            .font(.headline)
-                        Text(show.venue)
-                            .font(.subheadline)
-                        Text(show.date.formatted(date: .abbreviated, time: .omitted))
-                            .font(.caption)
+                        Text(show.city).font(.headline)
+                        Text(show.venue).font(.subheadline)
+                        Text(show.date.formatted(date: .abbreviated, time: .omitted)).font(.caption)
                     }
                     .frame(height: 120)
                     .frame(maxWidth: .infinity)
@@ -36,9 +32,7 @@ struct ShowGridView: View {
                     .cornerRadius(12)
                 }
 
-                Button(action: {
-                    isShowingAddShowView = true
-                }) {
+                Button(action: { isShowingAddShowView = true }) {
                     VStack {
                         Image(systemName: "plus.circle.fill").font(.system(size: 40))
                         Text("Add Show")
@@ -54,12 +48,12 @@ struct ShowGridView: View {
         }
         .sheet(isPresented: $isShowingAddShowView) {
             AddShowView(tourID: tourID, userID: userID, artistName: artistName) {
-                loadShows()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    loadShows()
+                }
             }
         }
-        .onAppear {
-            loadShows()
-        }
+        .onAppear { loadShows() }
     }
 
     private func loadShows() {

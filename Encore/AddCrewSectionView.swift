@@ -1,7 +1,10 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct AddCrewSectionView: View {
-    @Binding var crewMembers: [CrewMember]
+    let tourID: String
+
+    @State private var crewMembers: [CrewMember] = []
     @State private var newCrewName: String = ""
     @State private var newCrewEmail: String = ""
     @State private var roleInput: String = ""
@@ -29,45 +32,20 @@ struct AddCrewSectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Add Crew")
-                .font(.headline)
-
-            ForEach(crewMembers) { member in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(member.name) • \(member.roles.joined(separator: ", "))")
-                        .font(.subheadline)
-                    if !member.email.isEmpty {
-                        Text(member.email)
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                }
-                .padding(8)
-                .background(Color.gray.opacity(0.05))
-                .cornerRadius(8)
-            }
-
-            Divider().padding(.vertical, 8)
+            Text("Add Crew").font(.headline)
 
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    // Tag-style roles input
                     ZStack(alignment: .topLeading) {
                         VStack(spacing: 0) {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
                                     ForEach(selectedRoles, id: \.self) { role in
                                         HStack(spacing: 6) {
-                                            Text(role)
-                                                .font(.subheadline)
-                                            Button(action: {
-                                                selectedRoles.removeAll { $0 == role }
-                                            }) {
-                                                Image(systemName: "xmark")
-                                                    .font(.system(size: 10, weight: .bold))
-                                                    .foregroundColor(.gray)
+                                            Text(role).font(.subheadline)
+                                            Button(action: { selectedRoles.removeAll { $0 == role } }) {
+                                                Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).foregroundColor(.gray)
                                             }
-                                            .buttonStyle(PlainButtonStyle())
                                         }
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
@@ -101,7 +79,6 @@ struct AddCrewSectionView: View {
                                                 .frame(maxWidth: .infinity, alignment: .leading)
                                                 .padding(8)
                                         }
-                                        .buttonStyle(PlainButtonStyle())
                                     }
                                 }
                                 .background(Color.white)
@@ -116,17 +93,7 @@ struct AddCrewSectionView: View {
                     CustomTextField(placeholder: "Email", text: $newCrewEmail)
                 }
 
-                Button(action: {
-                    let name = newCrewName.trimmingCharacters(in: .whitespaces)
-                    let email = newCrewEmail.trimmingCharacters(in: .whitespaces)
-                    guard !name.isEmpty && !selectedRoles.isEmpty else { return }
-
-                    crewMembers.append(CrewMember(name: name, roles: selectedRoles, email: email))
-                    newCrewName = ""
-                    newCrewEmail = ""
-                    roleInput = ""
-                    selectedRoles = []
-                }) {
+                Button(action: { saveCrewMember() }) {
                     HStack {
                         Image(systemName: "plus")
                         Text("Add Crew Member")
@@ -134,7 +101,71 @@ struct AddCrewSectionView: View {
                 }
                 .font(.subheadline)
             }
+
+            // Crew List
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(crewMembers, id: \.name) { member in
+                    VStack(alignment: .leading) {
+                        Text("\(member.name) • \(member.roles.joined(separator: ", "))").font(.subheadline)
+                        if !member.email.isEmpty {
+                            Text(member.email).font(.caption).foregroundColor(.gray)
+                        }
+                    }
+                    .padding(8)
+                    .background(Color.gray.opacity(0.05))
+                    .cornerRadius(8)
+                }
+            }
         }
         .padding(.top, 12)
+        .onAppear { loadCrew() }
+    }
+
+    private func saveCrewMember() {
+        guard !newCrewName.isEmpty, !selectedRoles.isEmpty else { return }
+
+        let db = Firestore.firestore()
+        let crewData: [String: Any] = [
+            "name": newCrewName.trimmingCharacters(in: .whitespaces),
+            "email": newCrewEmail.trimmingCharacters(in: .whitespaces),
+            "roles": selectedRoles,
+            "createdAt": Date()
+        ]
+
+        db.collection("users")
+            .document(AuthManager.shared.user?.uid ?? "")
+            .collection("tours")
+            .document(tourID)
+            .collection("crew")
+            .addDocument(data: crewData) { error in
+                if error == nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        loadCrew()
+                    }
+                }
+            }
+
+        newCrewName = ""
+        newCrewEmail = ""
+        roleInput = ""
+        selectedRoles = []
+    }
+
+    private func loadCrew() {
+        let db = Firestore.firestore()
+        db.collection("users")
+            .document(AuthManager.shared.user?.uid ?? "")
+            .collection("tours")
+            .document(tourID)
+            .collection("crew")
+            .getDocuments { snapshot, _ in
+                self.crewMembers = snapshot?.documents.compactMap { doc in
+                    let data = doc.data()
+                    let name = data["name"] as? String ?? ""
+                    let email = data["email"] as? String ?? ""
+                    let roles = data["roles"] as? [String] ?? []
+                    return CrewMember(name: name, roles: roles, email: email)
+                } ?? []
+            }
     }
 }

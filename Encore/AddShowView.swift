@@ -210,18 +210,11 @@ struct AddShowView: View {
         showRef.setData(showData)
 
         for sa in supportActs {
-            let saData: [String: Any] = [
-                "name": sa.name,
-                "type": sa.type,
-                "soundCheck": Timestamp(date: sa.soundCheck),
-                "setTime": Timestamp(date: sa.setTime),
-                "changeoverMinutes": sa.changeoverMinutes,
-                "createdAt": FieldValue.serverTimestamp()
-            ]
-            showRef.collection("supportActs").addDocument(data: saData)
+            let trimmedName = sa.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedName.isEmpty { continue } // ✅ Skip empty support acts
 
-            db.collection("users").document(userID).collection("tours").document(tourID).collection("supportActs").document(sa.name).setData([
-                "name": sa.name,
+            db.collection("users").document(userID).collection("tours").document(tourID).collection("supportActs").document(trimmedName).setData([
+                "name": trimmedName,
                 "type": sa.type,
                 "createdAt": FieldValue.serverTimestamp()
             ])
@@ -236,18 +229,5 @@ struct AddShowView: View {
         components.hour = hour
         components.minute = 0
         return Calendar.current.date(from: components) ?? Date()
-    }
-}
-
-extension Color {
-    init(hex: String) {
-        let scanner = Scanner(string: hex)
-        _ = scanner.scanString("#")
-        var rgb: UInt64 = 0
-        scanner.scanHexInt64(&rgb)
-        let r = Double((rgb >> 16) & 0xFF) / 255
-        let g = Double((rgb >> 8) & 0xFF) / 255
-        let b = Double(rgb & 0xFF) / 255
-        self.init(red: r, green: g, blue: b)
     }
 }

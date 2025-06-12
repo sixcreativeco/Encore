@@ -1,59 +1,64 @@
 import SwiftUI
 import FirebaseFirestore
+import SDWebImageSwiftUI
 
 struct TourListView: View {
     @EnvironmentObject var appState: AppState
+    var onTourSelected: ((TourModel) -> Void)? = nil
+
     @State private var tours: [TourModel] = []
-    @State private var selectedTour: TourModel? = nil
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 32) {
-                    if !upcomingTours.isEmpty {
-                        Text("Upcoming").font(.title2.bold()).padding(.horizontal)
-                        LazyHGrid(rows: [GridItem(.fixed(260))], spacing: 16) {
-                            ForEach(upcomingTours) { tour in
-                                TourCard(tour: tour)
-                                    .onTapGesture { selectedTour = tour }
+        ScrollView {
+            LazyVStack(spacing: 20) {
+                ForEach(tours) { tour in
+                    Button(action: {
+                        onTourSelected?(tour)
+                    }) {
+                        HStack(spacing: 16) {
+                            if let url = URL(string: tour.posterURL ?? "") {
+                                WebImage(url: url)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 60, height: 80)
+                                    .clipped()
+                                    .cornerRadius(8)
+                            } else {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 60, height: 80)
                             }
-                        }
-                        .frame(height: 300)
-                        .padding(.horizontal)
-                    }
 
-                    if !pastTours.isEmpty {
-                        Text("Past Tours").font(.title2.bold()).padding(.horizontal)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
-                            ForEach(pastTours) { tour in
-                                TourCard(tour: tour)
-                                    .onTapGesture { selectedTour = tour }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(tour.name)
+                                    .font(.headline)
+                                Text(tour.artist)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
                             }
+                            Spacer()
                         }
-                        .padding(.horizontal)
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(10)
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
-            .navigationDestination(item: $selectedTour) { tour in
-                TourDetailView(tour: tour)
-            }
-            .onAppear { loadTours() }
+            .padding()
+        }
+        .onAppear {
+            loadTours()
         }
     }
 
-    var upcomingTours: [TourModel] {
-        tours.filter { $0.startDate >= Date() }
-    }
-
-    var pastTours: [TourModel] {
-        tours.filter { $0.endDate < Date() }
-    }
-
-    func loadTours() {
+    private func loadTours() {
         guard let userID = appState.userID else { return }
         let db = Firestore.firestore()
+
         db.collection("users").document(userID).collection("tours")
-            .order(by: "startDate").getDocuments { snapshot, _ in
+            .order(by: "createdAt", descending: true)
+            .getDocuments { snapshot, _ in
                 self.tours = snapshot?.documents.compactMap { TourModel(from: $0) } ?? []
             }
     }

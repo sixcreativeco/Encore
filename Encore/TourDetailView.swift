@@ -9,17 +9,26 @@ struct TourDetailView: View {
     @State private var offsetY: CGFloat = 0
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                headerSection
-                crewSection
-                showsSection
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 24) {
+                    headerSection
+                        .frame(height: geometry.size.width > 800 ? 400 : 300)
+
+                    HStack(alignment: .top, spacing: 24) {
+                        crewSection
+                            .frame(maxWidth: geometry.size.width > 1000 ? 300 : .infinity, alignment: .leading)
+
+                        showsSection
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding()
             }
-            .padding()
-        }
-        .ignoresSafeArea()
-        .onAppear {
-            loadPosterOffset()
+            .ignoresSafeArea()
+            .onAppear {
+                loadPosterOffset()
+            }
         }
     }
 
@@ -31,7 +40,7 @@ struct TourDetailView: View {
                     WebImage(url: url)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: geo.size.width, height: 300)
+                        .frame(width: geo.size.width, height: geo.size.height)
                         .offset(y: offsetY)
                         .gesture(
                             DragGesture().onChanged { value in
@@ -52,10 +61,9 @@ struct TourDetailView: View {
                             .opacity(0.85)
                         )
                 } else {
-                    Color.gray.frame(height: 300)
+                    Color.gray.frame(height: geo.size.height)
                 }
             }
-            .frame(height: 300)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(tour.artist)
@@ -67,11 +75,10 @@ struct TourDetailView: View {
             }
             .padding()
         }
-        .frame(height: 300)
         .background(Color.black.opacity(0.7))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(radius: 10)
-        .padding(.top, 48)  // <-- Push it down to avoid safe area cut off
+        .padding(.top, -10)
     }
 
     // MARK: Crew Section
@@ -81,7 +88,6 @@ struct TourDetailView: View {
                 .font(.headline)
             Text("Tour Manager: Cam Noble")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: Shows Section

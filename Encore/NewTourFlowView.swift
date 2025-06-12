@@ -82,6 +82,10 @@ struct NewTourFlowView: View {
                     .padding(.top, 40)
                 }
 
+                if let tourID = newTourID {
+                    AddCrewSectionView(tourID: tourID)
+                }
+
                 Divider()
 
                 if let tourID = newTourID, let userID = appState.userID {
