@@ -27,6 +27,9 @@ struct AddShowView: View {
     @State private var packOut = defaultTime(hour: 23)
     @State private var packOutNextDay = false
 
+    @StateObject private var venueSearch = VenueSearchService()
+    @State private var venueQuery = ""
+
     struct SupportActInput: Identifiable {
         var id = UUID().uuidString
         var name = ""
@@ -75,14 +78,40 @@ struct AddShowView: View {
                     .padding(.leading, -40)
                 Spacer()
             }
+
+            VStack(alignment: .leading, spacing: 8) {
+                StyledInputField(placeholder: "Venue", text: $venueQuery)
+                    .onChange(of: venueQuery) { venueSearch.searchVenues(query: $0) }
+
+                if !venueSearch.results.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(venueSearch.results.prefix(5)) { result in
+                            Button(action: {
+                                venue = result.name
+                                address = result.address
+                                city = result.city
+                                country = result.country
+                                venueQuery = result.name
+                            }) {
+                                VStack(alignment: .leading) {
+                                    Text(result.name).font(.body)
+                                    Text(result.address).font(.caption).foregroundColor(.gray)
+                                }
+                            }
+                            .padding(8)
+                        }
+                    }
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+
             HStack(spacing: 16) {
                 StyledInputField(placeholder: "City", text: $city)
                 StyledInputField(placeholder: "Country (optional)", text: $country)
             }
-            HStack(spacing: 16) {
-                StyledInputField(placeholder: "Venue", text: $venue)
-                StyledInputField(placeholder: "Address", text: $address)
-            }
+
+            StyledInputField(placeholder: "Address", text: $address)
         }
     }
 
@@ -145,7 +174,6 @@ struct AddShowView: View {
                 }
                 Divider()
             }
-
             StyledButtonV2(title: "+ Add Support Act", action: { supportActs.append(SupportActInput()) }, showArrow: false, width: 200)
         }
     }
@@ -192,7 +220,7 @@ struct AddShowView: View {
         let showData: [String: Any] = [
             "city": city,
             "country": country,
-            "venue": venue,
+            "venue": venueQuery,
             "address": address,
             "date": Timestamp(date: date),
             "loadIn": Timestamp(date: loadIn),
@@ -211,8 +239,7 @@ struct AddShowView: View {
 
         for sa in supportActs {
             let trimmedName = sa.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedName.isEmpty { continue } // ✅ Skip empty support acts
-
+            if trimmedName.isEmpty { continue }
             db.collection("users").document(userID).collection("tours").document(tourID).collection("supportActs").document(trimmedName).setData([
                 "name": trimmedName,
                 "type": sa.type,

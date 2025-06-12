@@ -21,15 +21,18 @@ struct ShowGridView: View {
 
             LazyVGrid(columns: columns, spacing: 20) {
                 ForEach(shows) { show in
-                    VStack {
-                        Text(show.city).font(.headline)
-                        Text(show.venue).font(.subheadline)
-                        Text(show.date.formatted(date: .abbreviated, time: .omitted)).font(.caption)
+                    NavigationLink(destination: ShowDetailView(show: show)) {
+                        VStack {
+                            Text(show.city).font(.headline)
+                            Text(show.venue).font(.subheadline)
+                            Text(show.date.formatted(date: .abbreviated, time: .omitted)).font(.caption)
+                        }
+                        .frame(height: 120)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.gray.opacity(0.15))
+                        .cornerRadius(12)
                     }
-                    .frame(height: 120)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.gray.opacity(0.15))
-                    .cornerRadius(12)
+                    .buttonStyle(.plain)
                 }
 
                 Button(action: { isShowingAddShowView = true }) {
