@@ -1,7 +1,7 @@
 import Foundation
 import FirebaseFirestore
 
-struct ItineraryDayModel: Identifiable, Codable, Hashable {
+struct ItineraryDay: Identifiable, Codable, Hashable {
     var id: String
     var date: Date
     var notes: String?

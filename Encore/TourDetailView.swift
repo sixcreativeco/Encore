@@ -18,7 +18,7 @@ struct TourDetailView: View {
                     HStack(alignment: .top, spacing: 24) {
                         
                         ScrollView {
-                            TourItineraryView(tourID: tour.id)
+                            TourItineraryView(tourID: tour.id, userID: appState.userID ?? "")
                                 .padding(.trailing, 8)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }

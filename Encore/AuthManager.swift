@@ -71,7 +71,8 @@ class AuthManager: ObservableObject {
                 appState.userID = nil
             }
         } catch {
-            print("❌ Sign out failed: \(error.localizedDescription)")
+            print("❌ Firebase Sign In Failed: \(error.localizedDescription)")
+            print("Error details: \(error)")
         }
     }
 }

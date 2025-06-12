@@ -3,59 +3,83 @@ import FirebaseFirestore
 
 struct TourItineraryView: View {
     var tourID: String
+    var userID: String
 
-    // Mock data — you'll later replace with Firestore pull
-    @State private var itineraryItems: [ItineraryItem] = [
-        ItineraryItem(type: .flight, title: "MEL - MNL", time: "1:30PM", note: "50min stop at BWN"),
-        ItineraryItem(type: .arrival, title: "Arrive in Manila", time: "8:45PM", note: "Meet with driver at Arrivals"),
-        ItineraryItem(type: .loadIn, title: "Load In", time: "8:45PM", note: "Meet with driver at Arrivals")
-    ]
+    @State private var itineraryItems: [ItineraryItemModel] = []
+    @State private var showAddItem = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Itinerary", onAdd: {
-                // Add itinerary logic
-            })
-
-            ForEach(itineraryItems, id: \.self) { item in
-                ItineraryCard(item: item)
-            }
-        }
-    }
-}
-
-struct ItineraryItem: Hashable {
-    enum ItemType { case flight, arrival, loadIn }
-    var type: ItemType
-    var title: String
-    var time: String
-    var note: String
-}
-
-struct ItineraryCard: View {
-    var item: ItineraryItem
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                icon
-                Text(item.title).font(.headline)
+                Text("Itinerary").font(.title2.bold())
                 Spacer()
-                Text(item.time).font(.subheadline)
+                Button(action: { showAddItem = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 24))
+                }
             }
-            Text(item.note).font(.footnote).foregroundColor(.gray)
+
+            if itineraryItems.isEmpty {
+                Text("No items yet").foregroundColor(.gray)
+            } else {
+                ForEach(itineraryItems.sorted(by: { $0.time < $1.time })) { item in
+                    ItineraryItemCard(item: item)
+                }
+            }
         }
         .padding()
-        .background(Color(nsColor: .controlBackgroundColor))
-        .cornerRadius(12)
-        .shadow(radius: 1)
+        .onAppear(perform: loadItinerary)
+        .sheet(isPresented: $showAddItem) {
+            ItineraryItemAddView(tourID: tourID, userID: userID) {
+                loadItinerary()
+            }
+        }
     }
 
-    private var icon: some View {
-        switch item.type {
-        case .flight: return Image(systemName: "airplane").font(.title2)
-        case .arrival: return Image(systemName: "airplane.arrival").font(.title2)
-        case .loadIn: return Image(systemName: "truck").font(.title2)
+    private func loadItinerary() {
+        let db = Firestore.firestore()
+        let itineraryRef = db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary")
+
+        itineraryRef.getDocuments { snapshot, _ in
+            let documents = snapshot?.documents ?? []
+
+            if documents.isEmpty {
+                loadShowToSeed()
+            } else {
+                self.itineraryItems = documents.compactMap { ItineraryItemModel(from: $0) }
+            }
+        }
+    }
+
+    private func loadShowToSeed() {
+        let db = Firestore.firestore()
+        let showRef = db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").order(by: "date").limit(to: 1)
+
+        showRef.getDocuments { snapshot, _ in
+            guard let show = snapshot?.documents.first else { return }
+            let data = show.data()
+
+            var generatedItems: [ItineraryItemModel] = []
+
+            if let loadIn = (data["loadIn"] as? Timestamp)?.dateValue() {
+                generatedItems.append(ItineraryItemModel(type: .loadIn, title: "Load In", time: loadIn))
+            }
+            if let soundCheck = (data["soundCheck"] as? Timestamp)?.dateValue() {
+                generatedItems.append(ItineraryItemModel(type: .soundcheck, title: "Soundcheck", time: soundCheck))
+            }
+            if let doors = (data["doorsOpen"] as? Timestamp)?.dateValue() {
+                generatedItems.append(ItineraryItemModel(type: .doors, title: "Doors Open", time: doors))
+            }
+            if let packOut = (data["packOut"] as? Timestamp)?.dateValue() {
+                generatedItems.append(ItineraryItemModel(type: .packOut, title: "Pack Out", time: packOut))
+            }
+
+            self.itineraryItems = generatedItems
+
+            // Save them to Firestore for persistence
+            for item in generatedItems {
+                db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary").document(item.id).setData(item.toFirestore())
+            }
         }
     }
 }
