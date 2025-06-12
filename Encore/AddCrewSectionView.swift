@@ -164,7 +164,7 @@ struct AddCrewSectionView: View {
                     let name = data["name"] as? String ?? ""
                     let email = data["email"] as? String ?? ""
                     let roles = data["roles"] as? [String] ?? []
-                    return CrewMember(name: name, roles: roles, email: email)
+                    return CrewMember(name: name, email: email, roles: roles)
                 } ?? []
             }
     }

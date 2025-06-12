@@ -10,7 +10,6 @@ struct TourModel: Identifiable, Hashable, Codable {
     var createdAt: Date
     var posterURL: String?
 
-    // Firestore snapshot initializer
     init?(from document: DocumentSnapshot) {
         let data = document.data()
         guard
@@ -32,7 +31,6 @@ struct TourModel: Identifiable, Hashable, Codable {
         self.posterURL = data?["posterURL"] as? String
     }
 
-    // Manual initializer for local-only usage or test data
     init(id: String, name: String, artist: String, startDate: Date, endDate: Date, createdAt: Date, posterURL: String? = nil) {
         self.id = id
         self.name = name
