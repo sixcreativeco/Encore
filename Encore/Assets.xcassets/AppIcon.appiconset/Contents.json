@@ -1,61 +1,61 @@
 {
   "images" : [
     {
-      "filename" : "Encore16.png",
+      "filename" : "EncoreIcon16.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "16x16"
     },
     {
-      "filename" : "Encore32.png",
+      "filename" : "EncoreIcon32.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "16x16"
     },
     {
-      "filename" : "Encore32 1.png",
+      "filename" : "EncoreIcon32 1.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "32x32"
     },
     {
-      "filename" : "Encore64.png",
+      "filename" : "EncoreIcon64.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "32x32"
     },
     {
-      "filename" : "Encore128.png",
+      "filename" : "EncoreIcon128.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "128x128"
     },
     {
-      "filename" : "Encore256.png",
+      "filename" : "EncoreIcon256 1.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "128x128"
     },
     {
-      "filename" : "Encore256 1.png",
+      "filename" : "EncoreIcon256.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "256x256"
     },
     {
-      "filename" : "Encore512.png",
+      "filename" : "EncoreIcon512 1.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "256x256"
     },
     {
-      "filename" : "Encore512 1.png",
+      "filename" : "EncoreIcon512.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "512x512"
     },
     {
-      "filename" : "Encore1024.png",
+      "filename" : "EncoreIcon1024.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "512x512"
