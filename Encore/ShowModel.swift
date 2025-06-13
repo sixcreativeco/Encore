@@ -55,6 +55,17 @@ struct ShowModel: Identifiable, Codable, Hashable {
         self.soundCheck = (data?["soundCheck"] as? Timestamp)?.dateValue()
         self.doorsOpen = (data?["doorsOpen"] as? Timestamp)?.dateValue()
 
+        // Pull headliner fields correctly
+        if let headlinerSoundCheck = (data?["headlinerSoundCheck"] as? Timestamp)?.dateValue(),
+           let headlinerSetTime = (data?["headlinerSetTime"] as? Timestamp)?.dateValue(),
+           let headlinerSetDurationMinutes = data?["headlinerSetDurationMinutes"] as? Int {
+            self.headliner = Headliner(
+                soundCheck: headlinerSoundCheck,
+                setTime: headlinerSetTime,
+                setDurationMinutes: headlinerSetDurationMinutes
+            )
+        }
+
         self.packOut = (data?["packOut"] as? Timestamp)?.dateValue()
         self.packOutNextDay = data?["packOutNextDay"] as? Bool ?? false
     }

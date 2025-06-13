@@ -21,7 +21,7 @@ struct ShowGridView: View {
 
             LazyVGrid(columns: columns, spacing: 20) {
                 ForEach(shows) { show in
-                    NavigationLink(destination: ShowDetailView(show: show)) {
+                    NavigationLink(destination: ShowDetailView(show: show, userID: userID, tourID: tourID)) {
                         VStack {
                             Text(show.city).font(.headline)
                             Text(show.venue).font(.subheadline)

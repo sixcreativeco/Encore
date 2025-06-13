@@ -1,6 +1,6 @@
 import Foundation
-import FirebaseCore
-import FirebaseAuth
+@preconcurrency import FirebaseCore
+@preconcurrency import FirebaseAuth
 import FirebaseFirestore
 import GoogleSignIn
 import AppKit
