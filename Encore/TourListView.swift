@@ -1,51 +1,85 @@
 import SwiftUI
 import FirebaseFirestore
-import SDWebImageSwiftUI
 
 struct TourListView: View {
     @EnvironmentObject var appState: AppState
     var onTourSelected: ((TourModel) -> Void)? = nil
 
-    @State private var tours: [TourModel] = []
+    @State private var upcomingTours: [TourModel] = []
+    @State private var currentTours: [TourModel] = []
+    @State private var pastTours: [TourModel] = []
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 20) {
-                ForEach(tours) { tour in
-                    Button(action: {
-                        onTourSelected?(tour)
-                    }) {
-                        HStack(spacing: 16) {
-                            if let url = URL(string: tour.posterURL ?? "") {
-                                WebImage(url: url)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 60, height: 80)
-                                    .clipped()
-                                    .cornerRadius(8)
-                            } else {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 60, height: 80)
-                            }
+            VStack(alignment: .leading, spacing: 32) {
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(tour.name)
-                                    .font(.headline)
-                                Text(tour.artist)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
+                if !upcomingTours.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Upcoming")
+                            .font(.title2.bold())
+                            .padding(.horizontal)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(upcomingTours) { tour in
+                                    Button(action: {
+                                        onTourSelected?(tour)
+                                    }) {
+                                        TourCard(tour: tour)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
                             }
-                            Spacer()
+                            .padding(.horizontal)
                         }
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(10)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                }
+
+                if !currentTours.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Current Tours")
+                            .font(.title2.bold())
+                            .padding(.horizontal)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(currentTours) { tour in
+                                    Button(action: {
+                                        onTourSelected?(tour)
+                                    }) {
+                                        TourCard(tour: tour)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                }
+
+                if !pastTours.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Past Tours")
+                            .font(.title2.bold())
+                            .padding(.horizontal)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(pastTours) { tour in
+                                    Button(action: {
+                                        onTourSelected?(tour)
+                                    }) {
+                                        TourCard(tour: tour)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
                 }
             }
-            .padding()
+            .padding(.vertical)
         }
         .onAppear {
             loadTours()
@@ -57,9 +91,15 @@ struct TourListView: View {
         let db = Firestore.firestore()
 
         db.collection("users").document(userID).collection("tours")
-            .order(by: "createdAt", descending: true)
+            .order(by: "startDate", descending: false)
             .getDocuments { snapshot, _ in
-                self.tours = snapshot?.documents.compactMap { TourModel(from: $0) } ?? []
+                let tours = snapshot?.documents.compactMap { TourModel(from: $0) } ?? []
+
+                let today = Calendar.current.startOfDay(for: Date())
+
+                self.upcomingTours = tours.filter { $0.startDate > today }
+                self.currentTours  = tours.filter { $0.startDate <= today && $0.endDate >= today }
+                self.pastTours     = tours.filter { $0.endDate < today }.sorted { $0.endDate > $1.endDate }
             }
     }
 }

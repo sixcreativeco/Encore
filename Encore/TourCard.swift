@@ -4,41 +4,34 @@ struct TourCard: View {
     let tour: TourModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Poster Image
-            AsyncImage(url: URL(string: tour.posterURL ?? "")) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-            } placeholder: {
-                ZStack {
-                    Color.gray.opacity(0.1)
-                    Image(systemName: "photo")
-                        .foregroundColor(.gray)
-                        .font(.system(size: 24))
+        VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { geo in
+                AsyncImage(url: URL(string: tour.posterURL ?? "")) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .clipped()
+                } placeholder: {
+                    ZStack {
+                        Color.gray.opacity(0.1)
+                        Image(systemName: "photo")
+                            .foregroundColor(.gray)
+                            .font(.system(size: 24))
+                    }
                 }
+                .frame(width: geo.size.width, height: geo.size.width * 3 / 2)
+                .cornerRadius(8)
             }
-            .frame(height: 180)
-            .frame(maxWidth: .infinity)
-            .clipped()
-            .cornerRadius(10)
-
-            // Tour Info
-            Text(tour.name)
-                .font(.headline)
-                .foregroundColor(.primary)
+            .aspectRatio(2/3, contentMode: .fit)
 
             Text(tour.artist)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.primary)
 
-            Text("\(tour.startDate.formatted(date: .abbreviated, time: .omitted)) → \(tour.endDate.formatted(date: .abbreviated, time: .omitted))")
-                .font(.caption)
-                .foregroundColor(.gray)
+            Text(tour.name)
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.gray.opacity(0.05))
-        .cornerRadius(12)
+        .frame(width: 160)
     }
 }
