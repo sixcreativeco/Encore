@@ -7,23 +7,32 @@ struct TourItineraryView: View {
 
     @State private var itineraryItems: [ItineraryItemModel] = []
     @State private var showAddItem = false
+    @State private var selectedItemForEdit: ItineraryItemModel? = nil
+    @State private var expandedItemID: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Itinerary").font(.title2.bold())
-                Spacer()
-                Button(action: { showAddItem = true }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 24))
-                }
-            }
+            SectionHeader(title: "Itinerary", onAdd: {
+                showAddItem = true
+            })
 
             if itineraryItems.isEmpty {
-                Text("No items yet").foregroundColor(.gray)
+                Text("No items yet").foregroundColor(.gray).padding()
             } else {
-                ForEach(itineraryItems.sorted(by: { $0.time < $1.time })) { item in
-                    ItineraryItemCard(item: item)
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(itineraryItems.sorted(by: { $0.time < $1.time })) { item in
+                            ItineraryItemCard(
+                                item: item,
+                                isExpanded: expandedItemID == item.id,
+                                onExpandToggle: { toggleExpanded(item) },
+                                onEdit: { selectedItemForEdit = item },
+                                onDelete: { deleteItem(item) }
+                            )
+                            .animation(.easeInOut, value: expandedItemID)
+                        }
+                    }
+                    .padding(.vertical, 8)
                 }
             }
         }
@@ -32,6 +41,21 @@ struct TourItineraryView: View {
         .sheet(isPresented: $showAddItem) {
             ItineraryItemAddView(tourID: tourID, userID: userID) {
                 loadItinerary()
+            }
+        }
+        .sheet(item: $selectedItemForEdit) { item in
+            ItineraryItemEditView(tourID: tourID, userID: userID, item: item) {
+                loadItinerary()
+            }
+        }
+    }
+
+    private func toggleExpanded(_ item: ItineraryItemModel) {
+        withAnimation(.easeInOut) {
+            if expandedItemID == item.id {
+                expandedItemID = nil
+            } else {
+                expandedItemID = item.id
             }
         }
     }
@@ -49,6 +73,15 @@ struct TourItineraryView: View {
                 self.itineraryItems = documents.compactMap { ItineraryItemModel(from: $0) }
             }
         }
+    }
+
+    private func deleteItem(_ item: ItineraryItemModel) {
+        let db = Firestore.firestore()
+        db.collection("users").document(userID)
+            .collection("tours").document(tourID)
+            .collection("itinerary").document(item.id).delete { _ in
+                loadItinerary()
+            }
     }
 
     private func loadShowToSeed() {
@@ -76,7 +109,6 @@ struct TourItineraryView: View {
 
             self.itineraryItems = generatedItems
 
-            // Save them to Firestore for persistence
             for item in generatedItems {
                 db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary").document(item.id).setData(item.toFirestore())
             }

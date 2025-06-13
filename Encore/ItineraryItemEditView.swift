@@ -1,22 +1,35 @@
 import SwiftUI
 import FirebaseFirestore
 
-struct ItineraryItemAddView: View {
+struct ItineraryItemEditView: View {
     var tourID: String
     var userID: String
+    var item: ItineraryItemModel
     var onSave: () -> Void
 
     @Environment(\.dismiss) var dismiss
 
-    @State private var type: ItineraryItemType = .custom
-    @State private var title = ""
-    @State private var time = Date()
-    @State private var note = ""
+    @State private var type: ItineraryItemType
+    @State private var title: String
+    @State private var time: Date
+    @State private var note: String
+
+    init(tourID: String, userID: String, item: ItineraryItemModel, onSave: @escaping () -> Void) {
+        self.tourID = tourID
+        self.userID = userID
+        self.item = item
+        self.onSave = onSave
+
+        _type = State(initialValue: item.type)
+        _title = State(initialValue: item.title)
+        _time = State(initialValue: item.time)
+        _note = State(initialValue: item.note ?? "")
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
-                Text("Add Itinerary Item").font(.largeTitle.bold())
+                Text("Edit Itinerary Item").font(.largeTitle.bold())
                 Spacer()
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark")
@@ -41,7 +54,7 @@ struct ItineraryItemAddView: View {
             TextField("Note", text: $note)
                 .textFieldStyle(.roundedBorder)
 
-            Button("Save Item") {
+            Button("Save Changes") {
                 saveItem()
             }
             .frame(maxWidth: .infinity)
@@ -65,9 +78,9 @@ struct ItineraryItemAddView: View {
             "note": note
         ]
 
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary").addDocument(data: data) { error in
+        db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary").document(item.id).setData(data) { error in
             if let error = error {
-                print("Error adding itinerary item: \(error.localizedDescription)")
+                print("Error updating itinerary item: \(error.localizedDescription)")
             } else {
                 onSave()
                 dismiss()
