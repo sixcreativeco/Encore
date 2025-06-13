@@ -5,6 +5,7 @@ struct ShowGridView: View {
     var tourID: String
     var userID: String
     var artistName: String
+    var onShowSelected: (ShowModel) -> Void
 
     @State private var shows: [ShowModel] = []
     @State private var isShowingAddShowView = false
@@ -21,7 +22,7 @@ struct ShowGridView: View {
 
             LazyVGrid(columns: columns, spacing: 20) {
                 ForEach(shows) { show in
-                    NavigationLink(destination: ShowDetailView(show: show, userID: userID, tourID: tourID)) {
+                    Button(action: { onShowSelected(show) }) {
                         VStack {
                             Text(show.city).font(.headline)
                             Text(show.venue).font(.subheadline)

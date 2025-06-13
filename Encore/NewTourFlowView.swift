@@ -91,17 +91,26 @@ struct NewTourFlowView: View {
                 if let tourID = newTourID, let userID = appState.userID {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Add Shows").font(.headline)
-                        ShowGridView(tourID: tourID, userID: userID, artistName: tourName)
+                        ShowGridView(
+                            tourID: tourID,
+                            userID: userID,
+                            artistName: artistName,
+                            onShowSelected: { selectedShow in
+                                appState.selectedShow = selectedShow
+                            }
+                        )
+                        Spacer()
                     }
+                    .padding()
                 }
-
-                Spacer()
             }
-            .padding()
+            // SFC → CONTROL WHERE THE WHOLE SCREEN SHIFTS AWAY FROM SIDEBAR
+            .padding(.leading, 20)  // <--- Main control here
+            .padding(.trailing, 20)
         }
     }
 
-    func selectPoster() {
+    private func selectPoster() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.png, .jpeg]
         panel.canChooseFiles = true
@@ -114,7 +123,7 @@ struct NewTourFlowView: View {
         }
     }
 
-    func saveTour() async {
+    private func saveTour() async {
         guard let userID = appState.userID else { return }
         isSaving = true
         let db = Firestore.firestore()

@@ -16,13 +16,14 @@ struct ShowDetailView: View {
     @State private var showEditNotes = false
 
     var body: some View {
+        mainContent
+    }
+
+    private var mainContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
-
                 headerSection
-
                 Divider()
-
                 HStack(alignment: .top, spacing: 16) {
                     showTimingsPanel
                     guestListPanel
@@ -49,83 +50,76 @@ struct ShowDetailView: View {
         .navigationTitle("Show Details")
     }
 
-    // MARK: HEADER SECTION
-
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 32) {
+            GeometryReader { geo in
+                let totalWidth = geo.size.width
+                let mapWidth = max(min(800, totalWidth * 0.55), 320)
+                let dynamicSpacing = max(12, totalWidth * 0.04)
 
-            // City, Venue, Date block
-            HStack(alignment: .top, spacing: 40) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(show.date.formatted(date: .numeric, time: .omitted))
-                        .font(.system(size: 16))
-                        .foregroundColor(.gray)
-
-                    Text(show.city.uppercased())
-                        .font(.system(size: 42, weight: .bold))
-
-                    Text(show.venue)
-                        .font(.system(size: 22, weight: .medium))
-                        .foregroundColor(.gray)
-
-                    if let loadIn = show.loadIn {
-                        Label {
-                            Text("Load In Time: \(loadIn.formatted(date: .omitted, time: .shortened))")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.black)
-                        } icon: {
-                            Image(systemName: "truck")
-                                .font(.system(size: 13))
-                                .foregroundColor(.black)
+                HStack(alignment: .top, spacing: dynamicSpacing) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(show.date.formatted(date: .numeric, time: .omitted))
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray)
+                        Text(show.city.uppercased())
+                            .font(.system(size: 42, weight: .bold))
+                        Text(show.venue)
+                            .font(.system(size: 22, weight: .medium))
+                            .foregroundColor(.gray)
+                        if let loadIn = show.loadIn {
+                            Label {
+                                Text("Load In Time: \(loadIn.formatted(date: .omitted, time: .shortened))")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.black)
+                            } icon: {
+                                Image(systemName: "truck")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.black)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.gray.opacity(0.15))
+                            .cornerRadius(6)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.gray.opacity(0.15))
-                        .cornerRadius(6)
                     }
-                }
 
-                Spacer()
+                    Spacer()
 
-                Map(coordinateRegion: $mapRegion, annotationItems: annotationItems()) { item in
-                    MapMarker(coordinate: item.coordinate, tint: .red)
+                    Map(coordinateRegion: $mapRegion, annotationItems: annotationItems()) { item in
+                        MapMarker(coordinate: item.coordinate, tint: .red)
+                    }
+                    .cornerRadius(12)
+                    .frame(width: mapWidth, height: 180)
                 }
-                .cornerRadius(12)
-                .frame(width: 500, height: 180)
             }
+            .frame(height: 200)
 
-            // Contact Info + Buttons (2x1 layout)
             HStack(alignment: .top, spacing: 40) {
-
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 10) {
                         Image(systemName: "mappin.and.ellipse").font(.system(size: 18))
                         Text(show.address).font(.system(size: 16))
                     }
-
                     HStack(spacing: 10) {
                         Image(systemName: "phone").font(.system(size: 18))
                         Text("09 358 1250").font(.system(size: 16))
                     }
-
                     HStack(spacing: 10) {
                         Image(systemName: "person.fill").font(.system(size: 18))
                         Text("Venue Contact").font(.system(size: 16))
                     }
                 }
-
                 Spacer()
-
                 VStack(alignment: .trailing, spacing: 16) {
                     StyledActionButton(title: "Edit Show", icon: "pencil", color: .blue)
                     StyledActionButton(title: "Upload Documents", icon: "tray.and.arrow.up", color: .green)
                 }
             }
             .frame(maxWidth: .infinity)
+            .padding(.top, -12) // bring buttons closer to map
         }
     }
-
-    // MARK: PANELS
 
     private var showTimingsPanel: some View {
         VStack(alignment: .leading) {
@@ -222,8 +216,6 @@ struct ShowDetailView: View {
         .cornerRadius(10)
     }
 
-    // MARK: DATA LOADERS
-
     private func loadGuestList() {
         let db = Firestore.firestore()
         db.collection("users").document(userID).collection("tours").document(tourID)
@@ -240,8 +232,6 @@ struct ShowDetailView: View {
                 self.venueNotes = doc?.data()?["venueNotes"] as? String ?? ""
             }
     }
-
-    // MARK: MAP
 
     private func loadMapForAddress() {
         let searchRequest = MKLocalSearch.Request()
@@ -269,7 +259,6 @@ struct ShowDetailView: View {
     }
 }
 
-// MARK: StyledActionButton component
 struct StyledActionButton: View {
     let title: String
     let icon: String

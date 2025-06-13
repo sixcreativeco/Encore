@@ -13,7 +13,6 @@ struct TourDetailView: View {
                 TourSummaryCardsView(tourID: tour.id)
                     .environmentObject(appState)
                 
-                // Columns wrapped inside a GeometryReader to stabilize widths
                 GeometryReader { geometry in
                     HStack(alignment: .top, spacing: 24) {
                         
@@ -35,12 +34,18 @@ struct TourDetailView: View {
                         .frame(width: geometry.size.width * 0.35, height: 500)
                     }
                 }
-                .frame(height: 500) // total height of columns section
+                .frame(height: 500)
                 
-                // ShowGrid always appears after main section
                 if let userID = appState.userID {
-                    ShowGridView(tourID: tour.id, userID: userID, artistName: tour.artist)
-                        .frame(maxWidth: .infinity)
+                    ShowGridView(
+                        tourID: tour.id,
+                        userID: userID,
+                        artistName: tour.artist,
+                        onShowSelected: { selectedShow in
+                            appState.selectedShow = selectedShow
+                        }
+                    )
+                    .frame(maxWidth: .infinity)
                 }
             }
             .padding()

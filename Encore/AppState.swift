@@ -10,9 +10,10 @@ class AppState: ObservableObject {
             }
         }
     }
-    
+
     @Published var selectedTab: String = "Dashboard"
     @Published var selectedTour: TourModel? = nil
+    @Published var selectedShow: ShowModel? = nil
 
     init() {
         self.userID = UserDefaults.standard.string(forKey: "userID")
