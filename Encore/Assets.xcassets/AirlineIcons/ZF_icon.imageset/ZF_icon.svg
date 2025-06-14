@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.4.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 144.89 80" style="enable-background:new 0 0 144.89 80;" xml:space="preserve">
+<style type="text/css">
+	.z268c64c{fill:#003E69;}
+	.l5653b7b{fill:#CF003D;}
+	
+		.dca92814{clip-path:url(#SVGID_00000127746981679360545110000005067397091519790502_);fill:url(#rect29_00000009579617875086619880000002577305337381590423_);}
+</style>
+<g>
+	<g id="g8" transform="matrix(0.8186779,0,0,0.8186779,-15.175727,-182.88939)">
+		<path id="path4" class="z268c64c" d="M78.57,289.95c-7.67-11.34-18.73-17.86-30.29-17.86H18.54l21.09,31.11
+			c7.67,11.34,18.73,17.86,30.29,17.86h29.74L78.57,289.95z"/>
+		<path id="path6" class="l5653b7b" d="M162.59,223.4c-12.76,0-26.89,10.02-38.56,27.44L91.22,299.7l14.46,21.42h4.05
+			c12.76,0,26.89-10.02,38.56-27.44l47.22-70.28H162.59z"/>
+	</g>
+	<g id="g31" transform="matrix(0.8186779,0,0,0.8186779,-15.175727,-182.88939)">
+		<g>
+			<defs>
+				<path id="SVGID_1_" d="M162.59,223.4c-12.76,0-26.89,10.02-38.56,27.44L91.22,299.7l14.52,21.42h4.05
+					c12.76,0,26.89-10.02,38.56-27.44l47.16-70.28H162.59z"/>
+			</defs>
+			<clipPath id="SVGID_00000145760913100921294520000017895903610197642166_">
+				<use xlink:href="#SVGID_1_"  style="overflow:visible;"/>
+			</clipPath>
+			
+				<linearGradient id="rect29_00000137092037270963593660000006373018763663161764_" gradientUnits="userSpaceOnUse" x1="261.1819" y1="-600.27" x2="265.7286" y2="-600.27" gradientTransform="matrix(0 -55.1745 55.1745 0 33262.9492 14731.6348)">
+				<stop  offset="0" style="stop-color:#7B1215"/>
+				<stop  offset="5.500000e-03" style="stop-color:#7B1215"/>
+				<stop  offset="0.1279" style="stop-color:#880F16"/>
+				<stop  offset="0.3559" style="stop-color:#AC0919"/>
+				<stop  offset="0.5769" style="stop-color:#D4011C"/>
+				<stop  offset="1" style="stop-color:#D4011C"/>
+			</linearGradient>
+			
+				<rect id="rect29" x="91.22" y="223.4" style="clip-path:url(#SVGID_00000145760913100921294520000017895903610197642166_);fill:url(#rect29_00000137092037270963593660000006373018763663161764_);" width="104.29" height="97.66"/>
+		</g>
+	</g>
+</g>
+</svg>

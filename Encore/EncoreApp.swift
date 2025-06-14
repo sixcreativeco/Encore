@@ -4,6 +4,7 @@ import FirebaseCore
 @main
 struct EncoreApp: App {
     @StateObject private var appState = AppState()
+    @StateObject private var airportDataManager = AirportDataManager()
 
     init() {
         FirebaseApp.configure()
@@ -14,9 +15,11 @@ struct EncoreApp: App {
             if appState.userID == nil {
                 SignInView()
                     .environmentObject(appState)
+                    .environmentObject(airportDataManager)
             } else {
                 SidebarContainerView()
                     .environmentObject(appState)
+                    .environmentObject(airportDataManager)
             }
         }
     }

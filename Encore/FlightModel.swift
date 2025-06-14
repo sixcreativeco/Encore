@@ -5,8 +5,8 @@ struct FlightModel: Identifiable, Codable {
     var id: String = UUID().uuidString
     var airline: String
     var flightNumber: String
-    var departureAirport: String // <- 3-letter IATA code
-    var arrivalAirport: String   // <- 3-letter IATA code
+    var departureAirport: String
+    var arrivalAirport: String
     var departureTime: Date
 
     init(id: String = UUID().uuidString,
@@ -38,6 +38,10 @@ struct FlightModel: Identifiable, Codable {
         self.departureAirport = departureAirport
         self.arrivalAirport = arrivalAirport
         self.departureTime = timestamp.dateValue()
+    }
+
+    var airlineCode: String {
+        return String(flightNumber.prefix { $0.isLetter }).uppercased()
     }
 
     var departureTimeFormatted: String {

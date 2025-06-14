@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.4.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 199 80" style="enable-background:new 0 0 199 80;" xml:space="preserve">
+<style type="text/css">
+	.o83ce018{fill:url(#SVGID_1_);}
+	.ie47f056{fill:url(#SVGID_00000026884166667703248780000002176920063199982244_);}
+	.p2566c54{fill:#333334;}
+</style>
+<g id="Layer_1">
+</g>
+<g id="Layer_2">
+	<linearGradient id="SVGID_1_" gradientUnits="userSpaceOnUse" x1="41.3234" y1="19.6929" x2="41.3234" y2="78.0077">
+		<stop  offset="0" style="stop-color:#EFB243"/>
+		<stop  offset="0.3611" style="stop-color:#E88737"/>
+		<stop  offset="0.4234" style="stop-color:#E57135"/>
+		<stop  offset="0.5077" style="stop-color:#E15B33"/>
+		<stop  offset="0.5876" style="stop-color:#DF4D32"/>
+		<stop  offset="0.6575" style="stop-color:#DE4832"/>
+		<stop  offset="0.7558" style="stop-color:#A05259"/>
+		<stop  offset="0.8722" style="stop-color:#5C5D83"/>
+		<stop  offset="0.9566" style="stop-color:#32649E"/>
+		<stop  offset="0.9997" style="stop-color:#2267A8"/>
+	</linearGradient>
+	<path class="o83ce018" d="M45.2,75.9c0,0-9.8,2.6-13.8-2.6c-4-5.2-30.9-45.4-30.9-45.4s-1.7-2.2,1.2-2.2s29,0,29,0L82.6,54L45.2,75.9z"
+		/>
+	
+		<linearGradient id="SVGID_00000098925019038585650400000008536893388022718855_" gradientUnits="userSpaceOnUse" x1="-15.0696" y1="34.8699" x2="84.8475" y2="68.0031">
+		<stop  offset="0.6139" style="stop-color:#333334;stop-opacity:0"/>
+		<stop  offset="0.9382" style="stop-color:#333334"/>
+	</linearGradient>
+	<path style="fill:url(#SVGID_00000098925019038585650400000008536893388022718855_);" d="M45.2,75.9c0,0-9.8,2.6-13.8-2.6
+		c-4-5.2-30.9-45.4-30.9-45.4s-1.7-2.2,1.2-2.2s29,0,29,0L82.6,54L45.2,75.9z"/>
+	<path class="p2566c54" d="M45.2,75.9c0,0,30.4-4.8,58-1.6c27.6,3.3,48.7,9,53.5,3.1c4.8-5.9,41.9-74.9,41.9-74.9s2.1-2.6-2.9-2.6
+		c-5,0-39.5,1.4-39.5,1.4L45.2,75.9z"/>
+</g>
+</svg>

@@ -2,8 +2,11 @@ import SwiftUI
 
 struct TourFlightsView: View {
     var tourID: String
+
     @State private var flights: [FlightModel] = []
     @State private var showAddFlight = false
+    @State private var expandedFlightID: String? = nil
+    @State private var selectedFlightForEdit: FlightModel? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -21,12 +24,6 @@ struct TourFlightsView: View {
         }
     }
 
-    private func loadFlights() {
-        FirebaseFlightService.loadFlights(tourID: tourID) { loadedFlights in
-            self.flights = loadedFlights
-        }
-    }
-
     private var placeholderView: some View {
         Text("No flights yet.")
             .frame(maxWidth: .infinity)
@@ -38,24 +35,42 @@ struct TourFlightsView: View {
     private var flightList: some View {
         VStack(spacing: 12) {
             ForEach(flights) { flight in
-                FlightCardView(
-                    airlineName: flight.airline,
-                    flightCode: flight.flightNumber,
-                    departureIATA: flight.departureAirport,
-                    arrivalIATA: flight.arrivalAirport,
-                    departureTime: formattedTime(flight.departureTime),
-                    arrivalTime: "N/A",
-                    duration: "N/A",
-                    airlineLogo: Image(systemName: "airplane"),
-                    isDarkMode: true
+                FlightItemCard(
+                    flight: flight,
+                    isExpanded: expandedFlightID == flight.id,
+                    onExpandToggle: { toggleExpanded(flight) },
+                    onEdit: { /* Leave empty for now */ },
+                    onDelete: { deleteFlight(flight) }
                 )
+                .animation(.easeInOut, value: expandedFlightID)
             }
         }
     }
 
-    private func formattedTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: date)
+    private func toggleExpanded(_ flight: FlightModel) {
+        withAnimation {
+            if expandedFlightID == flight.id {
+                expandedFlightID = nil
+            } else {
+                expandedFlightID = flight.id
+            }
+        }
+    }
+
+    private func loadFlights() {
+        FirebaseFlightService.loadFlights(tourID: tourID) { loadedFlights in
+            self.flights = loadedFlights
+        }
+    }
+
+    private func deleteFlight(_ flight: FlightModel) {
+        let db = FirebaseFlightService.db
+        db.collection("tours")
+            .document(tourID)
+            .collection("flights")
+            .document(flight.id)
+            .delete { _ in
+                loadFlights()
+            }
     }
 }

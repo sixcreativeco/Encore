@@ -1,23 +1,24 @@
 import Foundation
 
-struct AirportModel: Codable, Identifiable, Hashable, CustomStringConvertible {
-    let id: String
-    let name: String
-    let iata: String
+struct Airport: Codable {
     let icao: String
-    let timezone: String
-    let location: Location
+    let iata: String
+    let name: String
     let city: String
+    let state: String
     let country: String
-    let countryCode: String
-    let region: String
-
-    var description: String {
-        "\(city) (\(iata)) – \(name)"
-    }
+    let elevation: Int
+    let lat: Double
+    let lon: Double
+    let tz: String
 }
 
-struct Location: Codable, Hashable {
-    let latitude: Double
-    let longitude: Double
+typealias AirportDictionary = [String: Airport]
+
+struct AirportEntry: Identifiable {
+    let id = UUID()
+    let name: String  // e.g. "Auckland International Airport (AKL)"
+    let iata: String
+    let city: String
+    let country: String
 }

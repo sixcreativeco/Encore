@@ -8,7 +8,6 @@ struct FlightCardView: View {
     let departureTime: String
     let arrivalTime: String
     let duration: String
-    let airlineLogo: Image
     let isDarkMode: Bool
 
     var body: some View {
@@ -18,8 +17,8 @@ struct FlightCardView: View {
                     .font(.caption)
                     .foregroundColor(.gray)
                 Spacer()
-                airlineLogo
-                    .font(.system(size: 18))
+                AirlineLogoView(airlineCode: extractAirlineCode(from: flightCode), isIcon: true)
+                    .frame(width: 40, height: 40)
             }
 
             Text("\(departureIATA) - \(arrivalIATA)")
@@ -38,5 +37,10 @@ struct FlightCardView: View {
         .padding()
         .background(isDarkMode ? Color.black : Color.white)
         .cornerRadius(14)
+    }
+
+    private func extractAirlineCode(from flightNumber: String) -> String {
+        let prefix = flightNumber.prefix { $0.isLetter }
+        return String(prefix)
     }
 }
