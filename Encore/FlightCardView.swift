@@ -17,7 +17,10 @@ struct FlightCardView: View {
                     .font(.caption)
                     .foregroundColor(.gray)
                 Spacer()
-                AirlineLogoView(airlineCode: extractAirlineCode(from: flightCode), isIcon: true)
+                let airlineCode = extractAirlineCode(from: flightCode)
+                Image("\(airlineCode)_icon")
+                    .resizable()
+                    .scaledToFit()
                     .frame(width: 40, height: 40)
             }
 

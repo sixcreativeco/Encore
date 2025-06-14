@@ -135,7 +135,6 @@ struct AddFlightView: View {
         formatter.dateFormat = "yyyy-MM-dd"
         let formattedDate = formatter.string(from: flightDate)
 
-        // This is your live FlightLabs call — adjust if needed
         FlightLabsAPI.fetchFutureFlights(depIATA: selectedAirport.iata, date: formattedDate) { result in
             DispatchQueue.main.async {
                 self.isLoading = false
@@ -179,7 +178,10 @@ struct AddFlightView: View {
             HStack {
                 Text("\(flight.airline) \(flight.flightNumber)").font(.headline)
                 Spacer()
-                AirlineLogoView(airlineCode: extractAirlineCode(from: flight.flightNumber), isIcon: true)
+                let airlineCode = extractAirlineCode(from: flight.flightNumber)
+                Image("\(airlineCode)_icon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: 40, height: 40)
             }
             Text("\(flight.departureAirport) → \(flight.arrivalAirport)").font(.subheadline)

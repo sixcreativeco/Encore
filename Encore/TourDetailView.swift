@@ -21,7 +21,7 @@ struct TourDetailView: View {
                                 .padding(.trailing, 8)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(width: geometry.size.width * 0.6, height: 500)
+                        .frame(width: geometry.size.width * 0.5, height: 500) // reduced from 0.6 to 0.5
                         
                         ScrollView {
                             VStack(spacing: 24) {
@@ -31,7 +31,7 @@ struct TourDetailView: View {
                             .padding(.leading, 8)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(width: geometry.size.width * 0.35, height: 500)
+                        .frame(width: geometry.size.width * 0.45, height: 500) // increased from 0.35 to 0.45
                     }
                 }
                 .frame(height: 500)

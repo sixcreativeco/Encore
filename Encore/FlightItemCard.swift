@@ -7,23 +7,51 @@ struct FlightItemCard: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
 
+    @Environment(\.colorScheme) var colorScheme
+
     private let editColor = Color(red: 116/255, green: 151/255, blue: 173/255)
     private let deleteColor = Color(red: 193/255, green: 106/255, blue: 106/255)
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "airplane")
-                        .font(.title2)
-                    Text("\(flight.airline) \(flight.flightNumber)").font(.headline)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(flight.airline) - \(flight.flightNumber)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+
+                        Text("\(flight.departureAirport) - \(flight.arrivalAirport)")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
+
+                        HStack(spacing: 16) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "airplane.departure")
+                                    .font(.caption)
+                                Text("\(formattedTime(flight.departureTime))")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+
+                            HStack(spacing: 4) {
+                                Image(systemName: "airplane.arrival")
+                                    .font(.caption)
+                                Text("\(calculatedArrivalTime(departure: flight.departureTime))")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+
                     Spacer()
-                    Text(flight.departureTimeFormatted)
-                        .font(.subheadline)
+
+                    let airlineCode = extractAirlineCode(from: flight.flightNumber)
+                    Image("\(airlineCode)_icon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 60, height: 60)
                 }
-                Text("\(flight.departureAirport) → \(flight.arrivalAirport)")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
             }
             .padding()
             .onTapGesture {
@@ -62,8 +90,28 @@ struct FlightItemCard: View {
                 .transition(.opacity)
             }
         }
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(20)
-        .contentShape(Rectangle())
+        .background(Color(nsColor: .controlBackgroundColor))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 3)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+    }
+
+    private func extractAirlineCode(from flightNumber: String) -> String {
+        let prefix = flightNumber.prefix { $0.isLetter }
+        return String(prefix)
+    }
+
+    private func formattedTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mma"
+        return formatter.string(from: date).lowercased()
+    }
+
+    private func calculatedArrivalTime(departure: Date) -> String {
+        let arrivalDate = Calendar.current.date(byAdding: .hour, value: 3, to: departure) ?? departure
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mma"
+        return formatter.string(from: arrivalDate).lowercased()
     }
 }
