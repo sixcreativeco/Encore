@@ -5,6 +5,7 @@ struct AddFlightView: View {
     var onFlightAdded: () -> Void
 
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
 
     @State private var flightNumber = ""
     @State private var flightDate = Date()
@@ -178,11 +179,7 @@ struct AddFlightView: View {
             HStack {
                 Text("\(flight.airline) \(flight.flightNumber)").font(.headline)
                 Spacer()
-                let airlineCode = extractAirlineCode(from: flight.flightNumber)
-                Image("\(airlineCode)_icon")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 40, height: 40)
+                airlineIconView(for: flight)
             }
             Text("\(flight.departureAirport) → \(flight.arrivalAirport)").font(.subheadline)
             Text("Departs: \(formattedDate(flight.departureTime))").font(.caption)
@@ -190,6 +187,22 @@ struct AddFlightView: View {
         .padding()
         .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(12)
+    }
+
+    private func airlineIconView(for flight: FlightModel) -> some View {
+        let airlineCode = extractAirlineCode(from: flight.flightNumber).uppercased()
+        let imageName: String
+
+        if airlineCode == "NZ" {
+            imageName = colorScheme == .dark ? "\(airlineCode)_icon_light" : "\(airlineCode)_icon"
+        } else {
+            imageName = "\(airlineCode)_icon"
+        }
+
+        return Image(imageName)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 40, height: 40)
     }
 
     private func extractAirlineCode(from flightNumber: String) -> String {

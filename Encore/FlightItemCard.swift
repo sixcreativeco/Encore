@@ -7,8 +7,6 @@ struct FlightItemCard: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
 
-    @Environment(\.colorScheme) var colorScheme
-
     private let editColor = Color(red: 116/255, green: 151/255, blue: 173/255)
     private let deleteColor = Color(red: 193/255, green: 106/255, blue: 106/255)
 
@@ -19,27 +17,29 @@ struct FlightItemCard: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(flight.airline) - \(flight.flightNumber)")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(isAirNZ ? .white : .gray)
 
                         Text("\(flight.departureAirport) - \(flight.arrivalAirport)")
                             .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(colorScheme == .dark ? .white : .black)
+                            .foregroundColor(isAirNZ ? .white : .black)
 
                         HStack(spacing: 16) {
-                            HStack(spacing: 4) {
+                            HStack(spacing: 8) {
                                 Image(systemName: "airplane.departure")
                                     .font(.caption)
+                                    .foregroundColor(isAirNZ ? .white : .gray)
                                 Text("\(formattedTime(flight.departureTime))")
                                     .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(isAirNZ ? .white : .gray)
                             }
 
-                            HStack(spacing: 4) {
+                            HStack(spacing: 8) {
                                 Image(systemName: "airplane.arrival")
                                     .font(.caption)
-                                Text("\(calculatedArrivalTime(departure: flight.departureTime))")
+                                    .foregroundColor(isAirNZ ? .white : .gray)
+                                Text("\(formattedArrivalTime(flight.departureTime))")
                                     .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(isAirNZ ? .white : .gray)
                             }
                         }
                     }
@@ -47,7 +47,9 @@ struct FlightItemCard: View {
                     Spacer()
 
                     let airlineCode = extractAirlineCode(from: flight.flightNumber)
-                    Image("\(airlineCode)_icon")
+                    let imageName = airlineCode.uppercased() == "NZ" ? "\(airlineCode)_icon_light" : "\(airlineCode)_icon"
+
+                    Image(imageName)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 60, height: 60)
@@ -90,11 +92,15 @@ struct FlightItemCard: View {
                 .transition(.opacity)
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(isAirNZ ? Color(red: 20/255, green: 20/255, blue: 20/255) : Color.white)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 3)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
+    }
+
+    private var isAirNZ: Bool {
+        extractAirlineCode(from: flight.flightNumber).uppercased() == "NZ"
     }
 
     private func extractAirlineCode(from flightNumber: String) -> String {
@@ -108,8 +114,8 @@ struct FlightItemCard: View {
         return formatter.string(from: date).lowercased()
     }
 
-    private func calculatedArrivalTime(departure: Date) -> String {
-        let arrivalDate = Calendar.current.date(byAdding: .hour, value: 3, to: departure) ?? departure
+    private func formattedArrivalTime(_ date: Date) -> String {
+        let arrivalDate = Calendar.current.date(byAdding: .hour, value: 3, to: date) ?? date
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mma"
         return formatter.string(from: arrivalDate).lowercased()
