@@ -46,7 +46,7 @@ struct SidebarContainerView: View {
                 case "Tours": TourListView(onTourSelected: { appState.selectedTour = $0 }).environmentObject(appState)
                 case "Contacts": ContactsView(userID: appState.userID ?? "")
                 case "Team": Text("Team View")
-                case "Flights": Text("Flights View")
+                case "MyAccount": MyAccountView().environmentObject(appState)
                 case "NewTour": NewTourFlowView().environmentObject(appState)
                 default: Text("Unknown")
                 }
@@ -105,8 +105,8 @@ struct SidebarContainerView: View {
                 SidebarLabel(icon: "person.2.fill", title: "Team", isSelected: appState.selectedTab == "Team", spacing: 15.2) {
                     appState.selectedTab = "Team"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
-                SidebarLabel(icon: "airplane", title: "Flights", isSelected: appState.selectedTab == "Flights", spacing: 19.2) {
-                    appState.selectedTab = "Flights"; appState.selectedTour = nil; appState.selectedShow = nil
+                SidebarLabel(icon: "person.crop.circle", title: "My Account", isSelected: appState.selectedTab == "MyAccount", spacing: 25.2) {
+                    appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
             }
             .padding(.leading, 30)
@@ -146,8 +146,8 @@ struct SidebarContainerView: View {
                 SidebarIcon(icon: "person.2.fill", isSelected: appState.selectedTab == "Team") {
                     appState.selectedTab = "Team"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
-                SidebarIcon(icon: "airplane", isSelected: appState.selectedTab == "Flights") {
-                    appState.selectedTab = "Flights"; appState.selectedTour = nil; appState.selectedShow = nil
+                SidebarIcon(icon: "person.crop.circle", isSelected: appState.selectedTab == "MyAccount") {
+                    appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
             }
 
@@ -232,7 +232,7 @@ struct SidebarContainerView: View {
     }
 }
 
-// SidebarLabel Component
+// MARK: - SidebarLabel Component
 struct SidebarLabel: View {
     let icon: String
     let title: String
@@ -244,7 +244,7 @@ struct SidebarLabel: View {
         Button(action: action) {
             HStack(spacing: spacing) {
                 Image(systemName: icon)
-                    .font(.system(size: 16))
+                    .font(.system(size: title == "My Account" ? 18 : 16))
                     .offset(y: -1)
                 Text(title)
                     .font(.system(size: 15, weight: isSelected ? .bold : .regular))
@@ -256,7 +256,7 @@ struct SidebarLabel: View {
     }
 }
 
-// SidebarIcon Component
+// MARK: - SidebarIcon Component
 struct SidebarIcon: View {
     let icon: String
     let isSelected: Bool

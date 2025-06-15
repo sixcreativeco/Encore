@@ -51,22 +51,37 @@ struct ShowDetailView: View {
     }
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 32) {
+
+        // ✅ SPACING CONTROLS — tweak these values to adjust vertical gaps
+        let spacingDateToCity: CGFloat = 3
+        let spacingCityToVenue: CGFloat = 3
+        let spacingVenueToLoadIn: CGFloat = 7
+
+        return VStack(alignment: .leading, spacing: 32) {
             GeometryReader { geo in
                 let totalWidth = geo.size.width
                 let mapWidth = max(min(800, totalWidth * 0.55), 320)
                 let dynamicSpacing = max(12, totalWidth * 0.04)
 
                 HStack(alignment: .top, spacing: dynamicSpacing) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text(show.date.formatted(date: .numeric, time: .omitted))
                             .font(.system(size: 16))
                             .foregroundColor(.gray)
+
+                        Spacer().frame(height: spacingDateToCity)
+
                         Text(show.city.uppercased())
-                            .font(.system(size: 42, weight: .bold))
+                            .font(.system(size: 55, weight: .bold))
+
+                        Spacer().frame(height: spacingCityToVenue)
+
                         Text(show.venue)
                             .font(.system(size: 22, weight: .medium))
                             .foregroundColor(.gray)
+
+                        Spacer().frame(height: spacingVenueToLoadIn)
+
                         if let loadIn = show.loadIn {
                             Label {
                                 Text("Load In Time: \(loadIn.formatted(date: .omitted, time: .shortened))")
@@ -111,13 +126,31 @@ struct ShowDetailView: View {
                     }
                 }
                 Spacer()
+
                 VStack(alignment: .trailing, spacing: 16) {
-                    StyledActionButton(title: "Edit Show", icon: "pencil", color: .blue)
-                    StyledActionButton(title: "Upload Documents", icon: "tray.and.arrow.up", color: .green)
+                    Button(action: {}) {
+                        Label("Edit Show", systemImage: "pencil")
+                            .fontWeight(.semibold)
+                            .frame(width: 220, height: 44)
+                            .background(Color.blue.opacity(0.15))
+                            .foregroundColor(.blue)
+                            .cornerRadius(10)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: {}) {
+                        Label("Upload Documents", systemImage: "tray.and.arrow.up")
+                            .fontWeight(.semibold)
+                            .frame(width: 220, height: 44)
+                            .background(Color.green.opacity(0.15))
+                            .foregroundColor(.green)
+                            .cornerRadius(10)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.top, -12) // bring buttons closer to map
+            .padding(.top, -12)
         }
     }
 
@@ -165,8 +198,10 @@ struct ShowDetailView: View {
                 Text("Guest List").font(.headline)
                 Spacer()
                 Button(action: { showAddGuest = true }) {
-                    Image(systemName: "plus.circle.fill").font(.title3)
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
                 }
+                .buttonStyle(.plain)
             }
 
             if guestList.isEmpty {
@@ -198,8 +233,10 @@ struct ShowDetailView: View {
                 Text("Venue Notes").font(.headline)
                 Spacer()
                 Button(action: { showEditNotes = true }) {
-                    Image(systemName: "plus.circle.fill").font(.title3)
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
                 }
+                .buttonStyle(.plain)
             }
 
             if venueNotes.isEmpty {
@@ -256,26 +293,5 @@ struct ShowDetailView: View {
     struct MapItemWrapper: Identifiable {
         let id = UUID()
         let coordinate: CLLocationCoordinate2D
-    }
-}
-
-struct StyledActionButton: View {
-    let title: String
-    let icon: String
-    let color: Color
-
-    var body: some View {
-        Button(action: { }) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                Text(title)
-                    .fontWeight(.semibold)
-            }
-            .frame(width: 220, height: 44)
-            .background(color.opacity(0.15))
-            .foregroundColor(color)
-            .cornerRadius(10)
-        }
-        .buttonStyle(PlainButtonStyle())
     }
 }

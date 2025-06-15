@@ -14,8 +14,13 @@ class AppState: ObservableObject {
     @Published var selectedTab: String = "Dashboard"
     @Published var selectedTour: TourModel? = nil
     @Published var selectedShow: ShowModel? = nil
+    @Published var tours: [TourModel] = []  // ✅ Added
 
     init() {
         self.userID = UserDefaults.standard.string(forKey: "userID")
+    }
+
+    func removeTour(tourID: String) {  // ✅ Added
+        tours.removeAll { $0.id == tourID }
     }
 }
