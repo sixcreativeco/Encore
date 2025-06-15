@@ -29,7 +29,7 @@ struct TourDetailView: View {
                         ScrollView {
                             VStack(spacing: 24) {
                                 TourCrewView(tourID: tour.id)
-                                TourFlightsView(tourID: tour.id)
+                                TourFlightsView(tourID: tour.id, userID: appState.userID ?? "") // ✅ Pass userID here
                             }
                             .padding(.leading, 8)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -51,7 +51,6 @@ struct TourDetailView: View {
                     .frame(maxWidth: .infinity)
                 }
 
-                // ✅ Delete button at bottom
                 Button(role: .destructive) {
                     showingDeleteConfirmation = true
                 } label: {
@@ -88,7 +87,7 @@ struct TourDetailView: View {
             } else {
                 DispatchQueue.main.async {
                     appState.removeTour(tourID: tour.id)
-                    appState.selectedTour = nil  // ✅ Clears selection → auto-pops back to TourListView
+                    appState.selectedTour = nil
                     dismiss()
                 }
             }

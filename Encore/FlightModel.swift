@@ -2,7 +2,7 @@ import Foundation
 import FirebaseFirestore
 
 struct FlightModel: Identifiable, Codable {
-    var id: String = UUID().uuidString
+    var id: String
     var airline: String
     var flightNumber: String
     var departureAirport: String
@@ -49,5 +49,16 @@ struct FlightModel: Identifiable, Codable {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: departureTime)
+    }
+    
+    // Convert FlightModel into a ItineraryItemModel for combined display
+    func toItineraryItem() -> ItineraryItemModel {
+        return ItineraryItemModel(
+            id: id,
+            type: .flight,
+            title: "\(airline) \(flightNumber)",
+            time: departureTime,
+            note: "\(departureAirport) → \(arrivalAirport)"
+        )
     }
 }

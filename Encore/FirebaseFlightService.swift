@@ -4,7 +4,7 @@ import FirebaseFirestore
 struct FirebaseFlightService {
     static let db = Firestore.firestore()
 
-    static func saveFlight(tourID: String, flight: FlightModel, completion: @escaping () -> Void) {
+    static func saveFlight(userID: String, tourID: String, flight: FlightModel, completion: @escaping () -> Void) {
         let flightData: [String: Any] = [
             "airline": flight.airline,
             "flightNumber": flight.flightNumber,
@@ -13,16 +13,21 @@ struct FirebaseFlightService {
             "departureTime": Timestamp(date: flight.departureTime)
         ]
 
-        db.collection("tours")
+        db.collection("users")
+            .document(userID)
+            .collection("tours")
             .document(tourID)
             .collection("flights")
-            .addDocument(data: flightData) { _ in
+            .document(flight.id)
+            .setData(flightData) { _ in
                 completion()
             }
     }
 
-    static func loadFlights(tourID: String, completion: @escaping ([FlightModel]) -> Void) {
-        db.collection("tours")
+    static func loadFlights(userID: String, tourID: String, completion: @escaping ([FlightModel]) -> Void) {
+        db.collection("users")
+            .document(userID)
+            .collection("tours")
             .document(tourID)
             .collection("flights")
             .getDocuments { snapshot, error in
@@ -33,6 +38,18 @@ struct FirebaseFlightService {
 
                 let flights = documents.compactMap { FlightModel(from: $0) }
                 completion(flights)
+            }
+    }
+
+    static func deleteFlight(userID: String, tourID: String, flightID: String, completion: @escaping () -> Void) {
+        db.collection("users")
+            .document(userID)
+            .collection("tours")
+            .document(tourID)
+            .collection("flights")
+            .document(flightID)
+            .delete { _ in
+                completion()
             }
     }
 }

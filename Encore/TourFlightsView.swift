@@ -2,11 +2,11 @@ import SwiftUI
 
 struct TourFlightsView: View {
     var tourID: String
+    var userID: String
 
     @State private var flights: [FlightModel] = []
     @State private var showAddFlight = false
     @State private var expandedFlightID: String? = nil
-    @State private var selectedFlightForEdit: FlightModel? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -20,7 +20,7 @@ struct TourFlightsView: View {
         }
         .onAppear { loadFlights() }
         .sheet(isPresented: $showAddFlight) {
-            AddFlightView(tourID: tourID, onFlightAdded: { loadFlights() })
+            AddFlightView(userID: userID, tourID: tourID, onFlightAdded: { loadFlights() })
         }
     }
 
@@ -39,7 +39,7 @@ struct TourFlightsView: View {
                     flight: flight,
                     isExpanded: expandedFlightID == flight.id,
                     onExpandToggle: { toggleExpanded(flight) },
-                    onEdit: { /* Leave empty for now */ },
+                    onEdit: { /* Placeholder for edit */ },
                     onDelete: { deleteFlight(flight) }
                 )
                 .animation(.easeInOut, value: expandedFlightID)
@@ -58,19 +58,14 @@ struct TourFlightsView: View {
     }
 
     private func loadFlights() {
-        FirebaseFlightService.loadFlights(tourID: tourID) { loadedFlights in
+        FirebaseFlightService.loadFlights(userID: userID, tourID: tourID) { loadedFlights in
             self.flights = loadedFlights
         }
     }
 
     private func deleteFlight(_ flight: FlightModel) {
-        let db = FirebaseFlightService.db
-        db.collection("tours")
-            .document(tourID)
-            .collection("flights")
-            .document(flight.id)
-            .delete { _ in
-                loadFlights()
-            }
+        FirebaseFlightService.deleteFlight(userID: userID, tourID: tourID, flightID: flight.id) {
+            loadFlights()
+        }
     }
 }

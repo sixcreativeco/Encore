@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AddFlightView: View {
+    var userID: String
     var tourID: String
     var onFlightAdded: () -> Void
 
@@ -168,7 +169,7 @@ struct AddFlightView: View {
     }
 
     private func saveFlight(_ flight: FlightModel) {
-        FirebaseFlightService.saveFlight(tourID: tourID, flight: flight) {
+        FirebaseFlightService.saveFlight(userID: userID, tourID: tourID, flight: flight) {
             self.onFlightAdded()
             self.dismiss()
         }

@@ -4,13 +4,14 @@ import FirebaseFirestore
 struct ItineraryItemAddView: View {
     var tourID: String
     var userID: String
+    var presetDate: Date
     var onSave: () -> Void
 
     @Environment(\.dismiss) var dismiss
 
     @State private var type: ItineraryItemType = .custom
     @State private var title = ""
-    @State private var time = Date()
+    @State private var time: Date = Date()
     @State private var note = ""
 
     var body: some View {
@@ -54,6 +55,22 @@ struct ItineraryItemAddView: View {
         }
         .padding()
         .frame(minWidth: 400)
+        .onAppear {
+            initializeTime()
+        }
+    }
+
+    private func initializeTime() {
+        let calendar = Calendar.current
+        let now = Date()
+        let merged = calendar.date(
+            bySettingHour: calendar.component(.hour, from: now),
+            minute: calendar.component(.minute, from: now),
+            second: 0,
+            of: presetDate
+        ) ?? presetDate
+
+        self.time = merged
     }
 
     private func saveItem() {

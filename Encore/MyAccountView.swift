@@ -21,6 +21,7 @@ struct MyAccountView: View {
                 usageStatsSection
                 supportSection
                 devToolsSection
+                versionSection
 
             }
             .padding()
@@ -126,9 +127,6 @@ struct MyAccountView: View {
             Button("Contact Support") { }
             Button("Privacy Policy") { }
             Button("Terms of Service") { }
-            Text("App Version: 1.0.0")
-                .font(.footnote)
-                .foregroundColor(.gray)
         }
     }
 
@@ -144,6 +142,16 @@ struct MyAccountView: View {
             } label: {
                 Text("Wipe Local Cache")
             }
+        }
+    }
+
+    // MARK: - Version (added below dev tools)
+
+    private var versionSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("App Version: 1.6.9")
+                .font(.footnote)
+                .foregroundColor(.gray)
         }
     }
 

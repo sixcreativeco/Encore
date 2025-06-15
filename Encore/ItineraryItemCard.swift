@@ -7,7 +7,6 @@ struct ItineraryItemCard: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
 
-    // Local colors locked inside this file
     private let editColor = Color(red: 116/255, green: 151/255, blue: 173/255)
     private let deleteColor = Color(red: 193/255, green: 106/255, blue: 106/255)
 
@@ -21,6 +20,13 @@ struct ItineraryItemCard: View {
                     Spacer()
                     Text(item.time.formatted(date: .omitted, time: .shortened))
                 }
+
+                // ✅ NEW: Subtitle line if present (used for Flights)
+                if let subtitle = item.subtitle, !subtitle.isEmpty {
+                    Text(subtitle).font(.subheadline).foregroundColor(.gray)
+                }
+
+                // Existing notes
                 if let note = item.note, !note.isEmpty {
                     Text(note).font(.subheadline).foregroundColor(.gray)
                 }

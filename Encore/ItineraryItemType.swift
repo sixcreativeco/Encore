@@ -12,6 +12,7 @@ enum ItineraryItemType: String, Codable, CaseIterable {
     case freeTime
     case catering
     case custom
+    case headline
     
     var displayName: String {
         switch self {
@@ -26,6 +27,7 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         case .freeTime: return "Free Time"
         case .catering: return "Catering"
         case .custom: return "Custom"
+        case .headline: return "Headliner Set"
         }
     }
     
@@ -42,6 +44,7 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         case .freeTime: return "clock"
         case .catering: return "fork.knife"
         case .custom: return "calendar"
+        case .headline: return "music.mic"
         }
     }
 }
