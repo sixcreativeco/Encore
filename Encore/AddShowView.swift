@@ -12,7 +12,11 @@ struct AddShowView: View {
     @State private var country = ""
     @State private var venue = ""
     @State private var address = ""
+    @State private var contactName = ""
+    @State private var contactEmail = ""
+    @State private var contactPhone = ""
     @State private var date = Date()
+    @State private var venueAccess = defaultTime(hour: 12)
     @State private var loadIn = defaultTime(hour: 15)
     @State private var soundCheck = defaultTime(hour: 17)
     @State private var doorsOpen = defaultTime(hour: 19)
@@ -20,7 +24,6 @@ struct AddShowView: View {
     @State private var supportActs: [SupportActInput] = [SupportActInput()]
     @State private var allSupportActs: [String] = []
 
-    @State private var headlinerSoundCheck = defaultTime(hour: 18)
     @State private var headlinerSetTime = defaultTime(hour: 20)
     @State private var headlinerSetDurationMinutes = 60
 
@@ -29,6 +32,7 @@ struct AddShowView: View {
 
     @StateObject private var venueSearch = VenueSearchService()
     @State private var venueQuery = ""
+    @State private var showVenueSuggestions = false
 
     struct SupportActInput: Identifiable {
         var id = UUID().uuidString
@@ -52,7 +56,10 @@ struct AddShowView: View {
                 saveButton
             }
             .padding()
-            .onAppear(perform: loadSupportActs)
+            .onAppear {
+                loadSupportActs()
+                loadDefaultShowDate()
+            }
         }
         .frame(minWidth: 600, maxWidth: .infinity)
     }
@@ -72,18 +79,26 @@ struct AddShowView: View {
 
     private var showDetailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
+            Text("Date").font(.headline)
+
             HStack {
                 StyledDateField(date: $date)
                     .frame(width: 200)
                     .padding(.leading, -40)
                 Spacer()
             }
+            .padding(.bottom, -8)
+
+            Text("Venue").font(.headline)
 
             VStack(alignment: .leading, spacing: 8) {
                 StyledInputField(placeholder: "Venue", text: $venueQuery)
-                    .onChange(of: venueQuery) { venueSearch.searchVenues(query: $0) }
+                    .onChange(of: venueQuery) { value in
+                        showVenueSuggestions = !value.isEmpty
+                        venueSearch.searchVenues(query: value)
+                    }
 
-                if !venueSearch.results.isEmpty {
+                if showVenueSuggestions && !venueSearch.results.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(venueSearch.results.prefix(5)) { result in
                             Button(action: {
@@ -92,6 +107,8 @@ struct AddShowView: View {
                                 city = result.city
                                 country = result.country
                                 venueQuery = result.name
+                                showVenueSuggestions = false
+                                venueSearch.results = []  // <-- dropdown forced closed
                             }) {
                                 VStack(alignment: .leading) {
                                     Text(result.name).font(.body)
@@ -112,6 +129,12 @@ struct AddShowView: View {
             }
 
             StyledInputField(placeholder: "Address", text: $address)
+
+            HStack(spacing: 16) {
+                StyledInputField(placeholder: "Venue Contact Name", text: $contactName)
+                StyledInputField(placeholder: "Email", text: $contactEmail)
+                StyledInputField(placeholder: "Phone Number", text: $contactPhone)
+            }
         }
     }
 
@@ -119,6 +142,7 @@ struct AddShowView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Timings").font(.headline)
             HStack(spacing: 16) {
+                StyledTimePicker(label: "Venue Access", time: $venueAccess)
                 StyledTimePicker(label: "Load In", time: $loadIn)
                 StyledTimePicker(label: "Soundcheck", time: $soundCheck)
                 StyledTimePicker(label: "Doors", time: $doorsOpen)
@@ -182,7 +206,6 @@ struct AddShowView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Headliner: \(artistName)").font(.headline)
             HStack(spacing: 16) {
-                StyledTimePicker(label: "Soundcheck", time: $headlinerSoundCheck)
                 StyledTimePicker(label: "Set Time", time: $headlinerSetTime)
                 Stepper("Set Duration: \(headlinerSetDurationMinutes) min", value: $headlinerSetDurationMinutes, in: 0...300, step: 5)
             }
@@ -214,6 +237,15 @@ struct AddShowView: View {
             }
     }
 
+    private func loadDefaultShowDate() {
+        let db = Firestore.firestore()
+        db.collection("users").document(userID).collection("tours").document(tourID).getDocument { snapshot, _ in
+            if let tourData = snapshot?.data(), let startTimestamp = tourData["startDate"] as? Timestamp {
+                self.date = startTimestamp.dateValue()
+            }
+        }
+    }
+
     private func saveShow() {
         let db = Firestore.firestore()
 
@@ -222,11 +254,14 @@ struct AddShowView: View {
             "country": country,
             "venue": venueQuery,
             "address": address,
+            "contactName": contactName,
+            "contactEmail": contactEmail,
+            "contactPhone": contactPhone,
             "date": Timestamp(date: date),
+            "venueAccess": Timestamp(date: venueAccess),
             "loadIn": Timestamp(date: loadIn),
             "soundCheck": Timestamp(date: soundCheck),
             "doorsOpen": Timestamp(date: doorsOpen),
-            "headlinerSoundCheck": Timestamp(date: headlinerSoundCheck),
             "headlinerSetTime": Timestamp(date: headlinerSetTime),
             "headlinerSetDurationMinutes": headlinerSetDurationMinutes,
             "packOut": Timestamp(date: packOut),

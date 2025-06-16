@@ -9,6 +9,7 @@ struct ShowGridView: View {
 
     @State private var shows: [ShowModel] = []
     @State private var isShowingAddShowView = false
+    @State private var listener: ListenerRegistration?
 
     private let columns = [
         GridItem(.flexible(), spacing: 20),
@@ -51,20 +52,19 @@ struct ShowGridView: View {
             .padding(.horizontal)
         }
         .sheet(isPresented: $isShowingAddShowView) {
-            AddShowView(tourID: tourID, userID: userID, artistName: artistName) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    loadShows()
-                }
-            }
+            AddShowView(tourID: tourID, userID: userID, artistName: artistName) { }
         }
-        .onAppear { loadShows() }
+        .onAppear { listenForShows() }
+        .onDisappear { listener?.remove() }
     }
 
-    private func loadShows() {
+    private func listenForShows() {
         let db = Firestore.firestore()
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("shows")
+        listener = db.collection("users").document(userID)
+            .collection("tours").document(tourID)
+            .collection("shows")
             .order(by: "date")
-            .getDocuments { snapshot, _ in
+            .addSnapshotListener { snapshot, _ in
                 self.shows = snapshot?.documents.compactMap { ShowModel(from: $0) } ?? []
             }
     }

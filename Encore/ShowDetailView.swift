@@ -14,12 +14,12 @@ struct ShowDetailView: View {
     @State private var venueNotes: String = ""
     @State private var showAddGuest = false
     @State private var showEditNotes = false
+    @State private var showEditShow = false
+    @State private var showContactDetails = false
+
+    @EnvironmentObject var appState: AppState
 
     var body: some View {
-        mainContent
-    }
-
-    private var mainContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
                 headerSection
@@ -46,13 +46,14 @@ struct ShowDetailView: View {
                     loadVenueNotes()
                 }
             }
+            .sheet(isPresented: $showEditShow) {
+                ShowEditView(tourID: tourID, userID: userID, show: show)
+            }
         }
         .navigationTitle("Show Details")
     }
 
     private var headerSection: some View {
-
-        // ✅ SPACING CONTROLS — tweak these values to adjust vertical gaps
         let spacingDateToCity: CGFloat = 3
         let spacingCityToVenue: CGFloat = 3
         let spacingVenueToLoadIn: CGFloat = 7
@@ -65,6 +66,26 @@ struct ShowDetailView: View {
 
                 HStack(alignment: .top, spacing: dynamicSpacing) {
                     VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                appState.selectedShow = nil
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.left")
+                                    Text("Back")
+                                }
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.primary)
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 10)
+                                .background(Color.gray.opacity(0.2))
+                                .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+
+                        Spacer().frame(height: spacingDateToCity)
+
                         Text(show.date.formatted(date: .numeric, time: .omitted))
                             .font(.system(size: 16))
                             .foregroundColor(.gray)
@@ -73,6 +94,8 @@ struct ShowDetailView: View {
 
                         Text(show.city.uppercased())
                             .font(.system(size: 55, weight: .bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
 
                         Spacer().frame(height: spacingCityToVenue)
 
@@ -114,21 +137,32 @@ struct ShowDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 10) {
                         Image(systemName: "mappin.and.ellipse").font(.system(size: 18))
-                        Text(show.address).font(.system(size: 16))
-                    }
-                    HStack(spacing: 10) {
-                        Image(systemName: "phone").font(.system(size: 18))
-                        Text("09 358 1250").font(.system(size: 16))
+                        Button(action: openInMaps) {
+                            Text(show.address).font(.system(size: 16))
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     HStack(spacing: 10) {
                         Image(systemName: "person.fill").font(.system(size: 18))
-                        Text("Venue Contact").font(.system(size: 16))
+                        Text(show.contactName ?? "Venue Contact")
+                            .font(.system(size: 16))
+                            .onTapGesture {
+                                withAnimation { showContactDetails.toggle() }
+                            }
+                        if showContactDetails {
+                            if let email = show.contactEmail {
+                                Text(email).font(.system(size: 14)).foregroundColor(.gray)
+                            }
+                            if let phone = show.contactPhone {
+                                Text(phone).font(.system(size: 14)).foregroundColor(.gray)
+                            }
+                        }
                     }
                 }
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 16) {
-                    Button(action: {}) {
+                    Button(action: { showEditShow = true }) {
                         Label("Edit Show", systemImage: "pencil")
                             .fontWeight(.semibold)
                             .frame(width: 220, height: 44)
@@ -151,6 +185,17 @@ struct ShowDetailView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.top, -12)
+        }
+    }
+
+    private func openInMaps() {
+        let searchRequest = MKLocalSearch.Request()
+        searchRequest.naturalLanguageQuery = show.address
+        let search = MKLocalSearch(request: searchRequest)
+        search.start { response, _ in
+            if let mapItem = response?.mapItems.first {
+                mapItem.openInMaps()
+            }
         }
     }
 

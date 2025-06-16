@@ -18,7 +18,8 @@ struct SidebarContainerView: View {
                                 .foregroundColor(.gray)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .padding()
+                        .padding(.leading, 20)
+                        .padding(.top, 30)
                         Spacer()
                     }
                     contentView()
@@ -232,7 +233,6 @@ struct SidebarContainerView: View {
     }
 }
 
-// MARK: - SidebarLabel Component
 struct SidebarLabel: View {
     let icon: String
     let title: String
@@ -256,7 +256,6 @@ struct SidebarLabel: View {
     }
 }
 
-// MARK: - SidebarIcon Component
 struct SidebarIcon: View {
     let icon: String
     let isSelected: Bool

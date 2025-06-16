@@ -7,6 +7,7 @@ struct TourHeaderView: View {
     @EnvironmentObject var appState: AppState
     @State private var offsetY: CGFloat = 0
     @State private var initialOffsetY: CGFloat = 0
+    @State private var showEditTour = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -45,6 +46,29 @@ struct TourHeaderView: View {
                     .foregroundColor(.white)
             }
             .padding()
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: { showEditTour = true }) {
+                        HStack(spacing: 6) {
+                            Text("Edit Tour")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.white)
+                            Image(systemName: "square.and.pencil")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+                    .buttonStyle(PlainButtonStyle())  // fully disables default button background
+                }
+                Spacer()
+            }
+            .padding()
         }
         .frame(height: 200)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -52,16 +76,12 @@ struct TourHeaderView: View {
         .padding(.top, -10)
         .gesture(
             DragGesture()
-                .onChanged { value in
-                    offsetY = initialOffsetY + value.translation.height
-                }
-                .onEnded { _ in
-                    initialOffsetY = offsetY
-                    savePosterOffset()
-                }
+                .onChanged { value in offsetY = initialOffsetY + value.translation.height }
+                .onEnded { _ in initialOffsetY = offsetY; savePosterOffset() }
         )
-        .onAppear {
-            loadPosterOffset()
+        .onAppear { loadPosterOffset() }
+        .sheet(isPresented: $showEditTour) {
+            TourEditView(tour: tour).environmentObject(appState)
         }
     }
 
@@ -72,9 +92,7 @@ struct TourHeaderView: View {
             .document(userID)
             .collection("tours")
             .document(tour.id)
-            .updateData([
-                "posterOffsetY": Double(offsetY)
-            ])
+            .updateData(["posterOffsetY": Double(offsetY)])
     }
 
     private func loadPosterOffset() {

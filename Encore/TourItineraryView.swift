@@ -69,9 +69,7 @@ struct TourItineraryView: View {
             }
         }
         .onAppear {
-            loadTourDates {
-                refreshForSelectedDate()
-            }
+            setupRealtimeListeners()
         }
         .sheet(isPresented: $showAddItem) {
             ItineraryItemAddView(tourID: tourID, userID: userID, presetDate: selectedDate) {
@@ -88,7 +86,6 @@ struct TourItineraryView: View {
     private func mergedItemsForDate() -> [ItineraryItemModel] {
         let merged = (itineraryItems + showTimingItems + flightItems)
             .filter { isSameDay($0.time, selectedDate) }
-        print("✅ Merged items for \(formattedDate(selectedDate)): \(merged.count) items")
         return merged
     }
 
@@ -103,67 +100,37 @@ struct TourItineraryView: View {
     }
 
     private func refreshForSelectedDate() {
-        loadItinerary {
-            loadShowTimings {
-                loadFlights()
-            }
-        }
-    }
-
-    private func loadItinerary(completion: @escaping () -> Void) {
-        let db = Firestore.firestore()
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary")
-            .getDocuments { snapshot, _ in
-                self.itineraryItems = snapshot?.documents.compactMap { ItineraryItemModel(from: $0) } ?? []
-                print("🟢 Loaded \(self.itineraryItems.count) itinerary items")
-                completion()
-            }
+        // No longer needed - handled by real-time updates
     }
 
     private func deleteItem(_ item: ItineraryItemModel) {
         let db = Firestore.firestore()
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary").document(item.id).delete { _ in
-            refreshForSelectedDate()
-        }
+        db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary").document(item.id).delete()
     }
 
-    private func loadTourDates(completion: @escaping () -> Void) {
+    private func setupRealtimeListeners() {
         let db = Firestore.firestore()
+
+        // Tour dates
         db.collection("users").document(userID).collection("tours").document(tourID)
-            .getDocument { snapshot, _ in
+            .addSnapshotListener { snapshot, _ in
                 guard let data = snapshot?.data(),
                       let start = (data["startDate"] as? Timestamp)?.dateValue(),
                       let end = (data["endDate"] as? Timestamp)?.dateValue() else { return }
-
                 self.availableDates = generateDateRange(from: start, to: end)
                 self.selectedDate = start
-                print("📅 Loaded tour dates \(formattedDate(start)) → \(formattedDate(end))")
-                completion()
             }
-    }
 
-    private func generateDateRange(from start: Date, to end: Date) -> [Date] {
-        var dates: [Date] = []
-        var current = start
-        while current <= end {
-            dates.append(current)
-            current = calendar.date(byAdding: .day, value: 1, to: current)!
-        }
-        return dates
-    }
+        // Itinerary
+        db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary")
+            .addSnapshotListener { snapshot, _ in
+                self.itineraryItems = snapshot?.documents.compactMap { ItineraryItemModel(from: $0) } ?? []
+            }
 
-    private func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
-    }
-
-    private func loadShowTimings(completion: @escaping () -> Void) {
-        let db = Firestore.firestore()
+        // Show timings
         db.collection("users").document(userID).collection("tours").document(tourID).collection("shows")
-            .getDocuments { snapshot, _ in
+            .addSnapshotListener { snapshot, _ in
                 var timings: [ItineraryItemModel] = []
-
                 snapshot?.documents.forEach { doc in
                     let data = doc.data()
                     guard let showDate = (data["date"] as? Timestamp)?.dateValue() else { return }
@@ -192,17 +159,12 @@ struct TourItineraryView: View {
                         timings.append(ItineraryItemModel(type: .packOut, title: "Pack Out", time: fullPackOut))
                     }
                 }
-
                 self.showTimingItems = timings
-                print("🟠 Loaded \(self.showTimingItems.count) total show timing items")
-                completion()
             }
-    }
 
-    private func loadFlights() {
-        let db = Firestore.firestore()
+        // Flights
         db.collection("users").document(userID).collection("tours").document(tourID).collection("flights")
-            .getDocuments { snapshot, _ in
+            .addSnapshotListener { snapshot, _ in
                 let flights = snapshot?.documents.compactMap { doc -> ItineraryItemModel? in
                     guard let data = doc.data() as? [String: Any],
                           let airline = data["airline"] as? String,
@@ -217,7 +179,22 @@ struct TourItineraryView: View {
                     return ItineraryItemModel(type: .flight, title: title, time: depTime)
                 } ?? []
                 self.flightItems = flights
-                print("🔵 Loaded \(self.flightItems.count) flights")
             }
+    }
+
+    private func generateDateRange(from start: Date, to end: Date) -> [Date] {
+        var dates: [Date] = []
+        var current = start
+        while current <= end {
+            dates.append(current)
+            current = calendar.date(byAdding: .day, value: 1, to: current)!
+        }
+        return dates
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 }

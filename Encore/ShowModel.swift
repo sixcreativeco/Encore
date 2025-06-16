@@ -7,7 +7,13 @@ struct ShowModel: Identifiable, Codable, Hashable {
     var country: String?
     var venue: String
     var address: String
+
+    var contactName: String?
+    var contactEmail: String?
+    var contactPhone: String?
+
     var date: Date
+    var venueAccess: Date?
 
     var loadIn: Date?
     var soundCheck: Date?
@@ -48,25 +54,33 @@ struct ShowModel: Identifiable, Codable, Hashable {
         self.country = data?["country"] as? String
         self.venue = venue
         self.address = address
+
+        self.contactName = data?["contactName"] as? String
+        self.contactEmail = data?["contactEmail"] as? String
+        self.contactPhone = data?["contactPhone"] as? String
+
         self.date = dateTS.dateValue()
-        self.createdAt = createdAtTS.dateValue()
+        self.venueAccess = (data?["venueAccess"] as? Timestamp)?.dateValue()
 
         self.loadIn = (data?["loadIn"] as? Timestamp)?.dateValue()
         self.soundCheck = (data?["soundCheck"] as? Timestamp)?.dateValue()
         self.doorsOpen = (data?["doorsOpen"] as? Timestamp)?.dateValue()
 
-        // Pull headliner fields correctly
-        if let headlinerSoundCheck = (data?["headlinerSoundCheck"] as? Timestamp)?.dateValue(),
-           let headlinerSetTime = (data?["headlinerSetTime"] as? Timestamp)?.dateValue(),
-           let headlinerSetDurationMinutes = data?["headlinerSetDurationMinutes"] as? Int {
+        // Headliner: Allow partial creation
+        let headlinerSetTime = (data?["headlinerSetTime"] as? Timestamp)?.dateValue()
+        let headlinerSoundCheck = (data?["headlinerSoundCheck"] as? Timestamp)?.dateValue()
+        let headlinerSetDurationMinutes = data?["headlinerSetDurationMinutes"] as? Int
+
+        if headlinerSetTime != nil {
             self.headliner = Headliner(
-                soundCheck: headlinerSoundCheck,
-                setTime: headlinerSetTime,
-                setDurationMinutes: headlinerSetDurationMinutes
+                soundCheck: headlinerSoundCheck ?? headlinerSetTime!,
+                setTime: headlinerSetTime!,
+                setDurationMinutes: headlinerSetDurationMinutes ?? 0
             )
         }
 
         self.packOut = (data?["packOut"] as? Timestamp)?.dateValue()
         self.packOutNextDay = data?["packOutNextDay"] as? Bool ?? false
+        self.createdAt = createdAtTS.dateValue()
     }
 }
