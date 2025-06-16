@@ -8,19 +8,22 @@ struct FlightModel: Identifiable, Codable {
     var departureAirport: String
     var arrivalAirport: String
     var departureTime: Date
+    var passengers: [String]
 
     init(id: String = UUID().uuidString,
          airline: String,
          flightNumber: String,
          departureAirport: String,
          arrivalAirport: String,
-         departureTime: Date) {
+         departureTime: Date,
+         passengers: [String] = []) {
         self.id = id
         self.airline = airline
         self.flightNumber = flightNumber
         self.departureAirport = departureAirport
         self.arrivalAirport = arrivalAirport
         self.departureTime = departureTime
+        self.passengers = passengers
     }
 
     init?(from document: DocumentSnapshot) {
@@ -38,6 +41,7 @@ struct FlightModel: Identifiable, Codable {
         self.departureAirport = departureAirport
         self.arrivalAirport = arrivalAirport
         self.departureTime = timestamp.dateValue()
+        self.passengers = data["passengers"] as? [String] ?? []
     }
 
     var airlineCode: String {
@@ -51,7 +55,6 @@ struct FlightModel: Identifiable, Codable {
         return formatter.string(from: departureTime)
     }
     
-    // Convert FlightModel into a ItineraryItemModel for combined display
     func toItineraryItem() -> ItineraryItemModel {
         return ItineraryItemModel(
             id: id,

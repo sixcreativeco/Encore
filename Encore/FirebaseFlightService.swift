@@ -4,13 +4,14 @@ import FirebaseFirestore
 struct FirebaseFlightService {
     static let db = Firestore.firestore()
 
-    static func saveFlight(userID: String, tourID: String, flight: FlightModel, completion: @escaping () -> Void) {
+    static func saveFlight(userID: String, tourID: String, flight: FlightModel, passengers: [String], completion: @escaping () -> Void) {
         let flightData: [String: Any] = [
             "airline": flight.airline,
             "flightNumber": flight.flightNumber,
             "departureAirport": flight.departureAirport,
             "arrivalAirport": flight.arrivalAirport,
-            "departureTime": Timestamp(date: flight.departureTime)
+            "departureTime": Timestamp(date: flight.departureTime),
+            "passengers": passengers
         ]
 
         db.collection("users")

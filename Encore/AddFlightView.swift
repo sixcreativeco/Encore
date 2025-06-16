@@ -17,6 +17,11 @@ struct AddFlightView: View {
     @State private var fetchedFlight: FlightModel? = nil
     @State private var errorMessage: String? = nil
 
+    @State private var crewSearchText = ""
+    @State private var selectedCrew: [PassengerEntry] = []
+    @State private var baggageInput = ""
+    @State private var crewSuggestions: [CrewMember] = []
+
     private let airports = AirportService.shared.airports
 
     private var filteredAirports: [AirportEntry] {
@@ -28,17 +33,24 @@ struct AddFlightView: View {
         }
     }
 
+    private var filteredCrew: [CrewMember] {
+        if crewSearchText.isEmpty { return [] }
+        return crewSuggestions.filter {
+            $0.name.lowercased().contains(crewSearchText.lowercased())
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
-                Text("Add Flight")
-                    .font(.title.bold())
+                Text("Add Flight").font(.title.bold())
                 Spacer()
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
                         .foregroundColor(.gray)
                 }
+                .buttonStyle(.plain)
             }
 
             VStack(alignment: .leading, spacing: 16) {
@@ -89,6 +101,70 @@ struct AddFlightView: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Who's on this flight?").font(.headline)
+
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Name").font(.subheadline)
+                        TextField("Search Crew", text: $crewSearchText)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+
+                        if !filteredCrew.isEmpty {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    ForEach(filteredCrew, id: \.id) { crew in
+                                        Button {
+                                            crewSearchText = crew.name
+                                        } label: {
+                                            HStack {
+                                                Text(crew.name)
+                                                Spacer()
+                                            }
+                                            .padding(8)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(8)
+                            .frame(maxHeight: 150)
+                        }
+                    }
+
+                    VStack(alignment: .leading) {
+                        Text("Total Baggage (kg)").font(.subheadline)
+                        TextField("kg", text: $baggageInput)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                    }
+                }
+
+                Button(action: { addPassenger() }) {
+                    Text("+ Add Passenger")
+                        .font(.subheadline.bold())
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.gray.opacity(0.15))
+                        .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+
+                if !selectedCrew.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(selectedCrew, id: \.id) { passenger in
+                            HStack {
+                                Text(passenger.name)
+                                Spacer()
+                                Text("\(passenger.baggage) kg")
+                            }
+                        }
+                        let totalBaggage = selectedCrew.reduce(0) { $0 + (Int($1.baggage) ?? 0) }
+                        Text("Total Baggage: \(totalBaggage) KG").font(.subheadline).fontWeight(.bold)
+                    }
+                }
+            }
+
             if isLoading { ProgressView() }
 
             if let fetched = fetchedFlight {
@@ -106,6 +182,7 @@ struct AddFlightView: View {
                         .foregroundColor(.white)
                         .cornerRadius(10)
                 }
+                .buttonStyle(.plain)
                 .disabled(flightNumber.isEmpty || selectedAirport == nil)
             }
 
@@ -116,12 +193,27 @@ struct AddFlightView: View {
             Spacer()
         }
         .padding()
-        .frame(width: 500, height: 600)
+        .onAppear { loadCrew() }
     }
 
     private func selectAirport(_ airport: AirportEntry) {
         selectedAirport = airport
         airportSearchText = "\(airport.name) (\(airport.iata))"
+    }
+
+    private func addPassenger() {
+        let name = crewSearchText.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        let baggage = baggageInput.isEmpty ? "0" : baggageInput
+        selectedCrew.append(PassengerEntry(name: name, baggage: baggage))
+        crewSearchText = ""
+        baggageInput = ""
+    }
+
+    private func loadCrew() {
+        FirebaseTourService.loadCrew(userID: userID, tourID: tourID) { crew in
+            self.crewSuggestions = crew
+        }
     }
 
     private func fetchFlightData() {
@@ -169,7 +261,7 @@ struct AddFlightView: View {
     }
 
     private func saveFlight(_ flight: FlightModel) {
-        FirebaseFlightService.saveFlight(userID: userID, tourID: tourID, flight: flight) {
+        FirebaseFlightService.saveFlight(userID: userID, tourID: tourID, flight: flight, passengers: selectedCrew.map { $0.name }) {
             self.onFlightAdded()
             self.dismiss()
         }
@@ -217,4 +309,10 @@ struct AddFlightView: View {
         formatter.timeStyle = .short
         return formatter.string(from: date)
     }
+}
+
+struct PassengerEntry: Identifiable, Codable {
+    var id: String = UUID().uuidString
+    var name: String
+    var baggage: String
 }
