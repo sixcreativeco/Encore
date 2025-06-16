@@ -18,8 +18,9 @@ struct TourItineraryView: View {
     let calendar = Calendar.current
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
             SectionHeader(title: "Itinerary", onAdd: { showAddItem = true })
+                .padding()
 
             if !availableDates.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -39,15 +40,18 @@ struct TourItineraryView: View {
                         }
                     }
                     .padding(.horizontal)
+                    .padding(.bottom, 8)
                 }
             }
+        }
 
-            let allItems = mergedItemsForDate()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                let allItems = mergedItemsForDate()
 
-            if allItems.isEmpty {
-                Text("No items for this date").foregroundColor(.gray).padding()
-            } else {
-                ScrollView {
+                if allItems.isEmpty {
+                    Text("No items for this date").foregroundColor(.gray).padding()
+                } else {
                     LazyVStack(spacing: 16) {
                         ForEach(allItems.sorted(by: { $0.time < $1.time })) { item in
                             ItineraryItemCard(
@@ -59,11 +63,11 @@ struct TourItineraryView: View {
                             )
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.horizontal)
+                    .padding(.bottom, 16)
                 }
             }
         }
-        .padding()
         .onAppear {
             loadTourDates {
                 refreshForSelectedDate()

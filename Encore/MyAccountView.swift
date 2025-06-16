@@ -149,7 +149,7 @@ struct MyAccountView: View {
 
     private var versionSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("App Version: 1.6.9")
+            Text("App Version: 1.7.0")
                 .font(.footnote)
                 .foregroundColor(.gray)
         }

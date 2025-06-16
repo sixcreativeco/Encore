@@ -11,7 +11,7 @@ struct AddCrewSectionView: View {
     @State private var selectedRoles: [String] = []
     @State private var showRoleSuggestions: Bool = false
 
-    let roleOptions = [
+    @State private var roleOptions: [String] = [
         "Lead Artist", "Support Artist", "DJ", "Dancer", "Guest Performer", "Musician",
         "Content", "Tour Manager", "Artist Manager", "Road Manager", "Assistant Manager",
         "Tour Accountant", "Advance Coordinator", "Production Manager", "Stage Manager",
@@ -36,6 +36,9 @@ struct AddCrewSectionView: View {
 
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
+                    CustomTextField(placeholder: "Name", text: $newCrewName)
+                    CustomTextField(placeholder: "Email", text: $newCrewEmail)
+
                     ZStack(alignment: .topLeading) {
                         VStack(spacing: 0) {
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -44,8 +47,11 @@ struct AddCrewSectionView: View {
                                         HStack(spacing: 6) {
                                             Text(role).font(.subheadline)
                                             Button(action: { selectedRoles.removeAll { $0 == role } }) {
-                                                Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).foregroundColor(.gray)
+                                                Image(systemName: "xmark")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(.gray)
                                             }
+                                            .buttonStyle(.plain)
                                         }
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
@@ -59,6 +65,9 @@ struct AddCrewSectionView: View {
                                         .onChange(of: roleInput) { value in
                                             showRoleSuggestions = !value.isEmpty
                                         }
+                                        .onSubmit {
+                                            addCustomRole()
+                                        }
                                 }
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 6)
@@ -66,31 +75,31 @@ struct AddCrewSectionView: View {
                             .frame(height: 42)
                             .background(Color.gray.opacity(0.05))
                             .cornerRadius(8)
+                        }
 
-                            if showRoleSuggestions && !filteredRoles.isEmpty {
-                                VStack(spacing: 0) {
-                                    ForEach(filteredRoles.prefix(5), id: \.self) { suggestion in
-                                        Button(action: {
-                                            selectedRoles.append(suggestion)
-                                            roleInput = ""
-                                            showRoleSuggestions = false
-                                        }) {
-                                            Text(suggestion)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                                .padding(8)
-                                        }
+                        if showRoleSuggestions && !filteredRoles.isEmpty {
+                            VStack(spacing: 0) {
+                                ForEach(filteredRoles.prefix(5), id: \.self) { suggestion in
+                                    Button(action: {
+                                        selectedRoles.append(suggestion)
+                                        roleInput = ""
+                                        showRoleSuggestions = false
+                                    }) {
+                                        Text(suggestion)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(8)
                                     }
                                 }
-                                .background(Color.white)
-                                .cornerRadius(6)
-                                .shadow(radius: 1)
                             }
+                            .background(.background)
+                            .cornerRadius(6)
+                            .shadow(radius: 1)
+                            .offset(y: 50)
+                            .zIndex(1)
                         }
                     }
                     .frame(maxWidth: .infinity)
-
-                    CustomTextField(placeholder: "Name", text: $newCrewName)
-                    CustomTextField(placeholder: "Email", text: $newCrewEmail)
+                    .frame(height: 150) // <-- This locks the full height so layout never shifts
                 }
 
                 Button(action: { saveCrewMember() }) {
@@ -102,7 +111,6 @@ struct AddCrewSectionView: View {
                 .font(.subheadline)
             }
 
-            // Crew List
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(crewMembers, id: \.name) { member in
                     VStack(alignment: .leading) {
@@ -119,6 +127,17 @@ struct AddCrewSectionView: View {
         }
         .padding(.top, 12)
         .onAppear { loadCrew() }
+    }
+
+    private func addCustomRole() {
+        let trimmedRole = roleInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedRole.isEmpty else { return }
+        if !roleOptions.contains(trimmedRole) {
+            roleOptions.append(trimmedRole)
+        }
+        selectedRoles.append(trimmedRole)
+        roleInput = ""
+        showRoleSuggestions = false
     }
 
     private func saveCrewMember() {
