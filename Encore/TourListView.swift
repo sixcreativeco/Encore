@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseFirestore
+import Kingfisher
 
 struct TourListView: View {
     @EnvironmentObject var appState: AppState
@@ -12,36 +13,76 @@ struct TourListView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
+
                 if !upcomingTours.isEmpty {
-                    section(title: "Upcoming", tours: upcomingTours)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Upcoming")
+                            .font(.title2.bold())
+                            .padding(.horizontal)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(upcomingTours) { tour in
+                                    Button(action: {
+                                        onTourSelected?(tour)
+                                    }) {
+                                        TourCard(tour: tour)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
                 }
+
                 if !currentTours.isEmpty {
-                    section(title: "Current Tours", tours: currentTours)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Current Tours")
+                            .font(.title2.bold())
+                            .padding(.horizontal)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(currentTours) { tour in
+                                    Button(action: {
+                                        onTourSelected?(tour)
+                                    }) {
+                                        TourCard(tour: tour)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
                 }
+
                 if !pastTours.isEmpty {
-                    section(title: "Past Tours", tours: pastTours)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Past Tours")
+                            .font(.title2.bold())
+                            .padding(.horizontal)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(pastTours) { tour in
+                                    Button(action: {
+                                        onTourSelected?(tour)
+                                    }) {
+                                        TourCard(tour: tour)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
                 }
             }
             .padding(.vertical)
         }
         .onAppear { loadTours() }
-    }
-
-    private func section(title: String, tours: [TourModel]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.title2.bold()).padding(.horizontal)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(tours) { tour in
-                        Button(action: { onTourSelected?(tour) }) {
-                            TourCard(tour: tour)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                }
-                .padding(.horizontal)
-            }
-        }
     }
 
     private func loadTours() {
@@ -51,7 +92,6 @@ struct TourListView: View {
         var allTours: [TourModel] = []
         let group = DispatchGroup()
 
-        // Load owned tours
         group.enter()
         db.collection("users").document(userID).collection("tours")
             .order(by: "startDate", descending: false)
@@ -61,7 +101,6 @@ struct TourListView: View {
                 group.leave()
             }
 
-        // Load shared tours properly
         group.enter()
         db.collection("users").document(userID).collection("sharedTours")
             .getDocuments { snapshot, _ in
@@ -94,6 +133,14 @@ struct TourListView: View {
             self.upcomingTours = allTours.filter { $0.startDate > today }
             self.currentTours  = allTours.filter { $0.startDate <= today && $0.endDate >= today }
             self.pastTours     = allTours.filter { $0.endDate < today }.sorted { $0.endDate > $1.endDate }
+
+            // Preload images into Kingfisher's cache
+            self.preloadPosterImages(for: allTours)
         }
+    }
+
+    private func preloadPosterImages(for tours: [TourModel]) {
+        let urls = tours.compactMap { URL(string: $0.posterURL ?? "") }
+        ImagePrefetcher(urls: urls).start()
     }
 }

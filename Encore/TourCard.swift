@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 struct TourCard: View {
     let tour: TourModel
@@ -6,23 +7,23 @@ struct TourCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             GeometryReader { geo in
-                AsyncImage(url: URL(string: tour.posterURL ?? "")) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .clipped()
-                } placeholder: {
-                    ZStack {
-                        Color.gray.opacity(0.1)
-                        Image(systemName: "photo")
-                            .foregroundColor(.gray)
-                            .font(.system(size: 24))
+                KFImage(URL(string: tour.posterURL ?? ""))
+                    .placeholder {
+                        ZStack {
+                            Color.gray.opacity(0.1)
+                            Image(systemName: "photo")
+                                .foregroundColor(.gray)
+                                .font(.system(size: 24))
+                        }
                     }
-                }
-                .frame(width: geo.size.width, height: geo.size.width * 3 / 2)
-                .cornerRadius(8)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
             }
             .aspectRatio(2/3, contentMode: .fit)
+            .cornerRadius(8)
+
 
             Text(tour.artist)
                 .font(.system(size: 14, weight: .semibold))
