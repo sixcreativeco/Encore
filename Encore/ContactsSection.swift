@@ -1,59 +1,33 @@
 import SwiftUI
 import FirebaseFirestore
 
-struct ContactsView: View {
+struct ContactsSection: View {
     let userID: String
+    let searchText: String
+    let selectedFilter: String
+    @Binding var sortField: String
+    @Binding var sortAscending: Bool
 
     @State private var contacts: [ContactModel] = []
     @State private var isLoading: Bool = true
 
-    @State private var searchText: String = ""
-    @State private var selectedFilter: String = "All"
-    private let filters = ["All", "Artists", "Support Acts", "Crew", "Guests"]
-
-    var filteredContacts: [ContactModel] {
-        contacts.filter { contact in
-            let matchesFilter = selectedFilter == "All" || contact.role == roleForFilter(selectedFilter)
-            let matchesSearch = searchText.isEmpty || contact.name.lowercased().contains(searchText.lowercased())
-            return matchesFilter && matchesSearch
+    var body: some View {
+        Group {
+            if isLoading {
+                VStack { Spacer(); ProgressView().progressViewStyle(.circular); Spacer() }
+            } else {
+                ContactsTableView(contacts: filteredAndSorted, sortField: $sortField, sortAscending: $sortAscending)
+            }
         }
+        .onAppear(perform: loadContacts)
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Contacts")
-                .font(.largeTitle.bold())
-                .padding(.bottom, 10)
-
-            HStack {
-                StyledInputField(placeholder: "Search...", text: $searchText)
-                    .frame(width: 300)
-                Spacer()
-                Text("Filter").foregroundColor(.gray)
-                Picker("", selection: $selectedFilter) {
-                    ForEach(filters, id: \.self) { filter in
-                        Text(filter).tag(filter)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 400)
+    private var filteredAndSorted: [ContactModel] {
+        contacts
+            .filter { contact in
+                (selectedFilter == "All" || contact.role == selectedFilter) &&
+                (searchText.isEmpty || contact.matches(searchText))
             }
-
-            if isLoading {
-                Spacer().frame(height: 100)
-                ProgressView().progressViewStyle(.circular)
-            } else if filteredContacts.isEmpty {
-                Text("No contacts found").foregroundColor(.gray)
-            } else {
-                ScrollView {
-                    ContactsTableView(contacts: filteredContacts)
-                }
-            }
-        }
-        .padding()
-        .onAppear {
-            loadContacts()
-        }
     }
 
     private func loadContacts() {
@@ -62,7 +36,6 @@ struct ContactsView: View {
 
         db.collection("users").document(userID).collection("tours").getDocuments { snapshot, _ in
             let tourDocs = snapshot?.documents ?? []
-
             let group = DispatchGroup()
 
             for tourDoc in tourDocs {
@@ -87,7 +60,6 @@ struct ContactsView: View {
                 group.enter()
                 db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").getDocuments { showSnap, _ in
                     let showDocs = showSnap?.documents ?? []
-
                     let showGroup = DispatchGroup()
 
                     for showDoc in showDocs {
@@ -113,45 +85,14 @@ struct ContactsView: View {
                         }
                     }
 
-                    showGroup.notify(queue: .main) {
-                        group.leave()
-                    }
+                    showGroup.notify(queue: .main) { group.leave() }
                 }
             }
 
             group.notify(queue: .main) {
-                self.contacts = deduplicate(collected)
+                self.contacts = collected
                 self.isLoading = false
             }
-        }
-    }
-
-    private func deduplicate(_ models: [ContactModel]) -> [ContactModel] {
-        var dict: [String: ContactModel] = [:]
-        for model in models where !model.name.isEmpty {
-            let key = model.id
-            if let existing = dict[key] {
-                dict[key] = ContactModel(
-                    name: existing.name,
-                    role: existing.role.isEmpty ? model.role : existing.role,
-                    email: existing.email ?? model.email,
-                    phone: existing.phone ?? model.phone,
-                    notes: existing.notes ?? model.notes
-                )
-            } else {
-                dict[key] = model
-            }
-        }
-        return dict.values.sorted { $0.name < $1.name }
-    }
-
-    private func roleForFilter(_ filter: String) -> String {
-        switch filter {
-        case "Artists": return "Artist"
-        case "Support Acts": return "Support Act"
-        case "Crew": return "Crew"
-        case "Guests": return "Guest"
-        default: return ""
         }
     }
 }

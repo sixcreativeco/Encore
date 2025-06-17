@@ -2,18 +2,18 @@ import Foundation
 
 enum ContactFilter: String, CaseIterable {
     case all = "All"
-    case Artist = "Artist"
-    case SupportAct = "Support Act"
-    case Crew = "Crew"
-    case Guest = "Guest"
+    case artist = "Artist"
+    case supportAct = "Support Act"
+    case crew = "Crew"
+    case guest = "Guest"
 
     var displayName: String {
         switch self {
         case .all: return "All"
-        case .Artist: return "Artists"
-        case .SupportAct: return "Support Acts"
-        case .Crew: return "Crew"
-        case .Guest: return "Guests"
+        case .artist: return "Artists"
+        case .supportAct: return "Support Acts"
+        case .crew: return "Crew"
+        case .guest: return "Guests"
         }
     }
 }

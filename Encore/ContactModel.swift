@@ -17,6 +17,7 @@ struct ContactModel: Identifiable, Hashable {
         self.notes = notes
     }
 }
+
 extension ContactModel {
     func matches(_ query: String) -> Bool {
         let lowered = query.lowercased()

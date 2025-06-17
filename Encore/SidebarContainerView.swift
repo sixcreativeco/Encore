@@ -45,7 +45,7 @@ struct SidebarContainerView: View {
                 switch appState.selectedTab {
                 case "Dashboard": Text("Dashboard View")
                 case "Tours": TourListView(onTourSelected: { appState.selectedTour = $0 }).environmentObject(appState)
-                case "Contacts": ContactsView(userID: appState.userID ?? "")
+                case "Database": DatabaseView(userID: appState.userID ?? "")
                 case "Team": Text("Team View")
                 case "MyAccount": MyAccountView().environmentObject(appState)
                 case "NewTour": NewTourFlowView().environmentObject(appState)
@@ -100,8 +100,8 @@ struct SidebarContainerView: View {
                 SidebarLabel(icon: "calendar", title: "Tours", isSelected: appState.selectedTab == "Tours", spacing: 16) {
                     appState.selectedTab = "Tours"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
-                SidebarLabel(icon: "book.fill", title: "Contacts", isSelected: appState.selectedTab == "Contacts", spacing: 16) {
-                    appState.selectedTab = "Contacts"; appState.selectedTour = nil; appState.selectedShow = nil
+                SidebarLabel(icon: "book.fill", title: "Database", isSelected: appState.selectedTab == "Database", spacing: 16) {
+                    appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
                 SidebarLabel(icon: "person.2.fill", title: "Team", isSelected: appState.selectedTab == "Team", spacing: 15.2) {
                     appState.selectedTab = "Team"; appState.selectedTour = nil; appState.selectedShow = nil
@@ -141,8 +141,8 @@ struct SidebarContainerView: View {
                 SidebarIcon(icon: "calendar", isSelected: appState.selectedTab == "Tours") {
                     appState.selectedTab = "Tours"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
-                SidebarIcon(icon: "book.fill", isSelected: appState.selectedTab == "Contacts") {
-                    appState.selectedTab = "Contacts"; appState.selectedTour = nil; appState.selectedShow = nil
+                SidebarIcon(icon: "book.fill", isSelected: appState.selectedTab == "Database") {
+                    appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
                 SidebarIcon(icon: "person.2.fill", isSelected: appState.selectedTab == "Team") {
                     appState.selectedTab = "Team"; appState.selectedTour = nil; appState.selectedShow = nil
