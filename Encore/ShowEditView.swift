@@ -5,6 +5,7 @@ struct ShowEditView: View {
     @Environment(\.dismiss) var dismiss
     var tourID: String
     var userID: String
+    var ownerUserID: String
     var show: ShowModel
 
     @State private var city = ""
@@ -135,19 +136,19 @@ struct ShowEditView: View {
         self.packOut = show.packOut ?? defaultTime(hour: 23)
         self.packOutNextDay = show.packOutNextDay
 
-        // Load contact details if available (only if already added to Firestore later)
         let db = Firestore.firestore()
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").document(show.id).getDocument { doc, _ in
-            let data = doc?.data() ?? [:]
-            self.contactName = data["contactName"] as? String ?? ""
-            self.contactEmail = data["contactEmail"] as? String ?? ""
-            self.contactPhone = data["contactPhone"] as? String ?? ""
-        }
+        db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("shows").document(show.id)
+            .getDocument { doc, _ in
+                let data = doc?.data() ?? [:]
+                self.contactName = data["contactName"] as? String ?? ""
+                self.contactEmail = data["contactEmail"] as? String ?? ""
+                self.contactPhone = data["contactPhone"] as? String ?? ""
+            }
     }
 
     private func saveChanges() {
         let db = Firestore.firestore()
-        let showRef = db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").document(show.id)
+        let showRef = db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("shows").document(show.id)
 
         let showData: [String: Any] = [
             "city": city,

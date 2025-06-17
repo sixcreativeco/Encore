@@ -9,8 +9,10 @@ struct TourModel: Identifiable, Hashable, Codable {
     var endDate: Date
     var createdAt: Date
     var posterURL: String?
+    var ownerUserID: String  // <-- owner aware
 
-    init?(from document: DocumentSnapshot) {
+    // For loading from Firestore (requires ownerUserID to be passed manually when reading from sharedTours)
+    init?(from document: DocumentSnapshot, ownerUserID: String) {
         let data = document.data()
         guard
             let name = data?["tourName"] as? String,
@@ -29,9 +31,11 @@ struct TourModel: Identifiable, Hashable, Codable {
         self.endDate = endTimestamp.dateValue()
         self.createdAt = createdAtTimestamp.dateValue()
         self.posterURL = data?["posterURL"] as? String
+        self.ownerUserID = ownerUserID
     }
 
-    init(id: String, name: String, artist: String, startDate: Date, endDate: Date, createdAt: Date, posterURL: String? = nil) {
+    // For creating new TourModel instances elsewhere (now backwards compatible)
+    init(id: String, name: String, artist: String, startDate: Date, endDate: Date, createdAt: Date, posterURL: String? = nil, ownerUserID: String = "") {
         self.id = id
         self.name = name
         self.artist = artist
@@ -39,6 +43,7 @@ struct TourModel: Identifiable, Hashable, Codable {
         self.endDate = endDate
         self.createdAt = createdAt
         self.posterURL = posterURL
+        self.ownerUserID = ownerUserID
     }
 
     func hash(into hasher: inout Hasher) {

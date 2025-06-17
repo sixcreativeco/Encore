@@ -3,7 +3,7 @@ import FirebaseFirestore
 
 struct TourSummaryCardsView: View {
     var tourID: String
-    @EnvironmentObject var appState: AppState
+    var ownerUserID: String
 
     @State private var tourManagerName: String = "-"
     @State private var tourManagerRole: String = "-"
@@ -17,7 +17,7 @@ struct TourSummaryCardsView: View {
             summaryCard(title: "\(totalShows)", subtitle: "Total Shows")
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 8) // optional small top gap after header
+        .padding(.top, 8)
         .onAppear { loadTourSummaryData() }
     }
 
@@ -26,7 +26,7 @@ struct TourSummaryCardsView: View {
             Text(title).font(.title3.bold())
             Text(subtitle).font(.subheadline).foregroundColor(.gray)
         }
-        .padding(16) // internal padding inside each card
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(12)
@@ -34,10 +34,9 @@ struct TourSummaryCardsView: View {
     }
 
     private func loadTourSummaryData() {
-        guard let userID = appState.userID else { return }
         let db = Firestore.firestore()
 
-        db.collection("users").document(userID)
+        db.collection("users").document(ownerUserID)
             .collection("tours").document(tourID)
             .collection("crew")
             .whereField("roles", arrayContains: "Tour Manager")
@@ -48,14 +47,14 @@ struct TourSummaryCardsView: View {
                 }
             }
 
-        db.collection("users").document(userID)
+        db.collection("users").document(ownerUserID)
             .collection("tours").document(tourID)
             .collection("shows")
             .getDocuments { snapshot, _ in
                 self.totalShows = snapshot?.documents.count ?? 0
             }
 
-        db.collection("users").document(userID)
+        db.collection("users").document(ownerUserID)
             .collection("tours").document(tourID)
             .getDocument { doc, _ in
                 if let data = doc?.data(), let startTimestamp = data["startDate"] as? Timestamp {

@@ -4,6 +4,7 @@ import FirebaseFirestore
 struct ShowGridView: View {
     var tourID: String
     var userID: String
+    var ownerUserID: String
     var artistName: String
     var onShowSelected: (ShowModel) -> Void
 
@@ -52,7 +53,7 @@ struct ShowGridView: View {
             .padding(.horizontal)
         }
         .sheet(isPresented: $isShowingAddShowView) {
-            AddShowView(tourID: tourID, userID: userID, artistName: artistName) { }
+            AddShowView(tourID: tourID, userID: ownerUserID, artistName: artistName) { }
         }
         .onAppear { listenForShows() }
         .onDisappear { listener?.remove() }
@@ -60,7 +61,7 @@ struct ShowGridView: View {
 
     private func listenForShows() {
         let db = Firestore.firestore()
-        listener = db.collection("users").document(userID)
+        listener = db.collection("users").document(ownerUserID)
             .collection("tours").document(tourID)
             .collection("shows")
             .order(by: "date")

@@ -3,6 +3,7 @@ import FirebaseFirestore
 
 struct TourCrewView: View {
     var tourID: String
+    var ownerUserID: String
 
     @State private var crewMembers: [CrewMember] = []
     @State private var showAddCrew = false
@@ -33,15 +34,12 @@ struct TourCrewView: View {
             .shadow(radius: 1)
         }
         .frame(maxWidth: .infinity)
-        .onAppear {
-            setupListener()
-        }
+        .onAppear { setupListener() }
     }
 
     private func setupListener() {
-        guard let userID = AuthManager.shared.user?.uid else { return }
         let db = Firestore.firestore()
-        db.collection("users").document(userID)
+        db.collection("users").document(ownerUserID)
             .collection("tours").document(tourID)
             .collection("crew")
             .order(by: "name")

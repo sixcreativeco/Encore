@@ -94,6 +94,7 @@ struct NewTourFlowView: View {
                         ShowGridView(
                             tourID: tourID,
                             userID: userID,
+                            ownerUserID: userID,
                             artistName: artistName,
                             onShowSelected: { selectedShow in
                                 appState.selectedShow = selectedShow

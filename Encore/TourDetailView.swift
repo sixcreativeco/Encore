@@ -11,22 +11,33 @@ struct TourDetailView: View {
             VStack(spacing: 32) {
                 TourHeaderView(tour: tour)
                 
-                TourSummaryCardsView(tourID: tour.id)
+                TourSummaryCardsView(tourID: tour.id, ownerUserID: tour.ownerUserID)
                     .environmentObject(appState)
                 
                 GeometryReader { geometry in
                     HStack(alignment: .top, spacing: 24) {
                         ScrollView {
-                            TourItineraryView(tourID: tour.id, userID: appState.userID ?? "")
-                                .padding(.trailing, 8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            TourItineraryView(
+                                tourID: tour.id,
+                                userID: appState.userID ?? "",
+                                ownerUserID: tour.ownerUserID
+                            )
+                            .padding(.trailing, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .frame(width: geometry.size.width * 0.5, height: 500)
 
                         ScrollView {
                             VStack(spacing: 24) {
-                                TourCrewView(tourID: tour.id)
-                                TourFlightsView(tourID: tour.id, userID: appState.userID ?? "")
+                                TourCrewView(
+                                    tourID: tour.id,
+                                    ownerUserID: tour.ownerUserID
+                                )
+                                TourFlightsView(
+                                    tourID: tour.id,
+                                    userID: appState.userID ?? "",
+                                    ownerUserID: tour.ownerUserID
+                                )
                             }
                             .padding(.leading, 8)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -40,6 +51,7 @@ struct TourDetailView: View {
                     ShowGridView(
                         tourID: tour.id,
                         userID: userID,
+                        ownerUserID: tour.ownerUserID,
                         artistName: tour.artist,
                         onShowSelected: { selectedShow in
                             appState.selectedShow = selectedShow

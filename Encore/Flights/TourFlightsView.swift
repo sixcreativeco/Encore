@@ -3,6 +3,7 @@ import SwiftUI
 struct TourFlightsView: View {
     var tourID: String
     var userID: String
+    var ownerUserID: String
 
     @State private var flights: [FlightModel] = []
     @State private var showAddFlight = false
@@ -20,7 +21,7 @@ struct TourFlightsView: View {
         }
         .onAppear { loadFlights() }
         .sheet(isPresented: $showAddFlight) {
-            AddFlightView(userID: userID, tourID: tourID, onFlightAdded: { loadFlights() })
+            AddFlightView(userID: ownerUserID, tourID: tourID, onFlightAdded: { loadFlights() })
         }
     }
 
@@ -39,7 +40,7 @@ struct TourFlightsView: View {
                     flight: flight,
                     isExpanded: expandedFlightID == flight.id,
                     onExpandToggle: { toggleExpanded(flight) },
-                    onEdit: { /* Placeholder for edit */ },
+                    onEdit: { /* Placeholder */ },
                     onDelete: { deleteFlight(flight) }
                 )
                 .animation(.easeInOut, value: expandedFlightID)
@@ -58,13 +59,13 @@ struct TourFlightsView: View {
     }
 
     private func loadFlights() {
-        FirebaseFlightService.loadFlights(userID: userID, tourID: tourID) { loadedFlights in
+        FirebaseFlightService.loadFlights(userID: ownerUserID, tourID: tourID) { loadedFlights in
             self.flights = loadedFlights
         }
     }
 
     private func deleteFlight(_ flight: FlightModel) {
-        FirebaseFlightService.deleteFlight(userID: userID, tourID: tourID, flightID: flight.id) {
+        FirebaseFlightService.deleteFlight(userID: ownerUserID, tourID: tourID, flightID: flight.id) {
             loadFlights()
         }
     }

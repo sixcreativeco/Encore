@@ -35,21 +35,34 @@ struct SidebarContainerView: View {
     @ViewBuilder
     private func contentView() -> some View {
         VStack(spacing: 0) {
-            if let show = appState.selectedShow {
-                ShowDetailView(show: show, userID: appState.userID ?? "", tourID: appState.selectedTour?.id ?? "")
-                    .environmentObject(appState)
+            if let show = appState.selectedShow, let tour = appState.selectedTour {
+                ShowDetailView(
+                    show: show,
+                    userID: appState.userID ?? "",
+                    tourID: tour.id,
+                    ownerUserID: tour.ownerUserID
+                )
+                .environmentObject(appState)
             } else if let tour = appState.selectedTour {
                 TourDetailView(tour: tour)
                     .environmentObject(appState)
             } else {
                 switch appState.selectedTab {
-                case "Dashboard": Text("Dashboard View")
-                case "Tours": TourListView(onTourSelected: { appState.selectedTour = $0 }).environmentObject(appState)
-                case "Database": DatabaseView(userID: appState.userID ?? "")
-                case "Team": Text("Team View")
-                case "MyAccount": MyAccountView().environmentObject(appState)
-                case "NewTour": NewTourFlowView().environmentObject(appState)
-                default: Text("Unknown")
+                case "Dashboard":
+                    Text("Dashboard View")
+                case "Tours":
+                    TourListView(onTourSelected: { appState.selectedTour = $0 })
+                        .environmentObject(appState)
+                case "Database":
+                    DatabaseView(userID: appState.userID ?? "")
+                case "Team":
+                    Text("Team View")
+                case "MyAccount":
+                    MyAccountView().environmentObject(appState)
+                case "NewTour":
+                    NewTourFlowView().environmentObject(appState)
+                default:
+                    Text("Unknown")
                 }
             }
         }
@@ -118,9 +131,7 @@ struct SidebarContainerView: View {
                 addTourButtonExpanded
                 HStack(spacing: 6) {
                     Circle().fill(syncManager.isOnline ? Color.green : Color.gray).frame(width: 10, height: 10)
-                    Text("Online")
-                        .font(.footnote)
-                        .foregroundColor(.gray)
+                    Text("Online").font(.footnote).foregroundColor(.gray)
                 }.padding(.top, 4)
             }
             .padding(.bottom, 20)
@@ -153,7 +164,6 @@ struct SidebarContainerView: View {
             }
 
             Spacer()
-
             addTourButtonCollapsed
 
             Circle()
@@ -232,7 +242,6 @@ struct SidebarContainerView: View {
         }
     }
 }
-
 struct SidebarLabel: View {
     let icon: String
     let title: String

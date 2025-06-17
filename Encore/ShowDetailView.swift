@@ -6,6 +6,7 @@ struct ShowDetailView: View {
     let show: ShowModel
     let userID: String
     let tourID: String
+    let ownerUserID: String  // ✅ ADDED
 
     @State private var mapRegion: MKCoordinateRegion = MKCoordinateRegion()
     @State private var mapItem: MKMapItem?
@@ -37,17 +38,17 @@ struct ShowDetailView: View {
                 loadVenueNotes()
             }
             .sheet(isPresented: $showAddGuest) {
-                AddGuestView(userID: userID, tourID: tourID, showID: show.id) {
+                AddGuestView(userID: ownerUserID, tourID: tourID, showID: show.id) {  // ✅ Always write to ownerUserID
                     loadGuestList()
                 }
             }
             .sheet(isPresented: $showEditNotes) {
-                EditVenueNotesView(userID: userID, tourID: tourID, showID: show.id, notes: venueNotes) {
+                EditVenueNotesView(userID: ownerUserID, tourID: tourID, showID: show.id, notes: venueNotes) {
                     loadVenueNotes()
                 }
             }
             .sheet(isPresented: $showEditShow) {
-                ShowEditView(tourID: tourID, userID: userID, show: show)
+                ShowEditView(tourID: tourID, userID: userID, ownerUserID: ownerUserID, show: show)  // ✅ FIXED: Pass ownerUserID
             }
         }
         .navigationTitle("Show Details")
@@ -146,9 +147,7 @@ struct ShowDetailView: View {
                         Image(systemName: "person.fill").font(.system(size: 18))
                         Text(show.contactName ?? "Venue Contact")
                             .font(.system(size: 16))
-                            .onTapGesture {
-                                withAnimation { showContactDetails.toggle() }
-                            }
+                            .onTapGesture { withAnimation { showContactDetails.toggle() } }
                         if showContactDetails {
                             if let email = show.contactEmail {
                                 Text(email).font(.system(size: 14)).foregroundColor(.gray)
@@ -305,7 +304,7 @@ struct ShowDetailView: View {
 
     private func loadGuestList() {
         let db = Firestore.firestore()
-        db.collection("users").document(userID).collection("tours").document(tourID)
+        db.collection("users").document(ownerUserID).collection("tours").document(tourID)
             .collection("shows").document(show.id).collection("guestlist")
             .getDocuments { snapshot, _ in
                 self.guestList = snapshot?.documents.compactMap { GuestListItemModel(from: $0) } ?? []
@@ -314,7 +313,7 @@ struct ShowDetailView: View {
 
     private func loadVenueNotes() {
         let db = Firestore.firestore()
-        db.collection("users").document(userID).collection("tours").document(tourID)
+        db.collection("users").document(ownerUserID).collection("tours").document(tourID)
             .collection("shows").document(show.id).getDocument { doc, _ in
                 self.venueNotes = doc?.data()?["venueNotes"] as? String ?? ""
             }
@@ -323,7 +322,6 @@ struct ShowDetailView: View {
     private func loadMapForAddress() {
         let searchRequest = MKLocalSearch.Request()
         searchRequest.naturalLanguageQuery = show.address
-
         let search = MKLocalSearch(request: searchRequest)
         search.start { response, error in
             guard let mapItem = response?.mapItems.first else { return }

@@ -4,6 +4,7 @@ import FirebaseFirestore
 struct TourItineraryView: View {
     var tourID: String
     var userID: String
+    var ownerUserID: String
 
     @State private var itineraryItems: [ItineraryItemModel] = []
     @State private var showTimingItems: [ItineraryItemModel] = []
@@ -19,8 +20,7 @@ struct TourItineraryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SectionHeader(title: "Itinerary", onAdd: { showAddItem = true })
-                .padding()
+            SectionHeader(title: "Itinerary", onAdd: { showAddItem = true }).padding()
 
             if !availableDates.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -68,16 +68,14 @@ struct TourItineraryView: View {
                 }
             }
         }
-        .onAppear {
-            setupRealtimeListeners()
-        }
+        .onAppear { setupRealtimeListeners() }
         .sheet(isPresented: $showAddItem) {
-            ItineraryItemAddView(tourID: tourID, userID: userID, presetDate: selectedDate) {
+            ItineraryItemAddView(tourID: tourID, userID: ownerUserID, presetDate: selectedDate) {
                 refreshForSelectedDate()
             }
         }
         .sheet(item: $selectedItemForEdit) { item in
-            ItineraryItemEditView(tourID: tourID, userID: userID, item: item) {
+            ItineraryItemEditView(tourID: tourID, userID: ownerUserID, item: item) {
                 refreshForSelectedDate()
             }
         }
@@ -99,20 +97,17 @@ struct TourItineraryView: View {
         }
     }
 
-    private func refreshForSelectedDate() {
-        // No longer needed - handled by real-time updates
-    }
+    private func refreshForSelectedDate() {}
 
     private func deleteItem(_ item: ItineraryItemModel) {
         let db = Firestore.firestore()
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary").document(item.id).delete()
+        db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("itinerary").document(item.id).delete()
     }
 
     private func setupRealtimeListeners() {
         let db = Firestore.firestore()
 
-        // Tour dates
-        db.collection("users").document(userID).collection("tours").document(tourID)
+        db.collection("users").document(ownerUserID).collection("tours").document(tourID)
             .addSnapshotListener { snapshot, _ in
                 guard let data = snapshot?.data(),
                       let start = (data["startDate"] as? Timestamp)?.dateValue(),
@@ -121,14 +116,12 @@ struct TourItineraryView: View {
                 self.selectedDate = start
             }
 
-        // Itinerary
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary")
+        db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("itinerary")
             .addSnapshotListener { snapshot, _ in
                 self.itineraryItems = snapshot?.documents.compactMap { ItineraryItemModel(from: $0) } ?? []
             }
 
-        // Show timings
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("shows")
+        db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("shows")
             .addSnapshotListener { snapshot, _ in
                 var timings: [ItineraryItemModel] = []
                 snapshot?.documents.forEach { doc in
@@ -162,8 +155,7 @@ struct TourItineraryView: View {
                 self.showTimingItems = timings
             }
 
-        // Flights
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("flights")
+        db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("flights")
             .addSnapshotListener { snapshot, _ in
                 let flights = snapshot?.documents.compactMap { doc -> ItineraryItemModel? in
                     guard let data = doc.data() as? [String: Any],
