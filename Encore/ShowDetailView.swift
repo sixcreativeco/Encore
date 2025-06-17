@@ -255,7 +255,12 @@ struct ShowDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(guestList) { guest in
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(guest.name).font(.headline)
+                            HStack {
+                                Text(guest.name).font(.headline)
+                                if let additional = guest.additionalGuests, !additional.isEmpty, additional != "0" {
+                                    Text("+\(additional)").font(.subheadline).foregroundColor(.gray)
+                                }
+                            }
                             if let note = guest.note, !note.isEmpty {
                                 Text(note).font(.subheadline).foregroundColor(.gray)
                             }
