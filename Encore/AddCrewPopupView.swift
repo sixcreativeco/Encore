@@ -12,6 +12,11 @@ struct AddCrewPopupView: View {
     @State private var showRoleSuggestions: Bool = false
     @State private var selectedVisibility: String = "full"
     @State private var showVisibilityOptions: Bool = false
+    
+    // State for email validation
+    private enum EmailValidationState { case none, checking, valid, invalid }
+    @State private var emailValidationState: EmailValidationState = .none
+    @State private var emailCheckTask: Task<Void, Never>? = nil
 
     @State private var roleOptions: [String] = [
         "Lead Artist", "Support Artist", "DJ", "Dancer", "Guest Performer", "Musician",
@@ -67,8 +72,8 @@ struct AddCrewPopupView: View {
                 .padding()
         }
         .buttonStyle(PlainButtonStyle())
-        .background(Color.gray.opacity(0))
-        .foregroundColor(.primary)
+        .background(Color.accentColor) // Changed to accent color for better visibility
+        .foregroundColor(.white)
         .cornerRadius(12)
         .padding(.top, 24)
     }
@@ -77,7 +82,25 @@ struct AddCrewPopupView: View {
         VStack(spacing: 16) {
             HStack(spacing: 16) {
                 CustomTextField(placeholder: "Name", text: $newCrewName)
-                CustomTextField(placeholder: "Email", text: $newCrewEmail)
+                
+                HStack(spacing: 8) {
+                    CustomTextField(placeholder: "Email", text: $newCrewEmail)
+                    
+                    // Email validation indicator
+                    switch emailValidationState {
+                    case .checking:
+                        ProgressView().scaleEffect(0.5)
+                    case .valid:
+                        Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                    case .invalid:
+                        EmptyView().frame(width: 20) // No indicator for invalid, per request
+                    case .none:
+                        EmptyView().frame(width: 20)
+                    }
+                }
+            }
+            .onChange(of: newCrewEmail) { newValue in
+                checkEmailWithDebounce(email: newValue)
             }
 
             VStack(spacing: 0) {
@@ -112,7 +135,7 @@ struct AddCrewPopupView: View {
                         .padding(.vertical, 6)
                     }
                     .frame(height: 42)
-                    .background(Color.gray.opacity(0.05))
+                    .background(Color(nsColor: .controlBackgroundColor))
                     .cornerRadius(8)
                 }
 
@@ -190,11 +213,40 @@ struct AddCrewPopupView: View {
                         .cornerRadius(8)
                         .shadow(radius: 2)
                         .frame(width: 200)
-                        .position(x: 100, y: 120)
+                        .offset(y: 45) // Position dropdown below the button
                         .zIndex(10)
                     }
                 }
-                .frame(height: 70)
+                .frame(height: 70, alignment: .top)
+            }
+        }
+    }
+    
+    private func checkEmailWithDebounce(email: String) {
+        emailCheckTask?.cancel()
+        
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !trimmedEmail.isEmpty, trimmedEmail.contains("@") else {
+            emailValidationState = .none
+            return
+        }
+
+        emailValidationState = .checking
+        
+        emailCheckTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000) // 0.5s debounce
+                guard !Task.isCancelled else { return }
+                
+                FirebaseUserService.shared.checkUserExists(byEmail: trimmedEmail) { foundUserID in
+                    DispatchQueue.main.async {
+                        self.emailValidationState = (foundUserID != nil) ? .valid : .invalid
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.emailValidationState = .invalid
+                }
             }
         }
     }
@@ -210,7 +262,6 @@ struct AddCrewPopupView: View {
 
     private func visibilityDescription(for option: String) -> String {
         let name = newCrewName.isEmpty ? "They" : newCrewName
-
         switch option {
         case "full": return "\(name) can see the full itinerary. Best for core crew, admins, and agents."
         case "limited": return "\(name) can see most details. Good for production and show crew."
@@ -231,29 +282,23 @@ struct AddCrewPopupView: View {
     }
 
     private func saveCrewMember() {
-        guard !newCrewName.isEmpty, !selectedRoles.isEmpty else { return }
+        guard !newCrewName.isEmpty, !selectedRoles.isEmpty, !newCrewEmail.isEmpty else { return }
 
         let db = Firestore.firestore()
         let crewData: [String: Any] = [
             "name": newCrewName.trimmingCharacters(in: .whitespaces),
-            "email": newCrewEmail.trimmingCharacters(in: .whitespaces),
+            "email": newCrewEmail.trimmingCharacters(in: .whitespaces).lowercased(),
             "roles": selectedRoles,
             "visibility": selectedVisibility,
             "createdAt": Date()
         ]
 
         db.collection("users")
-            .document(AuthManager.shared.user?.uid ?? "")
+            .document(AuthManager.shared.user?.uid ?? "") // Ensure AuthManager is accessible
             .collection("tours")
             .document(tourID)
             .collection("crew")
             .addDocument(data: crewData)
-
-        newCrewName = ""
-        newCrewEmail = ""
-        roleInput = ""
-        selectedRoles = []
-        selectedVisibility = "full"
 
         presentationMode.wrappedValue.dismiss()
     }

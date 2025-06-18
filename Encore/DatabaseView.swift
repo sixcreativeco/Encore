@@ -9,35 +9,71 @@ struct DatabaseView: View {
         case hotels = "Hotels"
     }
 
+    private enum ActiveSheet: Identifiable {
+        case addContact, addVenue, addHotel
+        var id: Int { hashValue }
+    }
+
     @State private var selectedSection: SectionType = .contacts
     @State private var searchText: String = ""
     @State private var selectedFilter: String = "All"
     @State private var sortField: String = ""
     @State private var sortAscending: Bool = true
+    @State private var activeSheet: ActiveSheet?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            customHeader
+            headerAndActions
             searchAndFilterBar
             Divider()
             sectionContent
         }
         .padding()
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .addContact:
+                DBAddContactView() // New View
+            case .addVenue:
+                DBAddVenueView() // New View
+            case .addHotel:
+                DBAddHotelView() // New View
+            }
+        }
     }
 
-    private var customHeader: some View {
-        HStack(spacing: 24) {
-            ForEach(SectionType.allCases, id: \.self) { section in
-                Button(action: { selectedSection = section }) {
-                    Text(section.rawValue)
-                        .font(.largeTitle.bold())
-                        .foregroundColor(selectedSection == section ? .primary : .gray)
+    private var headerAndActions: some View {
+        HStack(alignment: .center) {
+            HStack(spacing: 24) {
+                ForEach(SectionType.allCases, id: \.self) { section in
+                    Button(action: { selectedSection = section }) {
+                        Text(section.rawValue)
+                            .font(.largeTitle.bold())
+                            .foregroundColor(selectedSection == section ? .primary : .gray)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.bottom, 10)
+            
             Spacer()
+            
+            Button(action: {
+                switch selectedSection {
+                case .contacts:
+                    activeSheet = .addContact
+                case .venues:
+                    activeSheet = .addVenue
+                case .hotels:
+                    activeSheet = .addHotel
+                }
+            }) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title)
+                    .foregroundColor(.accentColor)
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 10)
         }
-        .padding(.bottom, 10)
     }
 
     private var searchAndFilterBar: some View {

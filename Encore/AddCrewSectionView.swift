@@ -13,6 +13,11 @@ struct AddCrewSectionView: View {
     @State private var selectedVisibility: String = "full"
     @State private var showVisibilityOptions: Bool = false
 
+    @State private var emailValidationState: EmailValidationState = .none
+    @State private var emailCheckTask: Task<Void, Never>? = nil
+
+    private enum EmailValidationState { case none, checking, valid, invalid }
+
     @State private var roleOptions: [String] = [
         "Lead Artist", "Support Artist", "DJ", "Dancer", "Guest Performer", "Musician",
         "Content", "Tour Manager", "Artist Manager", "Road Manager", "Assistant Manager",
@@ -41,46 +46,59 @@ struct AddCrewSectionView: View {
             VStack(spacing: 16) {
                 HStack(spacing: 12) {
                     CustomTextField(placeholder: "Name", text: $newCrewName)
-                    CustomTextField(placeholder: "Email", text: $newCrewEmail)
 
-                    ZStack(alignment: .topLeading) {
-                        VStack(spacing: 0) {
-                            ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        CustomTextField(placeholder: "Email", text: $newCrewEmail)
+
+                        switch emailValidationState {
+                        case .checking:
+                            ProgressView().scaleEffect(0.5)
+                        case .valid:
+                            Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                        default:
+                            EmptyView().frame(width: 20)
+                        }
+                    }
+                }
+                .onChange(of: newCrewEmail) { newValue in
+                    checkEmailWithDebounce(email: newValue)
+                }
+
+                VStack(spacing: 4) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(selectedRoles, id: \.self) { role in
                                 HStack(spacing: 6) {
-                                    ForEach(selectedRoles, id: \.self) { role in
-                                        HStack(spacing: 6) {
-                                            Text(role).font(.subheadline)
-                                            Button(action: { selectedRoles.removeAll { $0 == role } }) {
-                                                Image(systemName: "xmark")
-                                                    .font(.system(size: 10, weight: .bold))
-                                                    .foregroundColor(.gray)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.gray.opacity(0.2))
-                                        .cornerRadius(6)
+                                    Text(role).font(.subheadline)
+                                    Button(action: { selectedRoles.removeAll { $0 == role } }) {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.gray)
                                     }
-
-                                    TextField("Type a role", text: $roleInput)
-                                        .textFieldStyle(PlainTextFieldStyle())
-                                        .frame(minWidth: 100)
-                                        .onChange(of: roleInput) { value in
-                                            showRoleSuggestions = !value.isEmpty
-                                        }
-                                        .onSubmit {
-                                            addCustomRole()
-                                        }
+                                    .buttonStyle(.plain)
                                 }
                                 .padding(.horizontal, 8)
-                                .padding(.vertical, 6)
+                                .padding(.vertical, 4)
+                                .background(Color.gray.opacity(0.2))
+                                .cornerRadius(6)
                             }
-                            .frame(height: 42)
-                            .background(Color.gray.opacity(0.05))
-                            .cornerRadius(8)
-                        }
 
+                            TextField("Type a role", text: $roleInput)
+                                .textFieldStyle(PlainTextFieldStyle())
+                                .frame(minWidth: 100)
+                                .onChange(of: roleInput) { value in
+                                    showRoleSuggestions = !value.isEmpty
+                                }
+                                .onSubmit { addCustomRole() }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                    }
+                    .frame(height: 42)
+                    .background(Color.gray.opacity(0.05))
+                    .cornerRadius(8)
+
+                    ZStack {
                         if showRoleSuggestions && !filteredRoles.isEmpty {
                             VStack(spacing: 0) {
                                 ForEach(filteredRoles.prefix(5), id: \.self) { suggestion in
@@ -93,78 +111,67 @@ struct AddCrewSectionView: View {
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                             .padding(8)
                                     }
+                                    .buttonStyle(.plain)
                                 }
                             }
                             .background(.background)
                             .cornerRadius(6)
                             .shadow(radius: 1)
-                            .offset(y: 50)
-                            .zIndex(1)
+                            .padding(.top, 4)
                         }
                     }
-                    .frame(maxWidth: .infinity)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Visibility").font(.subheadline).bold()
 
-                    ZStack(alignment: .topLeading) {
-                        HStack(alignment: .top, spacing: 8) {
-                            Button(action: {
-                                withAnimation { showVisibilityOptions.toggle() }
-                            }) {
-                                HStack {
-                                    Text(visibilityTitle(for: selectedVisibility))
-                                        .font(.subheadline)
-                                        .foregroundColor(.primary)
-                                    Spacer()
-                                    Image(systemName: showVisibilityOptions ? "chevron.up" : "chevron.down")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(.gray)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 12)
-                                .background(Color.gray.opacity(0.05))
-                                .cornerRadius(8)
+                    VStack(spacing: 0) {
+                        Button(action: { withAnimation { showVisibilityOptions.toggle() } }) {
+                            HStack {
+                                Text(visibilityTitle(for: selectedVisibility))
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Image(systemName: showVisibilityOptions ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.gray)
                             }
-                            .frame(width: 200)
-
-                            Text(visibilityDescription(for: selectedVisibility))
-                                .font(.footnote)
-                                .foregroundColor(.gray)
-                                .lineLimit(3)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading )
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 12)
+                            .background(Color.gray.opacity(0.05))
+                            .cornerRadius(8)
                         }
-                        .frame(height: 70)
+                        .frame(width: 200)
 
                         if showVisibilityOptions {
                             VStack(spacing: 0) {
-                                VStack(spacing: 0) {
-                                    ForEach(visibilityOptions, id: \.self) { option in
-                                        Button(action: {
-                                            selectedVisibility = option
-                                            showVisibilityOptions = false
-                                        }) {
-                                            Text(visibilityTitle(for: option))
-                                                .padding(.vertical, 12)
-                                                .padding(.horizontal, 12)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .foregroundColor(.primary)
+                                ForEach(visibilityOptions, id: \.self) { option in
+                                    Button(action: {
+                                        selectedVisibility = option
+                                        showVisibilityOptions = false
+                                    }) {
+                                        Text(visibilityTitle(for: option))
+                                            .padding(.vertical, 12)
+                                            .padding(.horizontal, 12)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
                                     }
+                                    .buttonStyle(.plain)
+                                    .foregroundColor(.primary)
                                 }
-                                .background(.background)
-                                .cornerRadius(8)
-                                .shadow(radius: 2)
                             }
-                            .frame(width: 200)
-                            .position(x: 100, y: 120)
-                            .zIndex(10)
+                            .background(.background)
+                            .cornerRadius(8)
+                            .shadow(radius: 2)
+                            .padding(.top, 4)
                         }
                     }
-                    .frame(height: 70)
+
+                    Text(visibilityDescription(for: selectedVisibility))
+                        .font(.footnote)
+                        .foregroundColor(.gray)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Button(action: { saveCrewMember() }) {
@@ -194,6 +201,35 @@ struct AddCrewSectionView: View {
         .onAppear { loadCrew() }
     }
 
+    private func checkEmailWithDebounce(email: String) {
+        emailCheckTask?.cancel()
+
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !trimmedEmail.isEmpty, trimmedEmail.contains("@") else {
+            emailValidationState = .none
+            return
+        }
+
+        emailValidationState = .checking
+
+        emailCheckTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000)
+                guard !Task.isCancelled else { return }
+
+                FirebaseUserService.shared.checkUserExists(byEmail: trimmedEmail) { foundUserID in
+                    DispatchQueue.main.async {
+                        self.emailValidationState = (foundUserID != nil) ? .valid : .invalid
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.emailValidationState = .invalid
+                }
+            }
+        }
+    }
+
     private func visibilityTitle(for option: String) -> String {
         switch option {
         case "full": return "Full"
@@ -205,16 +241,11 @@ struct AddCrewSectionView: View {
 
     private func visibilityDescription(for option: String) -> String {
         let name = newCrewName.isEmpty ? "They" : newCrewName
-
         switch option {
-        case "full":
-            return "\(name) can see the full itinerary. Best for core crew, admins, and agents."
-        case "limited":
-            return "\(name) can see most details. Good for production and show crew."
-        case "temporary":
-            return "\(name) can see show times and assigned items only. Best for support acts and one-offs."
-        default:
-            return ""
+        case "full": return "\(name) can see the full itinerary. Best for core crew, admins, and agents."
+        case "limited": return "\(name) can see most details. Good for production and show crew."
+        case "temporary": return "\(name) can see show times and assigned items only. Best for support acts and one-offs."
+        default: return ""
         }
     }
 
