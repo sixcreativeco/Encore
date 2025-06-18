@@ -4,6 +4,20 @@ import FirebaseFirestore
 struct FirebaseFlightService {
     static let db = Firestore.firestore()
 
+    // NEW: Real-time listener function
+    static func addFlightsListener(userID: String, tourID: String, completion: @escaping ([FlightModel]) -> Void) -> ListenerRegistration {
+        return db.collection("users").document(userID).collection("tours").document(tourID).collection("flights")
+            .addSnapshotListener { snapshot, error in
+                guard let documents = snapshot?.documents else {
+                    print("Error fetching flight snapshots: \(error?.localizedDescription ?? "Unknown error")")
+                    completion([])
+                    return
+                }
+                let flights = documents.compactMap { FlightModel(from: $0) }
+                completion(flights)
+            }
+    }
+
     static func saveFlight(userID: String, tourID: String, flight: FlightModel, passengers: [String], completion: @escaping () -> Void) {
         let flightData: [String: Any] = [
             "airline": flight.airline,

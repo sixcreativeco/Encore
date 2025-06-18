@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct TourFlightsView: View {
     var tourID: String
@@ -8,6 +9,7 @@ struct TourFlightsView: View {
     @State private var flights: [FlightModel] = []
     @State private var showAddFlight = false
     @State private var expandedFlightID: String? = nil
+    @State private var flightListener: ListenerRegistration? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -19,9 +21,10 @@ struct TourFlightsView: View {
                 flightList
             }
         }
-        .onAppear { loadFlights() }
+        .onAppear { setupListener() }
+        .onDisappear { flightListener?.remove() }
         .sheet(isPresented: $showAddFlight) {
-            AddFlightView(userID: ownerUserID, tourID: tourID, onFlightAdded: { loadFlights() })
+            AddFlightView(userID: ownerUserID, tourID: tourID, onFlightAdded: {})
         }
     }
 
@@ -58,15 +61,20 @@ struct TourFlightsView: View {
         }
     }
 
-    private func loadFlights() {
-        FirebaseFlightService.loadFlights(userID: ownerUserID, tourID: tourID) { loadedFlights in
-            self.flights = loadedFlights
+    private func setupListener() {
+        // Remove any existing listener to prevent duplicates
+        flightListener?.remove()
+        
+        // Set up the new real-time listener
+        flightListener = FirebaseFlightService.addFlightsListener(userID: ownerUserID, tourID: tourID) { loadedFlights in
+            self.flights = loadedFlights.sorted(by: { $0.departureTime < $1.departureTime })
         }
     }
 
     private func deleteFlight(_ flight: FlightModel) {
+        // This delete logic remains unchanged as per your instruction.
         FirebaseFlightService.deleteFlight(userID: ownerUserID, tourID: tourID, flightID: flight.id) {
-            loadFlights()
+            // UI will update automatically from the listener, so no local removal is needed.
         }
     }
 }

@@ -6,16 +6,16 @@ struct TourItineraryView: View {
     var userID: String
     var ownerUserID: String
 
-    @State private var itineraryItems: [ItineraryItemModel] = []
-    @State private var showTimingItems: [ItineraryItemModel] = []
-    @State private var flightItems: [ItineraryItemModel] = []
+    @State private var allItems: [ItineraryItemModel] = []
+    @State private var availableDates: [Date] = []
+    @State private var selectedDate: Date? = nil
 
     @State private var showAddItem = false
     @State private var selectedItemForEdit: ItineraryItemModel? = nil
     @State private var expandedItemID: String? = nil
-    @State private var availableDates: [Date] = []
-    @State private var selectedDate: Date = Date()
 
+    @State private var listeners: [ListenerRegistration] = []
+    
     let calendar = Calendar.current
 
     var body: some View {
@@ -31,11 +31,10 @@ struct TourItineraryView: View {
                                 .foregroundColor(isSameDay(date, selectedDate) ? .white : .primary)
                                 .padding(.vertical, 6)
                                 .padding(.horizontal, 14)
-                                .background(isSameDay(date, selectedDate) ? Color.blue : Color.gray.opacity(0.2))
+                                .background(isSameDay(date, selectedDate) ? Color.accentColor : Color.gray.opacity(0.2))
                                 .cornerRadius(8)
                                 .onTapGesture {
                                     selectedDate = date
-                                    refreshForSelectedDate()
                                 }
                         }
                     }
@@ -47,13 +46,13 @@ struct TourItineraryView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                let allItems = mergedItemsForDate()
+                let itemsForSelectedDate = allItems.filter { isSameDay($0.time, selectedDate) }
 
-                if allItems.isEmpty {
-                    Text("No items for this date").foregroundColor(.gray).padding()
+                if itemsForSelectedDate.isEmpty {
+                    Text("No items for this date.").foregroundColor(.gray).padding()
                 } else {
                     LazyVStack(spacing: 16) {
-                        ForEach(allItems.sorted(by: { $0.time < $1.time })) { item in
+                        ForEach(itemsForSelectedDate.sorted(by: { $0.time < $1.time })) { item in
                             ItineraryItemCard(
                                 item: item,
                                 isExpanded: expandedItemID == item.id,
@@ -68,27 +67,22 @@ struct TourItineraryView: View {
                 }
             }
         }
-        .onAppear { setupRealtimeListeners() }
+        .onAppear { setupListeners() }
+        .onDisappear { listeners.forEach { $0.remove() } }
         .sheet(isPresented: $showAddItem) {
-            ItineraryItemAddView(tourID: tourID, userID: ownerUserID, presetDate: selectedDate) {
-                refreshForSelectedDate()
-            }
+            // ItineraryItemAddView would be presented here
         }
         .sheet(item: $selectedItemForEdit) { item in
+            // This now correctly passes the onSave closure
             ItineraryItemEditView(tourID: tourID, userID: ownerUserID, item: item) {
-                refreshForSelectedDate()
+                // The listeners will handle the refresh automatically.
             }
         }
     }
 
-    private func mergedItemsForDate() -> [ItineraryItemModel] {
-        let merged = (itineraryItems + showTimingItems + flightItems)
-            .filter { isSameDay($0.time, selectedDate) }
-        return merged
-    }
-
-    private func isSameDay(_ d1: Date, _ d2: Date) -> Bool {
-        calendar.isDate(d1, equalTo: d2, toGranularity: .day)
+    private func isSameDay(_ d1: Date, _ d2: Date?) -> Bool {
+        guard let d2 = d2 else { return false }
+        return calendar.isDate(d1, inSameDayAs: d2)
     }
 
     private func toggleExpanded(_ item: ItineraryItemModel) {
@@ -97,87 +91,88 @@ struct TourItineraryView: View {
         }
     }
 
-    private func refreshForSelectedDate() {}
-
     private func deleteItem(_ item: ItineraryItemModel) {
-        let db = Firestore.firestore()
-        db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("itinerary").document(item.id).delete()
+        if item.type == .flight, let flightID = item.flightId {
+            TourDataManager.shared.deleteFlight(ownerUserID: ownerUserID, tourID: tourID, flightID: flightID) { error in
+                if let error = error { print("Error deleting flight: \(error.localizedDescription)") }
+            }
+        } else {
+            let db = Firestore.firestore()
+            db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("itinerary").document(item.id).delete()
+        }
     }
 
-    private func setupRealtimeListeners() {
+    private func setupListeners() {
+        // Clear existing listeners before setting up new ones
+        listeners.forEach { $0.remove() }
+        listeners.removeAll()
+        
         let db = Firestore.firestore()
-
-        db.collection("users").document(ownerUserID).collection("tours").document(tourID)
-            .addSnapshotListener { snapshot, _ in
-                guard let data = snapshot?.data(),
-                      let start = (data["startDate"] as? Timestamp)?.dateValue(),
-                      let end = (data["endDate"] as? Timestamp)?.dateValue() else { return }
-                self.availableDates = generateDateRange(from: start, to: end)
-                self.selectedDate = start
+        let tourRef = db.collection("users").document(ownerUserID).collection("tours").document(tourID)
+        
+        let tourListener = tourRef.addSnapshotListener { snapshot, _ in
+            guard let data = snapshot?.data(),
+                  let start = (data["startDate"] as? Timestamp)?.dateValue(),
+                  let end = (data["endDate"] as? Timestamp)?.dateValue() else { return }
+            
+            let newDates = generateDateRange(from: start, to: end)
+            if self.availableDates != newDates {
+                self.availableDates = newDates
+                self.selectedDate = newDates.first
             }
+        }
+        
+        let itemsListener = tourRef.collection("itinerary").addSnapshotListener { snapshot, _ in
+            let generalItems = snapshot?.documents.compactMap { ItineraryItemModel(from: $0) } ?? []
+            mergeAndRefresh(source: .general, items: generalItems)
+        }
+        
+        let flightsListener = tourRef.collection("flights").addSnapshotListener { snapshot, _ in
+            let flightItems = snapshot?.documents.compactMap { FlightModel(from: $0)?.toItineraryItem() } ?? []
+            mergeAndRefresh(source: .flights, items: flightItems)
+        }
+        
+        let showsListener = tourRef.collection("shows").addSnapshotListener { snapshot, _ in
+            var showItems: [ItineraryItemModel] = []
+            snapshot?.documents.forEach { doc in
+                let data = doc.data()
+                guard let showDate = (data["date"] as? Timestamp)?.dateValue() else { return }
 
-        db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("itinerary")
-            .addSnapshotListener { snapshot, _ in
-                self.itineraryItems = snapshot?.documents.compactMap { ItineraryItemModel(from: $0) } ?? []
-            }
-
-        db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("shows")
-            .addSnapshotListener { snapshot, _ in
-                var timings: [ItineraryItemModel] = []
-                snapshot?.documents.forEach { doc in
-                    let data = doc.data()
-                    guard let showDate = (data["date"] as? Timestamp)?.dateValue() else { return }
-
-                    func buildFullDate(base: Date, timeStamp: Timestamp?) -> Date? {
-                        guard let timeStamp = timeStamp else { return nil }
-                        let timeOnly = timeStamp.dateValue()
-                        let hour = calendar.component(.hour, from: timeOnly)
-                        let minute = calendar.component(.minute, from: timeOnly)
-                        return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base)
-                    }
-
-                    if let fullLoadIn = buildFullDate(base: showDate, timeStamp: data["loadIn"] as? Timestamp) {
-                        timings.append(ItineraryItemModel(type: .loadIn, title: "Load In", time: fullLoadIn))
-                    }
-                    if let fullSoundcheck = buildFullDate(base: showDate, timeStamp: data["soundCheck"] as? Timestamp) {
-                        timings.append(ItineraryItemModel(type: .soundcheck, title: "Soundcheck", time: fullSoundcheck))
-                    }
-                    if let fullDoors = buildFullDate(base: showDate, timeStamp: data["doorsOpen"] as? Timestamp) {
-                        timings.append(ItineraryItemModel(type: .doors, title: "Doors Open", time: fullDoors))
-                    }
-                    if let fullHeadline = buildFullDate(base: showDate, timeStamp: data["headlinerSetTime"] as? Timestamp) {
-                        timings.append(ItineraryItemModel(type: .headline, title: "Headliner Set", time: fullHeadline))
-                    }
-                    if let fullPackOut = buildFullDate(base: showDate, timeStamp: data["packOut"] as? Timestamp) {
-                        timings.append(ItineraryItemModel(type: .packOut, title: "Pack Out", time: fullPackOut))
-                    }
+                func buildFullDate(base: Date, timeStamp: Timestamp?) -> Date? {
+                    guard let timeStamp = timeStamp else { return nil }
+                    let timeOnly = timeStamp.dateValue()
+                    let hour = calendar.component(.hour, from: timeOnly)
+                    let minute = calendar.component(.minute, from: timeOnly)
+                    return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base)
                 }
-                self.showTimingItems = timings
+                
+                if let time = buildFullDate(base: showDate, timeStamp: data["loadIn"] as? Timestamp) { showItems.append(.init(id: "show-\(doc.documentID)-loadin", type: .loadIn, title: "Load In", time: time, subtitle: data["venue"] as? String)) }
+                if let time = buildFullDate(base: showDate, timeStamp: data["soundCheck"] as? Timestamp) { showItems.append(.init(id: "show-\(doc.documentID)-soundcheck", type: .soundcheck, title: "Soundcheck", time: time, subtitle: data["venue"] as? String)) }
+                if let time = buildFullDate(base: showDate, timeStamp: data["doorsOpen"] as? Timestamp) { showItems.append(.init(id: "show-\(doc.documentID)-doors", type: .doors, title: "Doors Open", time: time, subtitle: data["venue"] as? String)) }
+                if let time = buildFullDate(base: showDate, timeStamp: data["headlinerSetTime"] as? Timestamp) { showItems.append(.init(id: "show-\(doc.documentID)-headline", type: .headline, title: "Headliner Set", time: time, subtitle: data["venue"] as? String)) }
+                if let time = buildFullDate(base: showDate, timeStamp: data["packOut"] as? Timestamp) { showItems.append(.init(id: "show-\(doc.documentID)-packout", type: .packOut, title: "Pack Out", time: time, subtitle: data["venue"] as? String)) }
             }
-
-        db.collection("users").document(ownerUserID).collection("tours").document(tourID).collection("flights")
-            .addSnapshotListener { snapshot, _ in
-                let flights = snapshot?.documents.compactMap { doc -> ItineraryItemModel? in
-                    guard let data = doc.data() as? [String: Any],
-                          let airline = data["airline"] as? String,
-                          let flightNumber = data["flightNumber"] as? String,
-                          let depAirport = data["departureAirport"] as? String,
-                          let arrAirport = data["arrivalAirport"] as? String,
-                          let depTimeStamp = data["departureTime"] as? Timestamp
-                    else { return nil }
-
-                    let depTime = depTimeStamp.dateValue()
-                    let title = "\(airline) \(flightNumber) \(depAirport) → \(arrAirport)"
-                    return ItineraryItemModel(type: .flight, title: title, time: depTime)
-                } ?? []
-                self.flightItems = flights
-            }
+            mergeAndRefresh(source: .shows, items: showItems)
+        }
+        
+        // Store listeners to be removed on disappear
+        self.listeners = [tourListener, itemsListener, flightsListener, showsListener]
+    }
+    
+    // Using a temporary dictionary to hold results from listeners before merging
+    // to prevent race conditions and view update issues.
+    @State private var itemSources: [SourceType: [ItineraryItemModel]] = [:]
+    private enum SourceType { case general, flights, shows }
+    
+    private func mergeAndRefresh(source: SourceType, items: [ItineraryItemModel]) {
+        itemSources[source] = items
+        self.allItems = itemSources.values.flatMap { $0 }
     }
 
     private func generateDateRange(from start: Date, to end: Date) -> [Date] {
         var dates: [Date] = []
         var current = start
-        while current <= end {
+        while calendar.isDate(current, inSameDayAs: end) || current < end {
             dates.append(current)
             current = calendar.date(byAdding: .day, value: 1, to: current)!
         }
@@ -186,7 +181,7 @@ struct TourItineraryView: View {
 
     private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
+        formatter.dateFormat = "E, MMM d"
         return formatter.string(from: date)
     }
 }

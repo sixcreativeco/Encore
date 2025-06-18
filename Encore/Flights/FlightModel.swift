@@ -9,6 +9,7 @@ struct FlightModel: Identifiable, Codable {
     var arrivalAirport: String
     var departureTime: Date
     var passengers: [String]
+    var note: String?
 
     init(id: String = UUID().uuidString,
          airline: String,
@@ -16,7 +17,8 @@ struct FlightModel: Identifiable, Codable {
          departureAirport: String,
          arrivalAirport: String,
          departureTime: Date,
-         passengers: [String] = []) {
+         passengers: [String] = [],
+         note: String? = nil) {
         self.id = id
         self.airline = airline
         self.flightNumber = flightNumber
@@ -24,6 +26,7 @@ struct FlightModel: Identifiable, Codable {
         self.arrivalAirport = arrivalAirport
         self.departureTime = departureTime
         self.passengers = passengers
+        self.note = note
     }
 
     init?(from document: DocumentSnapshot) {
@@ -42,6 +45,19 @@ struct FlightModel: Identifiable, Codable {
         self.arrivalAirport = arrivalAirport
         self.departureTime = timestamp.dateValue()
         self.passengers = data["passengers"] as? [String] ?? []
+        self.note = data["note"] as? String
+    }
+
+    func toFirestore() -> [String: Any] {
+        return [
+            "airline": airline,
+            "flightNumber": flightNumber,
+            "departureAirport": departureAirport,
+            "arrivalAirport": arrivalAirport,
+            "departureTime": Timestamp(date: departureTime),
+            "passengers": passengers,
+            "note": note ?? NSNull()
+        ]
     }
 
     var airlineCode: String {
@@ -57,11 +73,13 @@ struct FlightModel: Identifiable, Codable {
     
     func toItineraryItem() -> ItineraryItemModel {
         return ItineraryItemModel(
-            id: id,
+            id: "flight-\(self.id)", // Itinerary items need their own unique ID
             type: .flight,
-            title: "\(airline) \(flightNumber)",
-            time: departureTime,
-            note: "\(departureAirport) → \(arrivalAirport)"
+            title: "\(self.airline) \(self.flightNumber)",
+            time: self.departureTime,
+            subtitle: "\(self.departureAirport) → \(self.arrivalAirport)", // Use subtitle for route
+            note: self.note, // Pass the synchronized note
+            flightId: self.id // Pass the original flight ID to create a link
         )
     }
 }
