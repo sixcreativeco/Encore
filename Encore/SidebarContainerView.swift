@@ -57,6 +57,9 @@ struct SidebarContainerView: View {
                     DatabaseView(userID: appState.userID ?? "")
                 case "Team":
                     Text("Team View")
+                case "Export":
+                    ExportView()
+                        .environmentObject(appState)
                 case "MyAccount":
                     MyAccountView().environmentObject(appState)
                 case "NewTour":
@@ -110,16 +113,19 @@ struct SidebarContainerView: View {
                 SidebarLabel(icon: "rectangle.grid.2x2.fill", title: "Dashboard", isSelected: appState.selectedTab == "Dashboard", spacing: 16) {
                     appState.selectedTab = "Dashboard"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
-                SidebarLabel(icon: "calendar", title: "Tours", isSelected: appState.selectedTab == "Tours", spacing: 16) {
+                SidebarLabel(icon: "calendar", title: "Tours", isSelected: appState.selectedTab == "Tours", spacing: 16.5) {
                     appState.selectedTab = "Tours"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
                 SidebarLabel(icon: "book.fill", title: "Database", isSelected: appState.selectedTab == "Database", spacing: 16) {
                     appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
-                SidebarLabel(icon: "person.2.fill", title: "Team", isSelected: appState.selectedTab == "Team", spacing: 15.2) {
+                SidebarLabel(icon: "person.2.fill", title: "Team", isSelected: appState.selectedTab == "Team", spacing: 13.9) {
                     appState.selectedTab = "Team"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
-                SidebarLabel(icon: "person.crop.circle", title: "My Account", isSelected: appState.selectedTab == "MyAccount", spacing: 25.2) {
+                SidebarLabel(icon: "square.and.arrow.up.fill", title: "Export", isSelected: appState.selectedTab == "Export", spacing: 18.8) {
+                    appState.selectedTab = "Export" // Does not reset selection
+                }
+                SidebarLabel(icon: "person.crop.circle", title: "My Account", isSelected: appState.selectedTab == "MyAccount", spacing: 17.0) {
                     appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
             }
@@ -158,12 +164,16 @@ struct SidebarContainerView: View {
                 SidebarIcon(icon: "person.2.fill", isSelected: appState.selectedTab == "Team") {
                     appState.selectedTab = "Team"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
+                SidebarIcon(icon: "square.and.arrow.up.fill", isSelected: appState.selectedTab == "Export") {
+                    appState.selectedTab = "Export" // Does not reset selection
+                }
                 SidebarIcon(icon: "person.crop.circle", isSelected: appState.selectedTab == "MyAccount") {
                     appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
             }
-
+            
             Spacer()
+
             addTourButtonCollapsed
 
             Circle()

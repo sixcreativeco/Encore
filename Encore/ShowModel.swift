@@ -19,12 +19,18 @@ struct ShowModel: Identifiable, Codable, Hashable {
     var soundCheck: Date?
     var doorsOpen: Date?
 
-    struct SupportAct: Codable, Hashable {
+    struct SupportAct: Codable, Hashable, Identifiable {
+        var id = UUID()
         var name: String
         var type: String
         var soundCheck: Date
         var setTime: Date
         var changeoverMinutes: Int
+        
+        // CodingKeys to exclude `id` from Firestore operations.
+        enum CodingKeys: String, CodingKey {
+            case name, type, soundCheck, setTime, changeoverMinutes
+        }
     }
     var supportActs: [SupportAct] = []
 

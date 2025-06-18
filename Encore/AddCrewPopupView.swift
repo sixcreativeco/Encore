@@ -12,7 +12,6 @@ struct AddCrewPopupView: View {
     @State private var showRoleSuggestions: Bool = false
     @State private var selectedVisibility: String = "full"
     @State private var showVisibilityOptions: Bool = false
-    @State private var matchingUserID: String? = nil
 
     @State private var roleOptions: [String] = [
         "Lead Artist", "Support Artist", "DJ", "Dancer", "Guest Performer", "Musician",
@@ -78,159 +77,140 @@ struct AddCrewPopupView: View {
         VStack(spacing: 16) {
             HStack(spacing: 16) {
                 CustomTextField(placeholder: "Name", text: $newCrewName)
-                ZStack(alignment: .trailing) {
-                    CustomTextField(placeholder: "Email", text: $newCrewEmail)
-                        .onChange(of: newCrewEmail) { value in checkEmail(value) }
-                    
-                    if let id = matchingUserID {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .padding(.trailing, 8)
-                    }
-                }
+                CustomTextField(placeholder: "Email", text: $newCrewEmail)
             }
-            rolesField
-            visibilityField
-        }
-    }
 
-    private var rolesField: some View {
-        VStack(spacing: 0) {
             VStack(spacing: 0) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(selectedRoles, id: \.self) { role in
-                            HStack(spacing: 6) {
-                                Text(role).font(.subheadline)
-                                Button(action: { selectedRoles.removeAll { $0 == role } }) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.gray)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.gray.opacity(0.2))
-                            .cornerRadius(6)
-                        }
-
-                        TextField("Type a role", text: $roleInput)
-                            .textFieldStyle(PlainTextFieldStyle())
-                            .frame(minWidth: 100)
-                            .onChange(of: roleInput) { value in showRoleSuggestions = !value.isEmpty }
-                            .onSubmit { addCustomRole() }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                }
-                .frame(height: 42)
-                .background(Color.gray.opacity(0.05))
-                .cornerRadius(8)
-            }
-
-            if showRoleSuggestions && !filteredRoles.isEmpty {
                 VStack(spacing: 0) {
-                    ForEach(filteredRoles.prefix(5), id: \.self) { suggestion in
-                        Button(action: {
-                            selectedRoles.append(suggestion)
-                            roleInput = ""
-                            showRoleSuggestions = false
-                        }) {
-                            Text(suggestion).padding(.vertical, 12).padding(.horizontal, 12).frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .foregroundColor(.primary)
-                    }
-                }
-                .background(.background)
-                .cornerRadius(8)
-                .shadow(radius: 2)
-                .padding(.top, 8)
-            }
-        }
-    }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(selectedRoles, id: \.self) { role in
+                                HStack(spacing: 6) {
+                                    Text(role).font(.subheadline)
+                                    Button(action: { selectedRoles.removeAll { $0 == role } }) {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.gray)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.gray.opacity(0.2))
+                                .cornerRadius(6)
+                            }
 
-    private var visibilityField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Visibility").font(.subheadline).bold()
-            ZStack(alignment: .topLeading) {
-                HStack(alignment: .top, spacing: 8) {
-                    Button(action: { withAnimation { showVisibilityOptions.toggle() } }) {
-                        HStack {
-                            Text(visibilityTitle(for: selectedVisibility)).font(.subheadline).foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: showVisibilityOptions ? "chevron.up" : "chevron.down").font(.system(size: 12, weight: .bold)).foregroundColor(.gray)
+                            TextField("Type a role", text: $roleInput)
+                                .textFieldStyle(PlainTextFieldStyle())
+                                .frame(minWidth: 100)
+                                .onChange(of: roleInput) { value in
+                                    showRoleSuggestions = !value.isEmpty
+                                }
+                                .onSubmit { addCustomRole() }
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 12)
-                        .cornerRadius(8)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
                     }
-                    .frame(width: 200)
-                    Text(visibilityDescription(for: selectedVisibility))
-                        .font(.footnote)
-                        .foregroundColor(.gray)
-                        .lineLimit(3)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 42)
+                    .background(Color.gray.opacity(0.05))
+                    .cornerRadius(8)
+                }
+
+                if showRoleSuggestions && !filteredRoles.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(filteredRoles.prefix(5), id: \.self) { suggestion in
+                            Button(action: {
+                                selectedRoles.append(suggestion)
+                                roleInput = ""
+                                showRoleSuggestions = false
+                            }) {
+                                Text(suggestion)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .foregroundColor(.primary)
+                        }
+                    }
+                    .background(.background)
+                    .cornerRadius(8)
+                    .shadow(radius: 2)
+                    .padding(.top, 8)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Visibility").font(.subheadline).bold()
+
+                ZStack(alignment: .topLeading) {
+                    HStack(alignment: .top, spacing: 8) {
+                        Button(action: { withAnimation { showVisibilityOptions.toggle() } }) {
+                            HStack {
+                                Text(visibilityTitle(for: selectedVisibility))
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Image(systemName: showVisibilityOptions ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 12)
+                            .cornerRadius(8)
+                        }
+                        .frame(width: 200)
+
+                        Text(visibilityDescription(for: selectedVisibility))
+                            .font(.footnote)
+                            .foregroundColor(.gray)
+                            .lineLimit(3)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(height: 70)
+
+                    if showVisibilityOptions {
+                        VStack(spacing: 0) {
+                            ForEach(visibilityOptions, id: \.self) { option in
+                                Button(action: {
+                                    selectedVisibility = option
+                                    showVisibilityOptions = false
+                                }) {
+                                    Text(visibilityTitle(for: option))
+                                        .padding(.vertical, 12)
+                                        .padding(.horizontal, 12)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .foregroundColor(.primary)
+                            }
+                        }
+                        .background(.background)
+                        .cornerRadius(8)
+                        .shadow(radius: 2)
+                        .frame(width: 200)
+                        .position(x: 100, y: 120)
+                        .zIndex(10)
+                    }
                 }
                 .frame(height: 70)
-                
-                if showVisibilityOptions {
-                    VStack(spacing: 0) {
-                        ForEach(visibilityOptions, id: \.self) { option in
-                            Button(action: {
-                                selectedVisibility = option
-                                showVisibilityOptions = false
-                            }) {
-                                Text(visibilityTitle(for: option)).padding(.vertical, 12).padding(.horizontal, 12).frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .buttonStyle(PlainButtonStyle()).foregroundColor(.primary)
-                        }
-                    }
-                    .background(.background).cornerRadius(8).shadow(radius: 2).frame(width: 200).position(x: 100, y: 120).zIndex(10)
-                }
-            }
-            .frame(height: 70)
-        }
-    }
-
-    private func checkEmail(_ email: String) {
-        FirebaseUserService.shared.checkUserExists(byEmail: email) { userId in
-            DispatchQueue.main.async {
-                self.matchingUserID = userId
             }
         }
-    }
-
-    private func saveCrewMember() {
-        guard !newCrewName.isEmpty, !selectedRoles.isEmpty else { return }
-        let db = Firestore.firestore()
-        let userID = AuthManager.shared.user?.uid ?? ""
-
-        let crewData: [String: Any] = [
-            "name": newCrewName.trimmingCharacters(in: .whitespaces),
-            "email": newCrewEmail.trimmingCharacters(in: .whitespaces),
-            "roles": selectedRoles,
-            "visibility": selectedVisibility,
-            "createdAt": Date()
-        ]
-
-        db.collection("users").document(userID).collection("tours").document(tourID).collection("crew").addDocument(data: crewData)
-
-        if let matchedUser = matchingUserID {
-            FirebaseUserService.shared.addSharedTour(for: matchedUser, tourID: tourID, creatorUserID: userID, role: selectedRoles, visibility: selectedVisibility)
-        }
-
-        presentationMode.wrappedValue.dismiss()
     }
 
     private func visibilityTitle(for option: String) -> String {
-        switch option { case "full": return "Full"; case "limited": return "Limited"; case "temporary": return "Temporary"; default: return option }
+        switch option {
+        case "full": return "Full"
+        case "limited": return "Limited"
+        case "temporary": return "Temporary"
+        default: return option
+        }
     }
 
     private func visibilityDescription(for option: String) -> String {
         let name = newCrewName.isEmpty ? "They" : newCrewName
+
         switch option {
         case "full": return "\(name) can see the full itinerary. Best for core crew, admins, and agents."
         case "limited": return "\(name) can see most details. Good for production and show crew."
@@ -242,8 +222,39 @@ struct AddCrewPopupView: View {
     private func addCustomRole() {
         let trimmedRole = roleInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedRole.isEmpty else { return }
-        if !roleOptions.contains(trimmedRole) { roleOptions.append(trimmedRole) }
+        if !roleOptions.contains(trimmedRole) {
+            roleOptions.append(trimmedRole)
+        }
         selectedRoles.append(trimmedRole)
-        roleInput = ""; showRoleSuggestions = false
+        roleInput = ""
+        showRoleSuggestions = false
+    }
+
+    private func saveCrewMember() {
+        guard !newCrewName.isEmpty, !selectedRoles.isEmpty else { return }
+
+        let db = Firestore.firestore()
+        let crewData: [String: Any] = [
+            "name": newCrewName.trimmingCharacters(in: .whitespaces),
+            "email": newCrewEmail.trimmingCharacters(in: .whitespaces),
+            "roles": selectedRoles,
+            "visibility": selectedVisibility,
+            "createdAt": Date()
+        ]
+
+        db.collection("users")
+            .document(AuthManager.shared.user?.uid ?? "")
+            .collection("tours")
+            .document(tourID)
+            .collection("crew")
+            .addDocument(data: crewData)
+
+        newCrewName = ""
+        newCrewEmail = ""
+        roleInput = ""
+        selectedRoles = []
+        selectedVisibility = "full"
+
+        presentationMode.wrappedValue.dismiss()
     }
 }

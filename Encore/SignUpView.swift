@@ -4,43 +4,63 @@ struct SignUpView: View {
     @State private var name: String = ""
     @State private var email: String = ""
     @State private var password: String = ""
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        VStack(spacing: 30) {
+        VStack(spacing: 0) {
+            // Dismiss Button for the sheet
+            HStack {
+                Spacer()
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark")
+                        .font(.headline.weight(.bold))
+                        .padding(12)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.secondary)
+            }
+            .padding(.top, 8)
+            .padding(.trailing, 8)
+
             Spacer()
 
-            Text("Create Account")
-                .font(.system(size: 32, weight: .bold))
-            
-            CustomTextField(placeholder: "Name", text: $name)
+            VStack(spacing: 40) {
+                Image("EncoreLogo")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 180)
+                    .foregroundColor(.primary)
+
+                VStack(spacing: 20) {
+                    CustomTextField(placeholder: "Full Name", text: $name)
+                    CustomTextField(placeholder: "Email", text: $email)
+                    CustomSecureField(placeholder: "Password", text: $password)
+                }
                 .frame(width: 300)
-            CustomTextField(placeholder: "Email", text: $email)
+                
+                Button(action: handleSignUp) {
+                    Text("Create Account")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
                 .frame(width: 300)
-            SecureField("Password", text: $password)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
-                .background(Color.gray.opacity(0.05))
-                .cornerRadius(8)
-                .frame(width: 300)
-            
-            Button(action: handleSignUp) {
-                Text("Sign Up")
-                    .font(.headline)
-                    .frame(maxWidth: 300)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
             }
             
             Spacer()
+            Spacer()
         }
-        .padding()
+        .frame(width: 450, height: 550)
     }
     
     private func handleSignUp() {
         // Sign up logic will go here
-        presentationMode.wrappedValue.dismiss()
+        dismiss()
     }
 }

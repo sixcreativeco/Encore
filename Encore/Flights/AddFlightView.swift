@@ -1,5 +1,8 @@
 import SwiftUI
 
+// The PassengerEntry struct definition has been removed from this file.
+// It must be defined in one, and only one, other file in your project.
+
 struct AddFlightView: View {
     var userID: String
     var tourID: String
@@ -211,8 +214,12 @@ struct AddFlightView: View {
     }
 
     private func loadCrew() {
-        FirebaseTourService.loadCrew(userID: userID, tourID: tourID) { crew in
-            self.crewSuggestions = crew
+        Task {
+            do {
+                self.crewSuggestions = try await FirebaseTourService.loadCrew(userID: userID, tourID: tourID)
+            } catch {
+                print("❌ Failed to load crew: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -247,12 +254,10 @@ struct AddFlightView: View {
                             arrivalAirport: match.airport.fs,
                             departureTime: scheduledDate
                         )
-
                         self.fetchedFlight = flight
                     } else {
                         self.errorMessage = "No matching flight found."
                     }
-
                 case .failure(let error):
                     self.errorMessage = error.localizedDescription
                 }
@@ -309,10 +314,4 @@ struct AddFlightView: View {
         formatter.timeStyle = .short
         return formatter.string(from: date)
     }
-}
-
-struct PassengerEntry: Identifiable, Codable {
-    var id: String = UUID().uuidString
-    var name: String
-    var baggage: String
 }
