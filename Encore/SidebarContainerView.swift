@@ -48,7 +48,9 @@ struct SidebarContainerView: View {
             } else {
                 switch appState.selectedTab {
                 case "Dashboard":
-                    Text("Dashboard View")
+                    // FIXED: Replaced the placeholder Text with the new DashboardView.
+                    DashboardView()
+                        .environmentObject(appState)
                 case "Tours":
                     TourListView(onTourSelected: { appState.selectedTour = $0 })
                         .environmentObject(appState)
@@ -252,7 +254,6 @@ struct SidebarContainerView: View {
     }
 }
 
-// FIXED: Restored the helper views that were previously omitted.
 struct SidebarLabel: View {
     let icon: String
     let title: String

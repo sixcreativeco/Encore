@@ -33,25 +33,18 @@ struct SignInView: View {
 
             VStack(spacing: 16) {
                 GoogleSignInButton {
-                    handleGoogleSignIn()
+                    Task {
+                        await handleGoogleSignIn()
+                    }
                 }
                 .frame(width: 280, height: 44)
 
-                SignInWithAppleButton(
-                    .signIn,
-                    onRequest: { request in /* Configure request */ },
-                    onCompletion: { result in /* Handle result */ }
-                )
-                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                .frame(width: 280, height: 44)
+                SignInWithAppleButton( .signIn, onRequest: { _ in }, onCompletion: { _ in } )
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                    .frame(width: 280, height: 44)
                 
                 HStack(spacing: 12) {
-                    VStack { Divider() }
-                    Text("OR")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 16)
-                    VStack { Divider() }
+                    VStack { Divider() }; Text("OR").font(.caption).foregroundColor(.secondary).padding(.vertical, 16); VStack { Divider() }
                 }
 
                 CustomTextField(placeholder: "Email", text: $email)
@@ -59,44 +52,41 @@ struct SignInView: View {
                 
                 Button(action: handleEmailSignIn) {
                     Text("Sign In")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.accentColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                        .fontWeight(.semibold).frame(maxWidth: .infinity).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
                 }
                 .buttonStyle(.plain)
             }
             .frame(width: 280)
 
             VStack(spacing: 6) {
-                Text("Don't have an account?")
-                    .font(.footnote)
-
-                Button("Sign Up") {
-                    showSignUp = true
-                }
-                .font(.footnote.bold())
-                .sheet(isPresented: $showSignUp) {
-                    SignUpView()
-                        .environmentObject(appState)
-                }
+                Text("Don't have an account?").font(.footnote)
+                Button("Sign Up") { showSignUp = true }.font(.footnote.bold())
+                    .sheet(isPresented: $showSignUp) { SignUpView().environmentObject(appState) }
             }
-
             Spacer()
         }
         .padding(32)
     }
 
-    private func handleGoogleSignIn() {
-        guard let presentingWindow = NSApplication.shared.keyWindow else { return }
-        Task {
-            await AuthManager.shared.handleGoogleSignIn(presentingWindow: presentingWindow, appState: appState)
+    private func handleGoogleSignIn() async {
+        // ADDED: Log the initial button press action.
+        print("LOG: 0. Google Sign-In button pressed in SignInView.")
+        
+        guard let presentingWindow = NSApplication.shared.keyWindow else {
+            print("LOG: ❌ Could not get key window.")
+            return
+        }
+        
+        let user = await AuthManager.shared.handleGoogleSignIn(presentingWindow: presentingWindow)
+        
+        // ADDED: Log the result from the AuthManager and the subsequent state change.
+        if let user = user {
+            print("LOG: 4. AuthManager returned user. Updating appState with UID: \(user.uid)")
+            appState.userID = user.uid
+        } else {
+            print("LOG: 4. AuthManager returned nil. No state change.")
         }
     }
     
-    private func handleEmailSignIn() {
-        // Email & Password sign in logic will go here
-    }
+    private func handleEmailSignIn() {}
 }

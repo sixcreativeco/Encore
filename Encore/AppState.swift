@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
+import Combine // Required for objectWillChange
 
 class AppState: ObservableObject {
     @Published var userID: String? = nil
@@ -16,24 +17,37 @@ class AppState: ObservableObject {
     }
 
     deinit {
-        // Detach the listener when AppState is deallocated
         if let authStateHandle = authStateHandle {
             Auth.auth().removeStateDidChangeListener(authStateHandle)
         }
     }
 
     private func registerAuthStateHandler() {
-        // This listener fires on launch if a user is cached, and on sign-in/sign-out events.
+        print("LOG: AppState registering auth state listener.")
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] (_, user) in
-            self?.userID = user?.uid
+            print("LOG: AuthStateDidChangeListener fired.")
+            
+            // FIXED: Manually send the objectWillChange notification before the state update.
+            // This explicitly tells SwiftUI that this object's data is about to change
+            // and that any views observing it need to be refreshed.
+            self?.objectWillChange.send()
+            
+            DispatchQueue.main.async {
+                if let user = user {
+                    print("LOG: Listener received signed-in user with UID: \(user.uid). Updating state.")
+                    self?.userID = user.uid
+                } else {
+                    print("LOG: Listener received nil user (signed out). Updating state.")
+                    self?.userID = nil
+                }
+            }
 
             if user == nil {
-                // Clear user-specific data on sign-out
                 self?.tours.removeAll()
             }
         }
     }
-
+ 
     func removeTour(tourID: String) {
         if let index = tours.firstIndex(where: { $0.id == tourID }) {
             tours.remove(at: index)
@@ -43,7 +57,6 @@ class AppState: ObservableObject {
     func loadTours() {
         guard let userID = userID else { return }
         let db = Firestore.firestore()
-
         var allTours: [TourModel] = []
         let group = DispatchGroup()
 
@@ -61,13 +74,10 @@ class AppState: ObservableObject {
             .getDocuments { snapshot, _ in
                 let sharedDocs = snapshot?.documents ?? []
                 let nestedGroup = DispatchGroup()
-
                 for doc in sharedDocs {
                     let tourID = doc.documentID
                     let ownerUserID = doc.data()["creatorUserID"] as? String ?? ""
-
                     guard !ownerUserID.isEmpty else { continue }
-
                     nestedGroup.enter()
                     db.collection("users").document(ownerUserID).collection("tours").document(tourID)
                         .getDocument { tourDoc, _ in
@@ -77,7 +87,6 @@ class AppState: ObservableObject {
                             nestedGroup.leave()
                         }
                 }
-
                 nestedGroup.notify(queue: .main) {
                     group.leave()
                 }

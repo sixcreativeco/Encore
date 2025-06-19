@@ -17,27 +17,43 @@ class AuthManager: ObservableObject {
 
     @Published var user: User?
 
-    func handleGoogleSignIn(presentingWindow: NSWindow, appState: AppState) async {
+    func handleGoogleSignIn(presentingWindow: NSWindow) async -> User? {
+        // ADDED: Log the start of the process.
+        print("LOG: 1. AuthManager.handleGoogleSignIn called.")
+        
         let config = GIDConfiguration(clientID: FirebaseApp.app()?.options.clientID ?? "")
         GIDSignIn.sharedInstance.configuration = config
 
-        guard let result = try? await GIDSignIn.sharedInstance.signIn(withPresenting: presentingWindow) else { return }
-        guard let idToken = result.user.idToken?.tokenString else { return }
-
-        let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: result.user.accessToken.tokenString)
-
         do {
+            guard let result = try? await GIDSignIn.sharedInstance.signIn(withPresenting: presentingWindow) else {
+                print("LOG: ❌ GIDSignIn returned nil. User may have cancelled.")
+                return nil
+            }
+            
+            // ADDED: Log success from Google Sign-In SDK.
+            print("LOG: 2. GIDSignIn successful. User: \(result.user.profile?.name ?? "N/A")")
+            
+            guard let idToken = result.user.idToken?.tokenString else {
+                print("LOG: ❌ Could not get idToken from Google result.")
+                return nil
+            }
+            
+            let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: result.user.accessToken.tokenString)
+            
             let authResult = try await Auth.auth().signIn(with: credential)
             self.user = authResult.user
-
-            DispatchQueue.main.async {
-                appState.userID = authResult.user.uid
-            }
-
+            
+            // ADDED: Log success from Firebase Auth.
+            print("LOG: 3. Firebase signIn successful. UID: \(authResult.user.uid)")
+            
             await self.createUserDocumentIfNeeded(userID: authResult.user.uid)
-
+            
+            return authResult.user
+            
         } catch {
-            print("❌ Firebase Sign In Failed: \(error.localizedDescription)")
+            // ADDED: Log any errors during the process.
+            print("LOG: ❌ ERROR in AuthManager.handleGoogleSignIn: \(error.localizedDescription)")
+            return nil
         }
     }
 
@@ -47,32 +63,26 @@ class AuthManager: ObservableObject {
 
         do {
             let document = try await ref.getDocument()
-            if document.exists { return }
-
-            let userData: [String: Any] = [
-                "uid": userID,
-                "email": self.user?.email ?? "",
-                "displayName": self.user?.displayName ?? "",
-                "createdAt": Timestamp(date: Date())
-            ]
+            if document.exists {
+                print("LOG: User document already exists for UID: \(userID)")
+                return
+            }
+            
+            let userData: [String: Any] = [ "uid": userID, "email": self.user?.email ?? "", "displayName": self.user?.displayName ?? "", "createdAt": Timestamp(date: Date()) ]
             try await ref.setData(userData)
-            print("✅ User document created")
+            print("LOG: ✅ User document created for UID: \(userID)")
 
         } catch {
-            print("❌ Failed creating user document: \(error.localizedDescription)")
+            print("LOG: ❌ Failed creating user document: \(error.localizedDescription)")
         }
     }
-
-    func signOut(appState: AppState) {
+  
+    func signOut() {
         do {
             try Auth.auth().signOut()
             self.user = nil
-            DispatchQueue.main.async {
-                appState.userID = nil
-            }
         } catch {
-            print("❌ Firebase Sign In Failed: \(error.localizedDescription)")
-            print("Error details: \(error)")
+            print("❌ Firebase Sign Out Failed: \(error.localizedDescription)")
         }
     }
 }

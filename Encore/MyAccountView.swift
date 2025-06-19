@@ -15,14 +15,12 @@ struct MyAccountView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
-
                 accountInfoSection
                 preferencesSection
                 usageStatsSection
                 supportSection
                 devToolsSection
                 versionSection
-
             }
             .padding()
             .onAppear {
@@ -145,11 +143,11 @@ struct MyAccountView: View {
         }
     }
 
-    // MARK: - Version (added below dev tools)
+    // MARK: - Version
 
     private var versionSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("App Version: 1.8.1")
+            Text("App Version: 1.8.1") // This can be updated as needed
                 .font(.footnote)
                 .foregroundColor(.gray)
         }
@@ -201,8 +199,7 @@ struct MyAccountView: View {
     // MARK: - Sign Out Logic
 
     private func signOut() {
-        appState.userID = nil
-        appState.selectedTour = nil
-        appState.selectedShow = nil
+        // FIXED: This now correctly calls the shared AuthManager to perform a full sign-out from Firebase.
+        AuthManager.shared.signOut()
     }
 }
