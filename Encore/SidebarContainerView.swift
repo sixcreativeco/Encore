@@ -38,13 +38,12 @@ struct SidebarContainerView: View {
             if let show = appState.selectedShow, let tour = appState.selectedTour {
                 ShowDetailView(
                     show: show,
-                    userID: appState.userID ?? "",
                     tourID: tour.id,
                     ownerUserID: tour.ownerUserID
                 )
                 .environmentObject(appState)
             } else if let tour = appState.selectedTour {
-                TourDetailView(tour: tour)
+                 TourDetailView(tour: tour)
                     .environmentObject(appState)
             } else {
                 switch appState.selectedTab {
@@ -54,18 +53,18 @@ struct SidebarContainerView: View {
                     TourListView(onTourSelected: { appState.selectedTour = $0 })
                         .environmentObject(appState)
                 case "Database":
-                    DatabaseView(userID: appState.userID ?? "")
+                     DatabaseView(userID: appState.userID ?? "")
                 case "Team":
                     Text("Team View")
                 case "Export":
                     ExportView()
-                        .environmentObject(appState)
+                         .environmentObject(appState)
                 case "MyAccount":
                     MyAccountView().environmentObject(appState)
                 case "NewTour":
                     NewTourFlowView().environmentObject(appState)
                 default:
-                    Text("Unknown")
+                     Text("Unknown")
                 }
             }
         }
@@ -91,7 +90,7 @@ struct SidebarContainerView: View {
         .padding(.leading, 20)
         .padding(.top, 20)
         .padding(.bottom, 20)
-        .animation(.easeInOut(duration: 0.25), value: isSidebarVisible)
+         .animation(.easeInOut(duration: 0.25), value: isSidebarVisible)
     }
 
     private var currentSidebarBackground: Color {
@@ -125,7 +124,7 @@ struct SidebarContainerView: View {
                 SidebarLabel(icon: "square.and.arrow.up.fill", title: "Export", isSelected: appState.selectedTab == "Export", spacing: 18.8) {
                     appState.selectedTab = "Export" // Does not reset selection
                 }
-                SidebarLabel(icon: "person.crop.circle", title: "My Account", isSelected: appState.selectedTab == "MyAccount", spacing: 17.0) {
+                 SidebarLabel(icon: "person.crop.circle", title: "My Account", isSelected: appState.selectedTab == "MyAccount", spacing: 17.0) {
                     appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
             }
@@ -141,7 +140,7 @@ struct SidebarContainerView: View {
                 }.padding(.top, 4)
             }
             .padding(.bottom, 20)
-            .padding(.leading, 30)
+             .padding(.leading, 30)
         }
         .padding(.horizontal, 20)
     }
@@ -152,7 +151,7 @@ struct SidebarContainerView: View {
                 .padding(.top, 10)
 
             VStack(spacing: 28) {
-                SidebarIcon(icon: "rectangle.grid.2x2.fill", isSelected: appState.selectedTab == "Dashboard") {
+                 SidebarIcon(icon: "rectangle.grid.2x2.fill", isSelected: appState.selectedTab == "Dashboard") {
                     appState.selectedTab = "Dashboard"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
                 SidebarIcon(icon: "calendar", isSelected: appState.selectedTab == "Tours") {
@@ -167,7 +166,7 @@ struct SidebarContainerView: View {
                 SidebarIcon(icon: "square.and.arrow.up.fill", isSelected: appState.selectedTab == "Export") {
                     appState.selectedTab = "Export" // Does not reset selection
                 }
-                SidebarIcon(icon: "person.crop.circle", isSelected: appState.selectedTab == "MyAccount") {
+                 SidebarIcon(icon: "person.crop.circle", isSelected: appState.selectedTab == "MyAccount") {
                     appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
             }
@@ -187,13 +186,13 @@ struct SidebarContainerView: View {
     private var logoSectionExpanded: some View {
         Button(action: { toggleColorMode() }) {
             Image("EncoreLogo")
-                .renderingMode(.template)
+                 .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 120)
                 .foregroundColor(currentLogoColor)
                 .padding(.top, 10)
-                .padding(.bottom, 20)
+                 .padding(.bottom, 20)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -203,7 +202,7 @@ struct SidebarContainerView: View {
             Image("EncoreE")
                 .renderingMode(.template)
                 .resizable()
-                .scaledToFit()
+                 .scaledToFit()
                 .frame(width: 24, height: 24)
                 .foregroundColor(currentLogoColor)
                 .padding(.top, 4)
@@ -221,7 +220,7 @@ struct SidebarContainerView: View {
             HStack {
                 Image(systemName: "plus.circle.fill")
                 Text("Add Tour").fontWeight(.semibold)
-            }
+             }
             .padding(.vertical, 10)
             .padding(.horizontal, 20)
             .frame(width: 190)
@@ -238,7 +237,7 @@ struct SidebarContainerView: View {
                 .font(.system(size: 18))
                 .padding(10)
                 .background(Color.white)
-                .clipShape(Circle())
+                 .clipShape(Circle())
                 .foregroundColor(.black)
         }
         .buttonStyle(PlainButtonStyle())
@@ -249,9 +248,11 @@ struct SidebarContainerView: View {
             overrideColorScheme = .light
         } else {
             overrideColorScheme = .dark
-        }
+         }
     }
 }
+
+// FIXED: Restored the helper views that were previously omitted.
 struct SidebarLabel: View {
     let icon: String
     let title: String
@@ -269,7 +270,7 @@ struct SidebarLabel: View {
                     .font(.system(size: 15, weight: isSelected ? .bold : .regular))
             }
             .foregroundColor(isSelected ? .white : Color.white.opacity(0.5))
-            .frame(maxWidth: .infinity, alignment: .leading)
+             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(PlainButtonStyle())
     }

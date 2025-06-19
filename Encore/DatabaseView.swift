@@ -20,6 +20,9 @@ struct DatabaseView: View {
     @State private var sortField: String = ""
     @State private var sortAscending: Bool = true
     @State private var activeSheet: ActiveSheet?
+    
+    // State to force a refresh of the contacts list
+    @State private var contactsKey = UUID()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -32,11 +35,14 @@ struct DatabaseView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .addContact:
-                DBAddContactView() // New View
+                // FIXED: Pass the closure to refresh the view on save.
+                ContactAddView() {
+                    self.contactsKey = UUID()
+                }
             case .addVenue:
-                DBAddVenueView() // New View
+                DBAddVenueView()
             case .addHotel:
-                DBAddHotelView() // New View
+                DBAddHotelView()
             }
         }
     }
@@ -59,12 +65,9 @@ struct DatabaseView: View {
             
             Button(action: {
                 switch selectedSection {
-                case .contacts:
-                    activeSheet = .addContact
-                case .venues:
-                    activeSheet = .addVenue
-                case .hotels:
-                    activeSheet = .addHotel
+                case .contacts: activeSheet = .addContact
+                case .venues: activeSheet = .addVenue
+                case .hotels: activeSheet = .addHotel
                 }
             }) {
                 Image(systemName: "plus.circle.fill")
@@ -97,6 +100,7 @@ struct DatabaseView: View {
         switch selectedSection {
         case .contacts:
             ContactsSection(userID: userID, searchText: searchText, selectedFilter: selectedFilter, sortField: $sortField, sortAscending: $sortAscending)
+                .id(contactsKey) // FIXED: This makes the view refresh when the key changes.
         case .venues:
             VenuesSection(userID: userID, searchText: searchText, selectedFilter: selectedFilter, sortField: $sortField, sortAscending: $sortAscending)
         case .hotels:

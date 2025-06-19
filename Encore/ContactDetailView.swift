@@ -1,43 +1,54 @@
 import SwiftUI
 
 struct ContactDetailView: View {
-    @State var contact: ContactModel
+    // The contact model is passed from a parent view.
+    let contact: ContactModel
+
+    // A private state copy is needed because ContactFormBody requires a Binding.
+    // This allows the form to display the data without allowing the detail view itself to be mutated.
+    @State private var formContact: ContactModel
+
+    // State to control the presentation of the edit sheet.
+    @State private var isPresentingEditView = false
+
+    // The initializer sets up the private state copy when the view is created.
+    init(contact: ContactModel) {
+        self.contact = contact
+        self._formContact = State(initialValue: contact)
+    }
 
     var body: some View {
-        Form {
-            Section(header: Text("Basic Info")) {
-                TextField("Name", text: $contact.name)
-                TextField("Role", text: $contact.role)
+        // We reuse the exact same form body here, but pass `isDisabled: true`
+        // to make all the input fields read-only.
+        ContactFormBody(contact: $formContact, isDisabled: true)
+            .navigationTitle(contact.name)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Edit") {
+                        isPresentingEditView = true
+                    }
+                }
             }
+            .sheet(isPresented: $isPresentingEditView) {
+                // When "Edit" is tapped, we will present the ContactEditView.
+                // This requires ContactEditView to be created next.
+                ContactEditView(contact: self.contact)
+            }
+    }
+}
 
-            Section(header: Text("Contact Details")) {
-                TextField("Email", text: emailBinding)
-                TextField("Phone", text: phoneBinding)
-                TextField("Notes", text: notesBinding)
-            }
+struct ContactDetailView_Previews: PreviewProvider {
+    static var previews: some View {
+        // Example of how to use the ContactDetailView within a NavigationView
+        NavigationView {
+            ContactDetailView(contact: ContactModel(
+                name: "Taine Noble",
+                roles: ["Content Creator", "Lighting", "Tour Manager"],
+                email: "taine.noble@example.com",
+                phone: "+64 21 123 4567",
+                location: "Auckland, NZ"
+            ))
         }
-        .navigationTitle("Edit Contact")
-    }
-
-    // Computed bindings to safely unwrap optionals
-    var emailBinding: Binding<String> {
-        Binding<String>(
-            get: { contact.email ?? "" },
-            set: { contact.email = $0 }
-        )
-    }
-
-    var phoneBinding: Binding<String> {
-        Binding<String>(
-            get: { contact.phone ?? "" },
-            set: { contact.phone = $0 }
-        )
-    }
-
-    var notesBinding: Binding<String> {
-        Binding<String>(
-            get: { contact.notes ?? "" },
-            set: { contact.notes = $0 }
-        )
+        .preferredColorScheme(.dark)
     }
 }

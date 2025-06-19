@@ -25,7 +25,7 @@ struct ContactsSection: View {
     private var filteredAndSorted: [ContactModel] {
         contacts
             .filter { contact in
-                (selectedFilter == "All" || contact.role == selectedFilter) &&
+                (selectedFilter == "All" || contact.roles.contains(selectedFilter)) &&
                 (searchText.isEmpty || contact.matches(searchText))
             }
     }
@@ -40,19 +40,19 @@ struct ContactsSection: View {
 
             for tourDoc in tourDocs {
                 let tourID = tourDoc.documentID
-                let artistName = tourDoc.data()["artistName"] as? String ?? ""
+                let artistName = tourDoc.data()["artist"] as? String ?? ""
 
                 if !artistName.isEmpty {
-                    collected.append(ContactModel(name: artistName, role: "Artist"))
+                    collected.append(ContactModel(name: artistName, roles: ["Artist"]))
                 }
 
                 group.enter()
                 db.collection("users").document(userID).collection("tours").document(tourID).collection("crew").getDocuments { crewSnap, _ in
                     for doc in crewSnap?.documents ?? [] {
                         let name = doc.data()["name"] as? String ?? ""
-                        let role = doc.data()["role"] as? String ?? ""
+                        let roles = doc.data()["roles"] as? [String] ?? []
                         let email = doc.data()["email"] as? String
-                        collected.append(ContactModel(name: name, role: role, email: email))
+                        collected.append(ContactModel(name: name, roles: roles, email: email))
                     }
                     group.leave()
                 }
@@ -69,7 +69,7 @@ struct ContactsSection: View {
                         db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").document(showID).collection("supportActs").getDocuments { supportSnap, _ in
                             for supDoc in supportSnap?.documents ?? [] {
                                 let name = supDoc.data()["name"] as? String ?? ""
-                                collected.append(ContactModel(name: name, role: "Support Act"))
+                                collected.append(ContactModel(name: name, roles: ["Support Act"]))
                             }
                             showGroup.leave()
                         }
@@ -79,7 +79,7 @@ struct ContactsSection: View {
                             for guestDoc in guestSnap?.documents ?? [] {
                                 let name = guestDoc.data()["name"] as? String ?? ""
                                 let note = guestDoc.data()["note"] as? String
-                                collected.append(ContactModel(name: name, role: "Guest", notes: note))
+                                collected.append(ContactModel(name: name, roles: ["Guest"], notes: note))
                             }
                             showGroup.leave()
                         }

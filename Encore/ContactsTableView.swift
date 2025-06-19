@@ -8,6 +8,7 @@ struct ContactsTableView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
+                // Header row remains the same
                 HStack {
                     sortableHeader("Name")
                     sortableHeader("Role")
@@ -18,6 +19,7 @@ struct ContactsTableView: View {
                 .padding(.vertical, 8)
                 Divider()
 
+                // Data rows now use the corrected MergedContact
                 ForEach(sortedMergedContacts, id: \.self) { contact in
                     HStack {
                         Text(contact.name).frame(maxWidth: .infinity, alignment: .leading)
@@ -41,7 +43,9 @@ struct ContactsTableView: View {
             let key = contact.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
             if var existing = dict[key] {
-                if !contact.role.isEmpty { existing.roles.insert(contact.role) }
+                // FIXED: Iterate over the `roles` array and insert each element into the Set.
+                contact.roles.forEach { existing.roles.insert($0) }
+                
                 if let email = contact.email, !email.isEmpty { existing.emails.insert(email) }
                 if let phone = contact.phone, !phone.isEmpty { existing.phones.insert(phone) }
                 if let note = contact.notes, !note.isEmpty { existing.notes.insert(note) }
@@ -49,14 +53,14 @@ struct ContactsTableView: View {
             } else {
                 dict[key] = MergedContact(
                     name: contact.name,
-                    roles: contact.role.isEmpty ? [] : [contact.role],
+                    // FIXED: Initialize the Set directly from the `roles` array.
+                    roles: Set(contact.roles),
                     emails: contact.email == nil ? [] : [contact.email!],
                     phones: contact.phone == nil ? [] : [contact.phone!],
                     notes: contact.notes == nil ? [] : [contact.notes!]
                 )
             }
         }
-
         return Array(dict.values)
     }
 
