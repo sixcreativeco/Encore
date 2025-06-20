@@ -20,7 +20,6 @@ struct DatabaseView: View {
     @State private var sortField: String = ""
     @State private var sortAscending: Bool = true
     @State private var activeSheet: ActiveSheet?
-    
     // State to force a refresh of the contacts list
     @State private var contactsKey = UUID()
 
@@ -35,8 +34,8 @@ struct DatabaseView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .addContact:
-                // FIXED: Pass the closure to refresh the view on save.
-                ContactAddView() {
+                // FIXED: Correctly pass the onContactAdded closure to the initializer.
+                ContactAddView {
                     self.contactsKey = UUID()
                 }
             case .addVenue:
@@ -100,7 +99,7 @@ struct DatabaseView: View {
         switch selectedSection {
         case .contacts:
             ContactsSection(userID: userID, searchText: searchText, selectedFilter: selectedFilter, sortField: $sortField, sortAscending: $sortAscending)
-                .id(contactsKey) // FIXED: This makes the view refresh when the key changes.
+                .id(contactsKey) // This makes the view refresh when the key changes.
         case .venues:
             VenuesSection(userID: userID, searchText: searchText, selectedFilter: selectedFilter, sortField: $sortField, sortAscending: $sortAscending)
         case .hotels:

@@ -1,95 +1,104 @@
 import Foundation
 import FirebaseFirestore
-import SwiftUI
 
-// Enum to define the different types of items that can be in a setlist.
-enum SetlistItemType: String, Codable, CaseIterable, Identifiable {
-    case song = "Song"
-    case note = "Note"
-    case lighting = "Lighting Cue"
-    case tech = "Technical Change"
+// The redundant 'String: Identifiable' extension has been removed.
+// The native conformance from macOS 14 will be used instead.
 
-    var id: String { self.rawValue }
-
-    var icon: String {
-        switch self {
-        case .song: return "music.mic"
-        case .note: return "pencil"
-        case .lighting: return "lightbulb.fill"
-        case .tech: return "wrench.and.screwdriver.fill"
-        }
-    }
-}
-
-// The data model for a single item in the setlist.
-struct SetlistItemModel: Identifiable, Codable, Hashable {
+struct SetlistItemModel: Identifiable, Hashable {
     var id: String
     var order: Int
-    var type: SetlistItemType
-    
-    // Fields for all types
-    var title: String? // Used for Song name
-    var notes: String? // Used for Note, Lighting notes, Tech notes
-    
-    // Fields for Lighting Cues
-    var mainColorHex: String? // Stored as a hex string, e.g., "#FF0000"
+    var itemType: ItemType
 
-    // Default initializer
-    init(id: String = UUID().uuidString, order: Int, type: SetlistItemType, title: String? = nil, notes: String? = nil, mainColorHex: String? = nil) {
+    enum ItemType: Hashable {
+        case song(SongDetails)
+        case marker(MarkerDetails)
+    }
+    
+    init(id: String = UUID().uuidString, order: Int, itemType: ItemType) {
         self.id = id
         self.order = order
-        self.type = type
-        self.title = title
-        self.notes = notes
-        self.mainColorHex = mainColorHex
+        self.itemType = itemType
     }
-
-    // Initializer for decoding from a Firestore document.
+    
     init?(from document: DocumentSnapshot) {
         guard let data = document.data(),
               let order = data["order"] as? Int,
-              let typeString = data["type"] as? String,
-              let type = SetlistItemType(rawValue: typeString) else {
-            return nil
-        }
+              let typeString = data["type"] as? String
+        else { return nil }
 
         self.id = document.documentID
         self.order = order
-        self.type = type
-        self.title = data["title"] as? String
-        self.notes = data["notes"] as? String
-        self.mainColorHex = data["mainColorHex"] as? String
+
+        if typeString == "song", let detailsData = data["details"] as? [String: Any] {
+            self.itemType = .song(SongDetails(from: detailsData))
+        } else if typeString == "marker", let detailsData = data["details"] as? [String: Any] {
+            self.itemType = .marker(MarkerDetails(from: detailsData))
+        } else {
+            return nil
+        }
     }
 
-    // Helper to convert the model to a dictionary for Firestore.
     func toFirestore() -> [String: Any] {
-        var data: [String: Any] = [
-            "id": id,
-            "order": order,
-            "type": type.rawValue
-        ]
-        
-        if let title = title { data["title"] = title }
-        if let notes = notes { data["notes"] = notes }
-        if let mainColorHex = mainColorHex { data["mainColorHex"] = mainColorHex }
-
+        var data: [String: Any] = ["id": id, "order": order]
+        switch itemType {
+        case .song(let details):
+            data["type"] = "song"
+            data["details"] = details.toFirestore()
+        case .marker(let details):
+            data["type"] = "marker"
+            data["details"] = details.toFirestore()
+        }
         return data
     }
+}
+
+struct SongDetails: Hashable {
+    var name: String; var bpm: Int?; var key: String?; var tonality: String?
+    var performanceNotes: String?; var lightingNotes: String?; var audioNotes: String?; var videoNotes: String?
     
-    // Computed property to easily access the color for Lighting Cues
-    var mainColor: Color {
-        guard let hex = mainColorHex else { return .clear }
-        // This is a simplified hex-to-color converter. A production app might use a more robust one.
-        let scanner = Scanner(string: hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted))
-        var hexNumber: UInt64 = 0
-        
-        if scanner.scanHexInt64(&hexNumber) {
-            let r = Double((hexNumber & 0xff0000) >> 16) / 255
-            let g = Double((hexNumber & 0x00ff00) >> 8) / 255
-            let b = Double(hexNumber & 0x0000ff) / 255
-            return Color(red: r, green: g, blue: b)
-        }
-        
-        return .clear
+    init(name: String, bpm: Int? = nil, key: String? = nil, tonality: String? = nil, performanceNotes: String? = nil, lightingNotes: String? = nil, audioNotes: String? = nil, videoNotes: String? = nil) {
+        self.name = name; self.bpm = bpm; self.key = key; self.tonality = tonality
+        self.performanceNotes = performanceNotes; self.lightingNotes = lightingNotes; self.audioNotes = audioNotes; self.videoNotes = videoNotes
+    }
+    
+    init(from data: [String: Any]) {
+        self.name = data["name"] as? String ?? ""; self.bpm = data["bpm"] as? Int
+        self.key = data["key"] as? String; self.tonality = data["tonality"] as? String
+        self.performanceNotes = data["performanceNotes"] as? String; self.lightingNotes = data["lightingNotes"] as? String
+        self.audioNotes = data["audioNotes"] as? String; self.videoNotes = data["videoNotes"] as? String
+    }
+    
+    func toFirestore() -> [String: Any] {
+        return [
+            "name": name, "bpm": bpm ?? NSNull(), "key": key ?? NSNull(), "tonality": tonality ?? NSNull(),
+            "performanceNotes": performanceNotes ?? NSNull(), "lightingNotes": lightingNotes ?? NSNull(),
+            "audioNotes": audioNotes ?? NSNull(), "videoNotes": videoNotes ?? NSNull()
+        ]
+    }
+}
+
+struct MarkerDetails: Hashable {
+    var description: String; var duration: TimeInterval?
+    
+    init(description: String, duration: TimeInterval? = nil) { self.description = description; self.duration = duration }
+    init(from data: [String: Any]) { self.description = data["description"] as? String ?? ""; self.duration = data["duration"] as? TimeInterval }
+    func toFirestore() -> [String: Any] { return ["description": description, "duration": duration ?? NSNull()] }
+}
+
+struct PersonalNoteModel: Identifiable, Hashable {
+    var id: String; var content: String; var authorCrewMemberID: String; var forCrewMemberID: String?; var createdAt: Date?
+    
+    init(id: String = UUID().uuidString, content: String, authorCrewMemberID: String, forCrewMemberID: String? = nil, createdAt: Date? = Date()) {
+        self.id = id; self.content = content; self.authorCrewMemberID = authorCrewMemberID; self.forCrewMemberID = forCrewMemberID; self.createdAt = createdAt
+    }
+
+    init?(from document: DocumentSnapshot) {
+        guard let data = document.data(), let content = data["content"] as? String, let authorCrewMemberID = data["authorCrewMemberID"] as? String else { return nil }
+        self.id = document.documentID; self.content = content; self.authorCrewMemberID = authorCrewMemberID; self.forCrewMemberID = data["forCrewMemberID"] as? String
+        self.createdAt = (data["createdAt"] as? Timestamp)?.dateValue()
+    }
+    
+    func toFirestore() -> [String: Any] {
+        return ["content": content, "authorCrewMemberID": authorCrewMemberID, "forCrewMemberID": forCrewMemberID ?? NSNull(), "createdAt": createdAt != nil ? Timestamp(date: createdAt!) : FieldValue.serverTimestamp()]
     }
 }

@@ -4,6 +4,7 @@ struct ContactsTableView: View {
     let contacts: [ContactModel]
     @Binding var sortField: String
     @Binding var sortAscending: Bool
+    var onContactSelected: (ContactModel) -> Void
 
     var body: some View {
         ScrollView {
@@ -19,17 +20,23 @@ struct ContactsTableView: View {
                 .padding(.vertical, 8)
                 Divider()
 
-                // Data rows now use the corrected MergedContact
-                ForEach(sortedMergedContacts, id: \.self) { contact in
-                    HStack {
-                        Text(contact.name).frame(maxWidth: .infinity, alignment: .leading)
-                        Text(contact.roles.joined(separator: ", ")).frame(maxWidth: .infinity, alignment: .leading)
-                        Text(contact.emails.joined(separator: ", ")).frame(maxWidth: .infinity, alignment: .leading)
-                        Text(contact.phones.joined(separator: ", ")).frame(maxWidth: .infinity, alignment: .leading)
-                        Text(contact.notes.joined(separator: ", ")).frame(maxWidth: .infinity, alignment: .leading)
+                // Data rows are now Buttons that trigger the sheet
+                ForEach(sortedMergedContacts, id: \.id) { contact in
+                    if let originalContact = findOriginalContact(for: contact.id) {
+                        Button(action: { onContactSelected(originalContact) }) {
+                            HStack {
+                                Text(contact.name).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(contact.roles.joined(separator: ", ")).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(contact.emails.joined(separator: ", ")).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(contact.phones.joined(separator: ", ")).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(contact.notes.joined(separator: ", ")).frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.vertical, 4)
+                            .contentShape(Rectangle()) // Ensure the whole area is tappable
+                        }
+                        .buttonStyle(.plain)
+                        Divider()
                     }
-                    .padding(.vertical, 4)
-                    Divider()
                 }
             }
             .padding(.horizontal)
@@ -52,12 +59,13 @@ struct ContactsTableView: View {
                 dict[key] = existing
             } else {
                 dict[key] = MergedContact(
+                    id: contact.id, // Store the ID of the original contact
                     name: contact.name,
                     // FIXED: Initialize the Set directly from the `roles` array.
                     roles: Set(contact.roles),
-                    emails: contact.email == nil ? [] : [contact.email!],
-                    phones: contact.phone == nil ? [] : [contact.phone!],
-                    notes: contact.notes == nil ? [] : [contact.notes!]
+                    emails: contact.email == nil || contact.email!.isEmpty ? [] : [contact.email!],
+                    phones: contact.phone == nil || contact.phone!.isEmpty ? [] : [contact.phone!],
+                    notes: contact.notes == nil || contact.notes!.isEmpty ? [] : [contact.notes!]
                 )
             }
         }
@@ -74,6 +82,10 @@ struct ContactsTableView: View {
             }
             return sortAscending ? comparison : !comparison
         }
+    }
+    
+    private func findOriginalContact(for id: String) -> ContactModel? {
+        return contacts.first { $0.id == id }
     }
 
     private func sortableHeader(_ field: String) -> some View {
@@ -98,7 +110,9 @@ struct ContactsTableView: View {
     }
 }
 
-struct MergedContact: Hashable {
+// MODIFIED: Added 'id' to track the original contact
+struct MergedContact: Hashable, Identifiable {
+    var id: String
     var name: String
     var roles: Set<String> = []
     var emails: Set<String> = []

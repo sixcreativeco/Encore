@@ -2,19 +2,22 @@ import SwiftUI
 import FirebaseFirestore
 
 struct SetlistView: View {
-    // IDs passed from the parent view (ShowDetailView)
+    @EnvironmentObject var appState: AppState
     let tourID: String
     let showID: String
     let ownerUserID: String
     
-    // State
     @State private var setlistItems: [SetlistItemModel] = []
     @State private var listener: ListenerRegistration?
-    @State private var showAddItemSheet = false // FIXED: This variable was missing or misspelled.
-    @State private var itemToEdit: SetlistItemModel?
-
+    
+    @State private var selectionToEdit: String?
+    @State private var itemForNotes: SetlistItemModel?
+    
+    // FIX: Replaced the unavailable 'EditMode' with a simple boolean state for macOS.
+    @State private var isEditing = false
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             header
             
             if setlistItems.isEmpty {
@@ -25,106 +28,119 @@ struct SetlistView: View {
         }
         .onAppear(perform: setupListener)
         .onDisappear { listener?.remove() }
-        .sheet(isPresented: $showAddItemSheet) { // FIXED: Now references the declared state variable.
-            AddEditSetlistItemView(order: setlistItems.count) { newItem in
-                SetlistService.shared.addItem(newItem, toShow: showID, inTour: tourID, byUser: ownerUserID) { error in
-                    if let error = error { print("Error adding item: \(error.localizedDescription)") }
+        .sheet(item: $selectionToEdit) { selectionID in
+            if let index = setlistItems.firstIndex(where: { $0.id == selectionID }) {
+                // The NavigationView and AddEditSetlistItemView are assumed to be defined elsewhere
+                // and are left as they were in your original code.
+                NavigationView {
+                    AddEditSetlistItemView(
+                        item: $setlistItems[index],
+                        onSave: { updatedItem in
+                            SetlistService.shared.saveItem(updatedItem, toShow: showID, inTour: tourID, byUser: ownerUserID)
+                        },
+                        onDelete: {
+                            deleteItem(at: index)
+                        }
+                    )
+                    .navigationTitle("Edit Setlist Item")
                 }
             }
         }
-        .sheet(item: $itemToEdit) { item in
-            AddEditSetlistItemView(item: item) { updatedItem in
-                SetlistService.shared.updateItem(updatedItem, inShow: showID, inTour: tourID, byUser: ownerUserID) { error in
-                    if let error = error { print("Error updating item: \(error.localizedDescription)") }
-                }
-            }
+        .sheet(item: $itemForNotes) { item in
+            SetlistNotesView(tourID: tourID, showID: showID, ownerUserID: ownerUserID, songItem: item)
+                .environmentObject(appState)
         }
+        .animation(.default, value: setlistItems)
     }
     
     private var header: some View {
         HStack {
             Text("Setlist").font(.headline)
             Spacer()
-            Button(action: { showAddItemSheet = true }) { // FIXED: Now references the declared state variable.
-                Image(systemName: "plus.circle.fill")
-                    .font(.title3)
+            
+            // This button now toggles our local 'isEditing' state.
+            Button(isEditing ? "Done" : "Reorder") {
+                isEditing.toggle()
             }
             .buttonStyle(.plain)
+            
+            Button(action: addItem) {
+                Image(systemName: "plus.circle.fill").font(.title2)
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 8)
         }
     }
     
     private var placeholderView: some View {
-        VStack {
-            Spacer()
-            Text("No Setlist Items")
-                .font(.headline)
-                .foregroundColor(.secondary)
-            Text("Add a song or note to get started.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .padding(40)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .cornerRadius(12)
+        Text("No Setlist Items. Add a song or marker to get started.")
+            .foregroundColor(.secondary)
+            .padding(40)
+            .frame(maxWidth: .infinity)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(12)
     }
 
     private var list: some View {
-        // List supports drag-and-drop reordering natively.
+        // The List itself is what enables drag-and-drop reordering.
         List {
             ForEach(setlistItems) { item in
-                SetlistCardView(item: item)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .padding(.vertical, 6)
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        Button { itemToEdit = item } label: { Label("Edit", systemImage: "pencil") }.tint(.blue)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) { deleteItem(item: item) } label: { Label("Delete", systemImage: "trash") }
-                    }
+                SetlistCardView(item: item) {
+                    self.itemForNotes = item
+                }
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .padding(.vertical, 2)
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    Button { selectionToEdit = item.id } label: { Label("Edit", systemImage: "pencil") }.tint(.blue)
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) { deleteItem(at: item) } label: { Label("Delete", systemImage: "trash") }
+                }
             }
-            .onMove(perform: moveItems)
+            // The .onMove modifier is only enabled when our 'isEditing' state is true.
+            .onMove(perform: isEditing ? moveItems : nil)
         }
         .listStyle(.plain)
         .background(Color.clear)
     }
 
-    /// Sets up the Firestore listener to automatically sync changes.
+    // MARK: - Data Functions
+    
     private func setupListener() {
-        listener?.remove() // Ensure no duplicate listeners
-        listener = SetlistService.shared.addListener(forShow: showID, inTour: tourID, byUser: ownerUserID) { items in
-            self.setlistItems = items
-        }
+        listener?.remove()
+        listener = SetlistService.shared.addListener(forShow: showID, inTour: tourID, byUser: ownerUserID) { self.setlistItems = $0 }
     }
     
-    /// Handles reordering of items from the List's onMove modifier.
+    private func addItem() {
+        let newItem = SetlistItemModel(order: setlistItems.count, itemType: .song(SongDetails(name: "New Song")))
+        SetlistService.shared.saveItem(newItem, toShow: showID, inTour: tourID, byUser: ownerUserID)
+        // Set the selection to open the edit sheet for the new item
+        self.selectionToEdit = newItem.id
+    }
+    
     private func moveItems(from source: IndexSet, to destination: Int) {
         var revisedItems = setlistItems
         revisedItems.move(fromOffsets: source, toOffset: destination)
         
-        // Update the `order` property on each item based on its new index.
         for (index, item) in revisedItems.enumerated() {
             revisedItems[index].order = index
         }
         
-        self.setlistItems = revisedItems
-        
-        // Save the new order to Firestore.
-        SetlistService.shared.updateOrder(for: revisedItems, inShow: showID, inTour: tourID, byUser: ownerUserID) { error in
-            if let error = error {
-                print("Error updating setlist order: \(error.localizedDescription)")
-            }
-        }
+        SetlistService.shared.updateOrder(for: revisedItems, inShow: showID, inTour: tourID, byUser: ownerUserID)
     }
     
-    /// Deletes a single item from the setlist.
-    private func deleteItem(item: SetlistItemModel) {
-        SetlistService.shared.deleteItem(itemID: item.id, fromShow: showID, inTour: tourID, byUser: ownerUserID) { error in
-            if let error = error {
-                print("Error deleting item: \(error.localizedDescription)")
-            }
-        }
+    private func deleteItem(at item: SetlistItemModel) {
+        SetlistService.shared.deleteItem(item.id, fromShow: showID, inTour: tourID, byUser: ownerUserID)
     }
+    
+    private func deleteItem(at index: Int) {
+        let item = setlistItems[index]
+        deleteItem(at: item)
+    }
+}
+
+// This extension is still needed for the .sheet(item: $selectionToEdit) modifier
+extension String: Identifiable {
+    public var id: String { self }
 }

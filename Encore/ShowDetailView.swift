@@ -38,6 +38,7 @@ struct ShowDetailView: View {
                         
                         // ADDED: The new Setlist View is now part of the layout.
                         SetlistView(tourID: tourID, showID: show.id, ownerUserID: ownerUserID)
+                            .environmentObject(appState) // Pass the environment object down
                     }
                     .frame(minWidth: 0, maxWidth: .infinity)
                 }
@@ -65,12 +66,7 @@ struct ShowDetailView: View {
         .navigationTitle("Show Details")
     }
 
-    // NOTE: All helper views and functions below this point remain unchanged.
-    // They are included here to provide the full, complete file as requested.
-
     private var headerSection: some View {
-        // This view is complex and remains unchanged from the user's codebase.
-        // [Existing headerSection code...]
         let spacingDateToCity: CGFloat = 3
         let spacingCityToVenue: CGFloat = 3
         let spacingVenueToLoadIn: CGFloat = 7

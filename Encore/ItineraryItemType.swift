@@ -13,6 +13,9 @@ enum ItineraryItemType: String, Codable, CaseIterable {
     case catering
     case custom
     case headline
+    case travel
+    case content
+    case merch
     
     var displayName: String {
         switch self {
@@ -28,23 +31,29 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         case .catering: return "Catering"
         case .custom: return "Custom"
         case .headline: return "Headliner Set"
+        case .travel: return "Travel"
+        case .content: return "Content"
+        case .merch: return "Merchandise"
         }
     }
     
     var iconName: String {
         switch self {
-        case .loadIn: return "truck"
+        case .loadIn: return "truck.box"
         case .soundcheck: return "music.mic"
         case .doors: return "door.left.hand.open"
         case .packOut: return "shippingbox"
         case .flight: return "airplane"
         case .arrival: return "airplane.arrival"
-        case .hotel: return "bed.double"
-        case .meeting: return "person.2"
-        case .freeTime: return "clock"
+        case .hotel: return "bed.double.fill"
+        case .meeting: return "person.2.fill"
+        case .freeTime: return "clock.fill"
         case .catering: return "fork.knife"
         case .custom: return "calendar"
-        case .headline: return "music.mic"
+        case .headline: return "music.mic.circle.fill"
+        case .travel: return "car.fill"
+        case .content: return "camera.fill"
+        case .merch: return "tshirt.fill"
         }
     }
 }

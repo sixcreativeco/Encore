@@ -10,76 +10,111 @@ struct TourItineraryView: View {
     @State private var availableDates: [Date] = []
     @State private var selectedDate: Date? = nil
 
-    @State private var showAddItem = false
-    @State private var selectedItemForEdit: ItineraryItemModel? = nil
+    @State private var activeSheet: ActiveSheet? = nil
     @State private var expandedItemID: String? = nil
-
     @State private var listeners: [ListenerRegistration] = []
-    
+
     let calendar = Calendar.current
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionHeader(title: "Itinerary", onAdd: { showAddItem = true }).padding()
+    private enum ActiveSheet: Identifiable, Equatable {
+        case addItem
+        case editItem(ItineraryItemModel)
 
-            if !availableDates.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(availableDates, id: \.self) { date in
-                            Text(formattedDate(date))
-                                .fontWeight(isSameDay(date, selectedDate) ? .bold : .regular)
-                                .foregroundColor(isSameDay(date, selectedDate) ? .white : .primary)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 14)
-                                .background(isSameDay(date, selectedDate) ? Color.accentColor : Color.gray.opacity(0.2))
-                                .cornerRadius(8)
-                                .onTapGesture {
-                                    selectedDate = date
-                                }
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-                }
+        var id: String {
+            switch self {
+            case .addItem:
+                return "addItem"
+            case .editItem(let item):
+                return "editItem-\(item.id)"
             }
         }
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                let itemsForSelectedDate = allItems.filter { isSameDay($0.time, selectedDate) }
-
-                if itemsForSelectedDate.isEmpty {
-                    Text("No items for this date.").foregroundColor(.gray).padding()
-                } else {
-                    LazyVStack(spacing: 16) {
-                        ForEach(itemsForSelectedDate.sorted(by: { $0.time < $1.time })) { item in
-                            ItineraryItemCard(
-                                item: item,
-                                isExpanded: expandedItemID == item.id,
-                                onExpandToggle: { toggleExpanded(item) },
-                                onEdit: { selectedItemForEdit = item },
-                                onDelete: { deleteItem(item) }
-                            )
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 16)
-                }
-            }
-        }
-        .onAppear { setupListeners() }
-        .onDisappear { listeners.forEach { $0.remove() } }
-        .sheet(isPresented: $showAddItem) {
-            // ItineraryItemAddView would be presented here
-        }
-        .sheet(item: $selectedItemForEdit) { item in
-            // This now correctly passes the onSave closure
-            ItineraryItemEditView(tourID: tourID, userID: ownerUserID, item: item) {
-                // The listeners will handle the refresh automatically.
-            }
+        static func == (lhs: TourItineraryView.ActiveSheet, rhs: TourItineraryView.ActiveSheet) -> Bool {
+            return lhs.id == rhs.id
         }
     }
 
+    var body: some View {
+        // 1. The root view is a ScrollView that contains ONLY the vertically scrolling cards.
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                let itemsForSelectedDate = allItems.filter { isSameDay($0.time, selectedDate) }
+
+                if itemsForSelectedDate.isEmpty {
+                    Text("No items for this date.")
+                        .foregroundColor(.gray)
+                        .padding(.top, 50)
+                } else {
+                    ForEach(itemsForSelectedDate.sorted(by: { $0.time < $1.time })) { item in
+                        // This is your corrected ItineraryItemCard, which no longer blocks gestures.
+                        ItineraryItemCard(
+                            item: item,
+                            isExpanded: expandedItemID == item.id,
+                            onExpandToggle: { toggleExpanded(item) },
+                            onEdit: { activeSheet = .editItem(item) },
+                            onDelete: { deleteItem(item) }
+                        )
+                    }
+                }
+            }
+            .padding()
+        }
+        // 2. This modifier "insets" the static header from the top edge of the ScrollView.
+        // This pins the header to the top and makes the card list scroll independently underneath it.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                // This is the static header content.
+                SectionHeader(title: "Itinerary", onAdd: { activeSheet = .addItem }).padding()
+
+                // This is the static, horizontally-scrolling date list.
+                if !availableDates.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(availableDates, id: \.self) { date in
+                                Text(formattedDate(date))
+                                    .fontWeight(isSameDay(date, selectedDate) ? .bold : .regular)
+                                    .foregroundColor(isSameDay(date, selectedDate) ? .white : .primary)
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 14)
+                                    .background(isSameDay(date, selectedDate) ? Color.accentColor : Color.gray.opacity(0.2))
+                                    .cornerRadius(8)
+                                    .onTapGesture {
+                                        selectedDate = date
+                                    }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .frame(height: 50)
+                    .padding(.bottom, 8)
+                }
+            }
+            // This background is necessary so the cards don't show through the header as they scroll.
+            .background(Color(.windowBackgroundColor))
+        }
+        .onAppear { setupListeners() }
+        .onDisappear { listeners.forEach { $0.remove() } }
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .addItem:
+                ItineraryItemAddView(
+                    tourID: tourID,
+                    userID: ownerUserID,
+                    presetDate: selectedDate ?? Date(),
+                    onSave: {}
+                )
+            case .editItem(let itemToEdit):
+                ItineraryItemEditView(
+                    tourID: tourID,
+                    userID: ownerUserID,
+                    item: itemToEdit,
+                    onSave: {}
+                )
+            }
+        }
+    }
+    
+    // All your data functions remain unchanged
     private func isSameDay(_ d1: Date, _ d2: Date?) -> Bool {
         guard let d2 = d2 else { return false }
         return calendar.isDate(d1, inSameDayAs: d2)
@@ -118,7 +153,9 @@ struct TourItineraryView: View {
             let newDates = generateDateRange(from: start, to: end)
             if self.availableDates != newDates {
                 self.availableDates = newDates
-                self.selectedDate = newDates.first
+                if self.selectedDate == nil {
+                    self.selectedDate = newDates.first
+                }
             }
         }
         
@@ -159,8 +196,6 @@ struct TourItineraryView: View {
         self.listeners = [tourListener, itemsListener, flightsListener, showsListener]
     }
     
-    // Using a temporary dictionary to hold results from listeners before merging
-    // to prevent race conditions and view update issues.
     @State private var itemSources: [SourceType: [ItineraryItemModel]] = [:]
     private enum SourceType { case general, flights, shows }
     

@@ -16,47 +16,80 @@ struct ItineraryItemAddView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
+            // Header
             HStack {
                 Text("Add Itinerary Item").font(.largeTitle.bold())
                 Spacer()
                 Button(action: { dismiss() }) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 24, weight: .medium))
-                        .padding(10)
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.gray)
                 }
                 .buttonStyle(.plain)
             }
 
-            Picker("Type", selection: $type) {
-                ForEach(ItineraryItemType.allCases, id: \.self) { itemType in
-                    Text(itemType.displayName).tag(itemType)
+            // Main Form
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    Image(systemName: type.iconName)
+                        .font(.title2)
+                        .foregroundColor(.accentColor)
+                        .frame(width: 30)
+                    
+                    StyledInputField(placeholder: "Event (e.g. 'Dinner reservation', 'Drive to venue')", text: $title)
+                        .onChange(of: title) { newValue in
+                            updateType(from: newValue)
+                        }
                 }
+                
+                StyledTimePicker(label: "Time", time: $time)
+                
+                CustomTextEditor(placeholder: "Notes (optional)", text: $note)
             }
-            .pickerStyle(.menu)
 
-            TextField("Title", text: $title)
-                .textFieldStyle(.roundedBorder)
+            Spacer()
 
-            DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
-
-            TextField("Note", text: $note)
-                .textFieldStyle(.roundedBorder)
-
+            // Save Button
             Button("Save Item") {
                 saveItem()
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color.accentColor)
+            .background(title.isEmpty ? Color.gray.opacity(0.5) : Color.accentColor)
             .foregroundColor(.white)
             .cornerRadius(10)
-
-            Spacer()
+            .disabled(title.isEmpty)
         }
-        .padding()
-        .frame(minWidth: 400)
+        .padding(32)
+        .frame(width: 500, height: 420)
         .onAppear {
             initializeTime()
+        }
+    }
+
+    private func updateType(from eventTitle: String) {
+        let lowercasedTitle = eventTitle.lowercased()
+        
+        if ["hotel", "motel", "airbnb", "lobby", "accommodation", "check in", "check out"].contains(where: lowercasedTitle.contains) {
+            self.type = .hotel
+        } else if ["drive", "transport", "pickup", "pick up", "drop off", "bus", "van", "car", "taxi", "uber", "lyft", "shuttle", "transfer", "transportation", "travel"].contains(where: lowercasedTitle.contains) {
+            self.type = .travel
+        } else if ["photoshoot", "shoot", "film", "content", "tiktok", "promo", "photo", "photo shoot" , "video", "video shoot", "social media"].contains(where: lowercasedTitle.contains) {
+            self.type = .content
+        } else if ["breakfast", "lunch", "dinner", "food", "catering", "buffet", "meal", "brunch", "lunchtime"].contains(where: lowercasedTitle.contains) {
+            self.type = .catering
+        } else if ["merch", "merchandise"].contains(where: lowercasedTitle.contains) {
+            self.type = .merch
+        } else if ["flight", "fly to", "airport", "take off", "land", "lands", "landing"].contains(where: lowercasedTitle.contains) {
+            self.type = .flight
+        } else if ["soundcheck", "sound check", "line check"].contains(where: lowercasedTitle.contains) {
+            self.type = .soundcheck
+        } else if ["load in", "load-in", "frieght"].contains(where: lowercasedTitle.contains) {
+            self.type = .loadIn
+        } else if ["doors"].contains(where: lowercasedTitle.contains) {
+            self.type = .doors
+        } else {
+            self.type = .custom
         }
     }
 
@@ -77,9 +110,9 @@ struct ItineraryItemAddView: View {
         let db = Firestore.firestore()
         let data: [String: Any] = [
             "type": type.rawValue,
-            "title": title,
+            "title": title.trimmingCharacters(in: .whitespacesAndNewlines),
             "time": Timestamp(date: time),
-            "note": note
+            "note": note.trimmingCharacters(in: .whitespacesAndNewlines)
         ]
 
         db.collection("users").document(userID).collection("tours").document(tourID).collection("itinerary").addDocument(data: data) { error in

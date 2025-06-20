@@ -14,38 +14,34 @@ struct TourDetailView: View {
                 TourSummaryCardsView(tourID: tour.id, ownerUserID: tour.ownerUserID)
                     .environmentObject(appState)
                 
-                GeometryReader { geometry in
-                    HStack(alignment: .top, spacing: 24) {
-                        ScrollView {
-                            TourItineraryView(
+                // FIX: Changed alignment from .top to .firstTextBaseline
+                HStack(alignment: .firstTextBaseline, spacing: 24) {
+                    
+                    // --- LEFT ITINERARY COLUMN ---
+                    TourItineraryView(
+                        tourID: tour.id,
+                        userID: appState.userID ?? "",
+                        ownerUserID: tour.ownerUserID
+                    )
+                    .frame(height: 500)
+
+                    // --- RIGHT CREW/FLIGHTS COLUMN ---
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            TourCrewView(
+                                tourID: tour.id,
+                                ownerUserID: tour.ownerUserID
+                            )
+                            TourFlightsView(
                                 tourID: tour.id,
                                 userID: appState.userID ?? "",
                                 ownerUserID: tour.ownerUserID
                             )
-                            .padding(.trailing, 8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(width: geometry.size.width * 0.5, height: 500)
-
-                        ScrollView {
-                            VStack(spacing: 24) {
-                                TourCrewView(
-                                    tourID: tour.id,
-                                    ownerUserID: tour.ownerUserID
-                                )
-                                TourFlightsView(
-                                    tourID: tour.id,
-                                    userID: appState.userID ?? "",
-                                    ownerUserID: tour.ownerUserID
-                                )
-                            }
-                            .padding(.leading, 8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(width: geometry.size.width * 0.45, height: 500)
+                        .padding()
                     }
+                    .frame(height: 500)
                 }
-                .frame(height: 500)
 
                 if let userID = appState.userID {
                     ShowGridView(
@@ -57,12 +53,11 @@ struct TourDetailView: View {
                             appState.selectedShow = selectedShow
                         }
                     )
-                    .frame(maxWidth: .infinity)
                 }
             }
-            .padding()
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 24)
+            .padding(.vertical)
         }
-        .ignoresSafeArea()
+        .ignoresSafeArea(edges: .bottom)
     }
 }
