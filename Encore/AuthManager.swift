@@ -3,7 +3,11 @@ import Foundation
 @preconcurrency import FirebaseAuth
 import FirebaseFirestore
 import GoogleSignIn
+
+// FIX: AppKit is specific to macOS. Use a compiler directive to only import it for the Mac build.
+#if os(macOS)
 import AppKit
+#endif
 
 class AuthManager: ObservableObject {
 
@@ -12,13 +16,15 @@ class AuthManager: ObservableObject {
         if FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }
+        
         self.user = Auth.auth().currentUser
     }
 
     @Published var user: User?
 
+    // The logic inside this function is wrapped to ensure it only compiles for macOS.
+    #if os(macOS)
     func handleGoogleSignIn(presentingWindow: NSWindow) async -> User? {
-        // ADDED: Log the start of the process.
         print("LOG: 1. AuthManager.handleGoogleSignIn called.")
         
         let config = GIDConfiguration(clientID: FirebaseApp.app()?.options.clientID ?? "")
@@ -30,7 +36,6 @@ class AuthManager: ObservableObject {
                 return nil
             }
             
-            // ADDED: Log success from Google Sign-In SDK.
             print("LOG: 2. GIDSignIn successful. User: \(result.user.profile?.name ?? "N/A")")
             
             guard let idToken = result.user.idToken?.tokenString else {
@@ -43,7 +48,6 @@ class AuthManager: ObservableObject {
             let authResult = try await Auth.auth().signIn(with: credential)
             self.user = authResult.user
             
-            // ADDED: Log success from Firebase Auth.
             print("LOG: 3. Firebase signIn successful. UID: \(authResult.user.uid)")
             
             await self.createUserDocumentIfNeeded(userID: authResult.user.uid)
@@ -51,11 +55,11 @@ class AuthManager: ObservableObject {
             return authResult.user
             
         } catch {
-            // ADDED: Log any errors during the process.
             print("LOG: ❌ ERROR in AuthManager.handleGoogleSignIn: \(error.localizedDescription)")
             return nil
         }
     }
+    #endif
 
     private func createUserDocumentIfNeeded(userID: String) async {
         let db = Firestore.firestore()

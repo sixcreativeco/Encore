@@ -10,6 +10,13 @@
 		EF11E75C2E01A1EF0091AB32 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = EF11E75B2E01A1EF0091AB32 /* Kingfisher */; };
 		EF21B63E2DF9479600C9C916 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = EF21B63D2DF9479600C9C916 /* GoogleSignIn */; };
 		EF21B6402DF9479600C9C916 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = EF21B63F2DF9479600C9C916 /* GoogleSignInSwift */; };
+		EF2B3F742E06FDB20055B8D3 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F732E06FDB20055B8D3 /* FirebaseFirestore */; };
+		EF2B3F762E06FE0C0055B8D3 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F752E06FE0C0055B8D3 /* FirebaseAuth */; };
+		EF2B3F782E06FE0C0055B8D3 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F772E06FE0C0055B8D3 /* FirebaseCore */; };
+		EF2B3F7C2E06FE170055B8D3 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F7B2E06FE170055B8D3 /* GoogleSignIn */; };
+		EF2B3F7E2E06FE170055B8D3 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F7D2E06FE170055B8D3 /* GoogleSignInSwift */; };
+		EF2B3F802E06FE170055B8D3 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F7F2E06FE170055B8D3 /* Kingfisher */; };
+		EF2B3F822E06FE230055B8D3 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F812E06FE230055B8D3 /* SDWebImageSwiftUI */; };
 		EF56FFD52DFA150A00AA14F3 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */; };
 		EFA43B892DEC9A11004781D4 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = EFA43B882DEC9A11004781D4 /* FirebaseAuth */; };
 		EFA43B8B2DEC9A11004781D4 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = EFA43B8A2DEC9A11004781D4 /* FirebaseCore */; };
@@ -18,6 +25,20 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		EF2B3F382E06F9F10055B8D3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EFA43B542DEC967E004781D4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EF2B3F262E06F9F00055B8D3;
+			remoteInfo = "Encore Viewer";
+		};
+		EF2B3F422E06F9F20055B8D3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EFA43B542DEC967E004781D4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EF2B3F262E06F9F00055B8D3;
+			remoteInfo = "Encore Viewer";
+		};
 		EFA43B6B2DEC967F004781D4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = EFA43B542DEC967E004781D4 /* Project object */;
@@ -35,6 +56,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		EF2B3F272E06F9F00055B8D3 /* Encore Viewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Encore Viewer.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EF2B3F372E06F9F10055B8D3 /* Encore ViewerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Encore ViewerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EF2B3F412E06F9F20055B8D3 /* Encore ViewerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Encore ViewerUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		EFA43B5C2DEC967E004781D4 /* Encore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Encore.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EFA43B6A2DEC967F004781D4 /* EncoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EncoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EFA43B742DEC967F004781D4 /* EncoreUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EncoreUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -45,16 +69,80 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				Mobile/MobileMainView.swift,
+				Mobile/MobileTourItineraryView.swift,
 			);
 			target = EFA43B5B2DEC967E004781D4 /* Encore */;
+		};
+		EF2B3F492E06F9F20055B8D3 /* Exceptions for "Encore Viewer" folder in "Encore Viewer" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = EF2B3F262E06F9F00055B8D3 /* Encore Viewer */;
+		};
+		EF2B3F542E06FA130055B8D3 /* Exceptions for "Encore" folder in "Encore Viewer" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AppState.swift,
+				AuthManager.swift,
+				EncoreApp.swift,
+				"GoogleService-Info.plist",
+				ItineraryItemCard.swift,
+				ItineraryItemType.swift,
+				Mobile/MobileMainView.swift,
+				Mobile/MobileTourItineraryView.swift,
+				Models/AirportModel.swift,
+				Models/Contact.swift,
+				Models/Flight.swift,
+				Models/GuestListItemModel.swift,
+				Models/Hotel.swift,
+				Models/ItineraryDayModel.swift,
+				Models/ItineraryItem.swift,
+				Models/PersonalNote.swift,
+				Models/SetlistItem.swift,
+				Models/Show.swift,
+				Models/ShowModel.swift,
+				Models/SupportAct.swift,
+				Models/SupportActModel.swift,
+				Models/Tour.swift,
+				Models/TourCrew.swift,
+				Models/Venue.swift,
+				OfflineSyncManager.swift,
+				TourCard.swift,
+				Views/MyAccountView.swift,
+				Views/SignInView.swift,
+				Views/TourItineraryView.swift,
+				Views/TourListView.swift,
+			);
+			target = EF2B3F262E06F9F00055B8D3 /* Encore Viewer */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		EF2B3F282E06F9F00055B8D3 /* Encore Viewer */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EF2B3F492E06F9F20055B8D3 /* Exceptions for "Encore Viewer" folder in "Encore Viewer" target */,
+			);
+			path = "Encore Viewer";
+			sourceTree = "<group>";
+		};
+		EF2B3F3A2E06F9F10055B8D3 /* Encore ViewerTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Encore ViewerTests";
+			sourceTree = "<group>";
+		};
+		EF2B3F442E06F9F20055B8D3 /* Encore ViewerUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Encore ViewerUITests";
+			sourceTree = "<group>";
+		};
 		EFA43B5E2DEC967E004781D4 /* Encore */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				EF21B6422DF94D4700C9C916 /* Exceptions for "Encore" folder in "Encore" target */,
+				EF2B3F542E06FA130055B8D3 /* Exceptions for "Encore" folder in "Encore Viewer" target */,
 			);
 			path = Encore;
 			sourceTree = "<group>";
@@ -72,6 +160,34 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		EF2B3F242E06F9F00055B8D3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EF2B3F7C2E06FE170055B8D3 /* GoogleSignIn in Frameworks */,
+				EF2B3F742E06FDB20055B8D3 /* FirebaseFirestore in Frameworks */,
+				EF2B3F802E06FE170055B8D3 /* Kingfisher in Frameworks */,
+				EF2B3F822E06FE230055B8D3 /* SDWebImageSwiftUI in Frameworks */,
+				EF2B3F7E2E06FE170055B8D3 /* GoogleSignInSwift in Frameworks */,
+				EF2B3F782E06FE0C0055B8D3 /* FirebaseCore in Frameworks */,
+				EF2B3F762E06FE0C0055B8D3 /* FirebaseAuth in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF2B3F342E06F9F10055B8D3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF2B3F3E2E06F9F20055B8D3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EFA43B592DEC967E004781D4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -104,12 +220,23 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		EF2B3F722E06FDB20055B8D3 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		EFA43B532DEC967E004781D4 = {
 			isa = PBXGroup;
 			children = (
 				EFA43B5E2DEC967E004781D4 /* Encore */,
 				EFA43B6D2DEC967F004781D4 /* EncoreTests */,
 				EFA43B772DEC967F004781D4 /* EncoreUITests */,
+				EF2B3F282E06F9F00055B8D3 /* Encore Viewer */,
+				EF2B3F3A2E06F9F10055B8D3 /* Encore ViewerTests */,
+				EF2B3F442E06F9F20055B8D3 /* Encore ViewerUITests */,
+				EF2B3F722E06FDB20055B8D3 /* Frameworks */,
 				EFA43B5D2DEC967E004781D4 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -120,6 +247,9 @@
 				EFA43B5C2DEC967E004781D4 /* Encore.app */,
 				EFA43B6A2DEC967F004781D4 /* EncoreTests.xctest */,
 				EFA43B742DEC967F004781D4 /* EncoreUITests.xctest */,
+				EF2B3F272E06F9F00055B8D3 /* Encore Viewer.app */,
+				EF2B3F372E06F9F10055B8D3 /* Encore ViewerTests.xctest */,
+				EF2B3F412E06F9F20055B8D3 /* Encore ViewerUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -127,6 +257,81 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		EF2B3F262E06F9F00055B8D3 /* Encore Viewer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EF2B3F4A2E06F9F20055B8D3 /* Build configuration list for PBXNativeTarget "Encore Viewer" */;
+			buildPhases = (
+				EF2B3F232E06F9F00055B8D3 /* Sources */,
+				EF2B3F242E06F9F00055B8D3 /* Frameworks */,
+				EF2B3F252E06F9F00055B8D3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				EF2B3F282E06F9F00055B8D3 /* Encore Viewer */,
+			);
+			name = "Encore Viewer";
+			packageProductDependencies = (
+				EF2B3F732E06FDB20055B8D3 /* FirebaseFirestore */,
+				EF2B3F752E06FE0C0055B8D3 /* FirebaseAuth */,
+				EF2B3F772E06FE0C0055B8D3 /* FirebaseCore */,
+				EF2B3F7B2E06FE170055B8D3 /* GoogleSignIn */,
+				EF2B3F7D2E06FE170055B8D3 /* GoogleSignInSwift */,
+				EF2B3F7F2E06FE170055B8D3 /* Kingfisher */,
+				EF2B3F812E06FE230055B8D3 /* SDWebImageSwiftUI */,
+			);
+			productName = "Encore Viewer";
+			productReference = EF2B3F272E06F9F00055B8D3 /* Encore Viewer.app */;
+			productType = "com.apple.product-type.application";
+		};
+		EF2B3F362E06F9F10055B8D3 /* Encore ViewerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EF2B3F4D2E06F9F20055B8D3 /* Build configuration list for PBXNativeTarget "Encore ViewerTests" */;
+			buildPhases = (
+				EF2B3F332E06F9F10055B8D3 /* Sources */,
+				EF2B3F342E06F9F10055B8D3 /* Frameworks */,
+				EF2B3F352E06F9F10055B8D3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EF2B3F392E06F9F10055B8D3 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				EF2B3F3A2E06F9F10055B8D3 /* Encore ViewerTests */,
+			);
+			name = "Encore ViewerTests";
+			packageProductDependencies = (
+			);
+			productName = "Encore ViewerTests";
+			productReference = EF2B3F372E06F9F10055B8D3 /* Encore ViewerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		EF2B3F402E06F9F20055B8D3 /* Encore ViewerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EF2B3F502E06F9F20055B8D3 /* Build configuration list for PBXNativeTarget "Encore ViewerUITests" */;
+			buildPhases = (
+				EF2B3F3D2E06F9F20055B8D3 /* Sources */,
+				EF2B3F3E2E06F9F20055B8D3 /* Frameworks */,
+				EF2B3F3F2E06F9F20055B8D3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EF2B3F432E06F9F20055B8D3 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				EF2B3F442E06F9F20055B8D3 /* Encore ViewerUITests */,
+			);
+			name = "Encore ViewerUITests";
+			packageProductDependencies = (
+			);
+			productName = "Encore ViewerUITests";
+			productReference = EF2B3F412E06F9F20055B8D3 /* Encore ViewerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		EFA43B5B2DEC967E004781D4 /* Encore */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = EFA43B7E2DEC967F004781D4 /* Build configuration list for PBXNativeTarget "Encore" */;
@@ -213,6 +418,17 @@
 				LastSwiftUpdateCheck = 1640;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
+					EF2B3F262E06F9F00055B8D3 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					EF2B3F362E06F9F10055B8D3 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = EF2B3F262E06F9F00055B8D3;
+					};
+					EF2B3F402E06F9F20055B8D3 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = EF2B3F262E06F9F00055B8D3;
+					};
 					EFA43B5B2DEC967E004781D4 = {
 						CreatedOnToolsVersion = 16.4;
 					};
@@ -249,11 +465,35 @@
 				EFA43B5B2DEC967E004781D4 /* Encore */,
 				EFA43B692DEC967F004781D4 /* EncoreTests */,
 				EFA43B732DEC967F004781D4 /* EncoreUITests */,
+				EF2B3F262E06F9F00055B8D3 /* Encore Viewer */,
+				EF2B3F362E06F9F10055B8D3 /* Encore ViewerTests */,
+				EF2B3F402E06F9F20055B8D3 /* Encore ViewerUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		EF2B3F252E06F9F00055B8D3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF2B3F352E06F9F10055B8D3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF2B3F3F2E06F9F20055B8D3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EFA43B5A2DEC967E004781D4 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -278,6 +518,27 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		EF2B3F232E06F9F00055B8D3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF2B3F332E06F9F10055B8D3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF2B3F3D2E06F9F20055B8D3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EFA43B582DEC967E004781D4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -302,6 +563,16 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		EF2B3F392E06F9F10055B8D3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EF2B3F262E06F9F00055B8D3 /* Encore Viewer */;
+			targetProxy = EF2B3F382E06F9F10055B8D3 /* PBXContainerItemProxy */;
+		};
+		EF2B3F432E06F9F20055B8D3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EF2B3F262E06F9F00055B8D3 /* Encore Viewer */;
+			targetProxy = EF2B3F422E06F9F20055B8D3 /* PBXContainerItemProxy */;
+		};
 		EFA43B6C2DEC967F004781D4 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = EFA43B5B2DEC967E004781D4 /* Encore */;
@@ -315,6 +586,151 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		EF2B3F4B2E06F9F20055B8D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Encore Viewer/Encore_Viewer.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C6D3VXTZCC;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Encore Viewer/Info.plist";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "SixCreative.Encore-Viewer";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		EF2B3F4C2E06F9F20055B8D3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Encore Viewer/Encore_Viewer.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C6D3VXTZCC;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Encore Viewer/Info.plist";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "SixCreative.Encore-Viewer";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		EF2B3F4E2E06F9F20055B8D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C6D3VXTZCC;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "SixCreative.Encore-ViewerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Encore Viewer.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Encore Viewer";
+			};
+			name = Debug;
+		};
+		EF2B3F4F2E06F9F20055B8D3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C6D3VXTZCC;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "SixCreative.Encore-ViewerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Encore Viewer.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Encore Viewer";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		EF2B3F512E06F9F20055B8D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C6D3VXTZCC;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "SixCreative.Encore-ViewerUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Encore Viewer";
+			};
+			name = Debug;
+		};
+		EF2B3F522E06F9F20055B8D3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C6D3VXTZCC;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "SixCreative.Encore-ViewerUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Encore Viewer";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		EFA43B7C2DEC967F004781D4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -562,6 +978,33 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		EF2B3F4A2E06F9F20055B8D3 /* Build configuration list for PBXNativeTarget "Encore Viewer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EF2B3F4B2E06F9F20055B8D3 /* Debug */,
+				EF2B3F4C2E06F9F20055B8D3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EF2B3F4D2E06F9F20055B8D3 /* Build configuration list for PBXNativeTarget "Encore ViewerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EF2B3F4E2E06F9F20055B8D3 /* Debug */,
+				EF2B3F4F2E06F9F20055B8D3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EF2B3F502E06F9F20055B8D3 /* Build configuration list for PBXNativeTarget "Encore ViewerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EF2B3F512E06F9F20055B8D3 /* Debug */,
+				EF2B3F522E06F9F20055B8D3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		EFA43B572DEC967E004781D4 /* Build configuration list for PBXProject "Encore" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -650,6 +1093,41 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EF21B63C2DF9479600C9C916 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		EF2B3F732E06FDB20055B8D3 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		EF2B3F752E06FE0C0055B8D3 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		EF2B3F772E06FE0C0055B8D3 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		EF2B3F7B2E06FE170055B8D3 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EF21B63C2DF9479600C9C916 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		EF2B3F7D2E06FE170055B8D3 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EF21B63C2DF9479600C9C916 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+		EF2B3F7F2E06FE170055B8D3 /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EF11E75A2E01A1EF0091AB32 /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
+		EF2B3F812E06FE230055B8D3 /* SDWebImageSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EF56FFD32DFA150A00AA14F3 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
+			productName = SDWebImageSwiftUI;
 		};
 		EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */ = {
 			isa = XCSwiftPackageProductDependency;
