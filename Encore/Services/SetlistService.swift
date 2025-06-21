@@ -8,7 +8,6 @@ class SetlistService {
     // --- Setlist Item Functions ---
 
     func addListener(forShow showID: String, completion: @escaping ([SetlistItem]) -> Void) -> ListenerRegistration {
-        // Query the top-level 'setlists' collection for items matching the showID.
         return db.collection("setlists")
             .whereField("showId", isEqualTo: showID)
             .order(by: "order")
@@ -18,25 +17,26 @@ class SetlistService {
                     completion([])
                     return
                 }
-                // Use the power of Codable to automatically decode documents into our new SetlistItem struct.
                 let items = documents.compactMap { try? $0.data(as: SetlistItem.self) }
                 completion(items)
             }
     }
 
     func saveItem(_ item: SetlistItem) {
-        // Save the item directly to the top-level 'setlists' collection.
-        // We use the item's ID to create or update the document.
+        // FIX: This now uses the item's ID to create the document, ensuring the ID is stable.
+        // This resolves the bug where editing was interrupted.
         guard let itemID = item.id else {
-            // If the item is new and has no ID, Firestore will generate one.
-            try? db.collection("setlists").addDocument(from: item)
+            print("Error: Attempted to save a setlist item with no ID.")
             return
         }
-        try? db.collection("setlists").document(itemID).setData(from: item, merge: true)
+        do {
+            try db.collection("setlists").document(itemID).setData(from: item, merge: true)
+        } catch {
+            print("Error saving setlist item: \(error.localizedDescription)")
+        }
     }
 
     func deleteItem(_ itemID: String) {
-        // Delete the item directly from the top-level 'setlists' collection.
         db.collection("setlists").document(itemID).delete()
     }
     
@@ -54,7 +54,6 @@ class SetlistService {
     // --- Personal Note Functions ---
 
     func addNotesListener(for itemID: String, completion: @escaping ([PersonalNote]) -> Void) -> ListenerRegistration {
-        // Query the new top-level 'personalNotes' collection.
         return db.collection("personalNotes")
             .whereField("setlistItemId", isEqualTo: itemID)
             .order(by: "createdAt", descending: true)
@@ -70,7 +69,6 @@ class SetlistService {
     }
 
     func saveNote(_ note: PersonalNote) {
-        // Save the note directly to the top-level 'personalNotes' collection.
         guard let noteID = note.id else {
             try? db.collection("personalNotes").addDocument(from: note)
             return
@@ -79,7 +77,6 @@ class SetlistService {
     }
     
     func deleteNote(_ noteID: String) {
-        // Delete the note directly from the top-level 'personalNotes' collection.
         db.collection("personalNotes").document(noteID).delete()
     }
 }

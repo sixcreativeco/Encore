@@ -20,6 +20,7 @@ struct ShowDetailView: View {
     @State private var showAddGuest = false
     @State private var showEditShow = false
     @State private var showContactDetails = false
+    @State private var showLiveSetlist = false // State for the new sheet
 
     @EnvironmentObject var appState: AppState
 
@@ -40,31 +41,30 @@ struct ShowDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
-                headerSection
-                Divider()
-                
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        showTimingsPanel // This panel is now dynamic
-                    }
-                    .frame(minWidth: 0, maxWidth: .infinity)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 32) {
+                    headerSection
+                    Divider()
                     
-                    VStack(alignment: .leading, spacing: 16) {
-                        guestListPanel
+                    HStack(alignment: .top, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            showTimingsPanel
+                            // ADDED: The guest list panel is now in the left column
+                            guestListPanel
+                        }
+                        .frame(minWidth: 0, maxWidth: .infinity)
                         
-                        SetlistView(
-                            tourID: tour.id ?? "",
-                            showID: show.id ?? "",
-                            ownerUserID: tour.ownerId
-                        )
-                        .environmentObject(appState)
+                        // The right column can now be used for other details
+                        VStack(alignment: .leading, spacing: 16) {
+                            // The old SetlistView is removed.
+                            // This space is now available.
+                            Spacer()
+                        }
+                        .frame(minWidth: 0, maxWidth: .infinity)
                     }
-                    .frame(minWidth: 0, maxWidth: .infinity)
                 }
+                .padding()
             }
-            .padding()
             .onAppear {
                 loadAllShowDetails()
             }
@@ -76,9 +76,11 @@ struct ShowDetailView: View {
             .sheet(isPresented: $showEditShow) {
                 ShowEditView(tour: tour, show: $show)
             }
+            .sheet(isPresented: $showLiveSetlist) {
+                LiveSetlistView(tour: tour, show: show)
+            }
+            .navigationTitle("Show Details")
         }
-        .navigationTitle("Show Details")
-    }
 
     private var headerSection: some View {
         let spacingDateToCity: CGFloat = 3
@@ -162,14 +164,15 @@ struct ShowDetailView: View {
                     }
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 16) {
+                VStack(alignment: .trailing, spacing: 10) {
+                     Button(action: { showLiveSetlist = true }) {
+                        Label("Open Live Setlist", systemImage: "play.display")
+                            .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.accentColor.opacity(0.2)).foregroundColor(.accentColor).cornerRadius(10)
+                    }.buttonStyle(.plain)
+                    
                     Button(action: { showEditShow = true }) {
                         Label("Edit Show", systemImage: "pencil")
                             .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.blue.opacity(0.15)).foregroundColor(.blue).cornerRadius(10)
-                    }.buttonStyle(.plain)
-                    Button(action: {}) {
-                        Label("Upload Documents", systemImage: "tray.and.arrow.up")
-                            .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.green.opacity(0.15)).foregroundColor(.green).cornerRadius(10)
                     }.buttonStyle(.plain)
                 }
             }
@@ -194,7 +197,6 @@ struct ShowDetailView: View {
             HStack {
                 Text("Show Timings").font(.headline)
                 Spacer()
-                // You could add an "Add Custom Timing" button here if needed
             }.padding(.bottom, 4)
 
             if timelineEvents.isEmpty {
@@ -266,7 +268,6 @@ struct ShowDetailView: View {
             let db = Firestore.firestore()
             var events: [ShowTimelineEvent] = []
 
-            // Fetch all related itinerary items for this show
             let itinerarySnapshot = try? await db.collection("itineraryItems")
                 .whereField("showId", isEqualTo: showID)
                 .getDocuments()
@@ -275,18 +276,14 @@ struct ShowDetailView: View {
                 try? $0.data(as: ItineraryItem.self)
             } ?? []
             
-            // Add all itinerary items to the timeline
             for item in itineraryItems {
                 events.append(ShowTimelineEvent(time: item.timeUTC.dateValue(), label: item.title))
             }
 
-            // Manually add events from the Show document if they don't already exist
-            // This prevents duplicates if they were also created as itinerary items.
             if let time = show.venueAccess?.dateValue(), !events.contains(where: { $0.label == "Venue Access" }) {
                 events.append(ShowTimelineEvent(time: time, label: "Venue Access"))
             }
 
-            // Sort all events chronologically
             events.sort()
 
             await MainActor.run {

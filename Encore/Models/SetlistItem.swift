@@ -1,7 +1,6 @@
 import Foundation
 import FirebaseFirestore
 
-// FIX: Added Equatable conformance for SwiftUI animations.
 struct SetlistItem: Codable, Identifiable, Equatable {
     @DocumentID var id: String?
     let showId: String
@@ -22,8 +21,14 @@ struct SetlistItem: Codable, Identifiable, Equatable {
     // Marker-specific details
     var markerDescription: String?
     var markerDuration: TimeInterval?
-
+    
     enum ItemType: String, Codable {
-        case song, marker
+        case song
+        case marker
+        case a_break = "Break"
+        
+        // ADDED: New specific types for notes
+        case lightingNote
+        case soundNote
     }
 }
