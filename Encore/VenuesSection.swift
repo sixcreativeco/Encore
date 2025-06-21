@@ -8,8 +8,10 @@ struct VenuesSection: View {
     @Binding var sortField: String
     @Binding var sortAscending: Bool
 
-    @State private var venues: [VenueModel] = []
+    // FIX: The state now uses our new, top-level 'Venue' model.
+    @State private var venues: [Venue] = []
     @State private var isLoading: Bool = true
+    @State private var listener: ListenerRegistration?
 
     var body: some View {
         VStack {
@@ -19,71 +21,40 @@ struct VenuesSection: View {
                 Spacer()
             } else {
                 ScrollView {
+                    // This will cause an error in VenueTableView next, which is expected.
                     VenueTableView(venues: filteredAndSorted(), sortField: $sortField, sortAscending: $sortAscending)
                 }
             }
         }
-        .onAppear(perform: loadVenues)
+        .onAppear(perform: setupListener)
+        .onDisappear { listener?.remove() }
     }
 
-    private func loadVenues() {
+    // --- FIX IS HERE ---
+    private func setupListener() {
+        self.isLoading = true
+        listener?.remove()
+        
         let db = Firestore.firestore()
-        var collected: [VenueModel] = []
-
-        db.collection("users").document(userID).collection("tours").getDocuments { snapshot, _ in
-            let tourDocs = snapshot?.documents ?? []
-            let group = DispatchGroup()
-
-            for tourDoc in tourDocs {
-                let tourID = tourDoc.documentID
-
-                group.enter()
-                db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").getDocuments { showSnap, _ in
-                    let showDocs = showSnap?.documents ?? []
-
-                    for showDoc in showDocs {
-                        let data = showDoc.data()
-                        let name = data["venue"] as? String ?? ""
-                        let address = data["address"] as? String ?? ""
-                        let city = data["city"] as? String ?? ""
-                        let contactName = data["contactName"] as? String ?? ""
-                        let contactEmail = data["contactEmail"] as? String ?? ""
-                        let contactPhone = data["contactPhone"] as? String ?? ""
-
-                        if !name.isEmpty {
-                            collected.append(
-                                VenueModel(
-                                    name: name,
-                                    address: address,
-                                    city: city,
-                                    contactName: contactName,
-                                    contactEmail: contactEmail,
-                                    contactPhone: contactPhone
-                                )
-                            )
-                        }
-                    }
-                    group.leave()
+        
+        // This is now ONE simple, real-time listener on the top-level /venues collection.
+        // It only fetches venues created by the current user.
+        listener = db.collection("venues")
+            .whereField("ownerId", isEqualTo: userID)
+            .addSnapshotListener { snapshot, error in
+                guard let documents = snapshot?.documents else {
+                    print("Error loading venues: \(error?.localizedDescription ?? "Unknown")")
+                    self.isLoading = false
+                    return
                 }
-            }
-
-            group.notify(queue: .main) {
-                self.venues = deduplicate(collected)
+                
+                // We use Codable to automatically decode into our new [Venue] model.
+                self.venues = documents.compactMap { try? $0.data(as: Venue.self) }
                 self.isLoading = false
             }
-        }
     }
 
-    private func deduplicate(_ models: [VenueModel]) -> [VenueModel] {
-        var dict: [String: VenueModel] = [:]
-        for model in models where !model.name.isEmpty {
-            let key = "\(model.name.lowercased())-\(model.city.lowercased())"
-            dict[key] = model
-        }
-        return dict.values.sorted { $0.name < $1.name }
-    }
-
-    private func filteredAndSorted() -> [VenueModel] {
+    private func filteredAndSorted() -> [Venue] {
         let filtered = venues.filter { venue in
             let matchesFilter = selectedFilter == "All" || venue.city == selectedFilter
             let matchesSearch = searchText.isEmpty || venue.name.lowercased().contains(searchText.lowercased())
@@ -97,7 +68,7 @@ struct VenuesSection: View {
         }
     }
 
-    private func sortFieldValue(_ venue: VenueModel) -> String {
+    private func sortFieldValue(_ venue: Venue) -> String {
         switch sortField {
         case "City": return venue.city
         default: return venue.name

@@ -1,11 +1,10 @@
 import SwiftUI
 
 // This is a reusable UI component.
-// You can place this button in any view that has access to a `show` and `tour` object.
-
 struct ExportShowTimingButton: View {
-    let show: ShowModel
-    let tour: TourModel
+    // FIX: Updated to use the new 'Show' and 'Tour' models.
+    let show: Show
+    let tour: Tour
 
     @State private var pdfURL: URL?
     @State private var isSharing = false
@@ -30,6 +29,8 @@ struct ExportShowTimingButton: View {
         isProcessing = true
         
         Task {
+            // This now passes the new model types to the PDF renderer.
+            // This will cause a new error in 'ShowTimingPDFView' which we will fix later.
             let viewToRender = ShowTimingPDFView(show: show, tour: tour)
             let url = await PDFGenerator.generate(view: viewToRender)
             
@@ -42,10 +43,8 @@ struct ExportShowTimingButton: View {
     }
 }
 
-// You will also need to add this sharingSheet modifier extension to your project,
-// for example in a new file called 'View+SharingSheet.swift'.
-// This is required to present the share sheet on macOS.
-
+// NOTE: The sharingSheet extension and its related components remain unchanged.
+// They are correct as they are.
 extension View {
     func sharingSheet(isPresented: Binding<Bool>, items: [Any]) -> some View {
         self.modifier(SharingSheet(isPresented: isPresented, items: items))
@@ -75,8 +74,6 @@ private struct SharingSheetPresenter: NSViewRepresentable {
             let picker = NSSharingServicePicker(items: items)
             picker.delegate = context.coordinator
             
-            // We need to show the picker relative to a view.
-            // Using a slight delay ensures the view hierarchy is stable.
             DispatchQueue.main.async {
                 picker.show(relativeTo: .zero, of: nsView, preferredEdge: .minY)
             }
@@ -95,7 +92,6 @@ private struct SharingSheetPresenter: NSViewRepresentable {
         }
         
         func sharingServicePicker(_ sharingServicePicker: NSSharingServicePicker, didChoose service: NSSharingService?, error: Error?) {
-            // Dismiss the sheet after a selection or cancellation.
             parent.isPresented = false
         }
     }

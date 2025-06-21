@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct FlightItemCard: View {
-    let flight: FlightModel
+    // FIX: Changed from FlightModel to our new Flight struct.
+    let flight: Flight
     let isExpanded: Bool
     let onExpandToggle: () -> Void
     let onEdit: () -> Void
@@ -11,15 +12,18 @@ struct FlightItemCard: View {
     private let deleteColor = Color(red: 193/255, green: 106/255, blue: 106/255)
 
     var body: some View {
+        // NOTE: All UI code below is identical to your original file.
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(flight.airline) - \(flight.flightNumber)")
+                        // FIX: Using optional-safe access for new model properties
+                        Text("\(flight.airline ?? "N/A") - \(flight.flightNumber ?? "----")")
                             .font(.caption)
                             .foregroundColor(isAirNZ ? .white : .gray)
 
-                        Text("\(flight.departureAirport) - \(flight.arrivalAirport)")
+                        // FIX: Using new property names 'origin' and 'destination'
+                        Text("\(flight.origin) - \(flight.destination)")
                             .font(.system(size: 32, weight: .bold))
                             .foregroundColor(isAirNZ ? .white : .black)
 
@@ -28,7 +32,8 @@ struct FlightItemCard: View {
                                 Image(systemName: "airplane.departure")
                                     .font(.caption)
                                     .foregroundColor(isAirNZ ? .white : .gray)
-                                Text("\(formattedTime(flight.departureTime))")
+                                // FIX: Accessing .dateValue() from the Timestamp property
+                                Text("\(formattedTime(flight.departureTimeUTC.dateValue()))")
                                     .font(.caption)
                                     .foregroundColor(isAirNZ ? .white : .gray)
                             }
@@ -37,7 +42,8 @@ struct FlightItemCard: View {
                                 Image(systemName: "airplane.arrival")
                                     .font(.caption)
                                     .foregroundColor(isAirNZ ? .white : .gray)
-                                Text("\(formattedArrivalTime(flight.departureTime))")
+                                // FIX: Accessing .dateValue() from the Timestamp property
+                                Text("\(formattedArrivalTime(flight.arrivalTimeUTC.dateValue()))")
                                     .font(.caption)
                                     .foregroundColor(isAirNZ ? .white : .gray)
                             }
@@ -45,8 +51,9 @@ struct FlightItemCard: View {
                     }
 
                     Spacer()
-
-                    let airlineCode = extractAirlineCode(from: flight.flightNumber)
+                    
+                    // This logic remains the same, but is now safer with nil-coalescing
+                    let airlineCode = extractAirlineCode(from: flight.flightNumber ?? "")
                     let imageName = airlineCode.uppercased() == "NZ" ? "\(airlineCode)_icon_light" : "\(airlineCode)_icon"
 
                     Image(imageName)
@@ -100,7 +107,7 @@ struct FlightItemCard: View {
     }
 
     private var isAirNZ: Bool {
-        extractAirlineCode(from: flight.flightNumber).uppercased() == "NZ"
+        extractAirlineCode(from: flight.flightNumber ?? "").uppercased() == "NZ"
     }
 
     private func extractAirlineCode(from flightNumber: String) -> String {
@@ -113,11 +120,11 @@ struct FlightItemCard: View {
         formatter.dateFormat = "h:mma"
         return formatter.string(from: date).lowercased()
     }
-
+    
+    // NOTE: This logic seems to assume a 3-hour flight. You may want to revise this later.
     private func formattedArrivalTime(_ date: Date) -> String {
-        let arrivalDate = Calendar.current.date(byAdding: .hour, value: 3, to: date) ?? date
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mma"
-        return formatter.string(from: arrivalDate).lowercased()
+        return formatter.string(from: date).lowercased()
     }
 }

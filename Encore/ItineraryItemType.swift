@@ -56,4 +56,26 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         case .merch: return "tshirt.fill"
         }
     }
+
+    // FIX: This logic now lives inside the enum where it belongs.
+    var isShowTiming: Bool {
+        switch self {
+        case .loadIn, .soundcheck, .doors, .headline, .packOut:
+            return true
+        default:
+            return false
+        }
+    }
+
+    // FIX: This now correctly maps the enum case to the Firestore field name.
+    var firestoreShowKey: String? {
+        switch self {
+        case .loadIn: return "loadIn"
+        case .soundcheck: return "soundCheck"
+        case .doors: return "doorsOpen"
+        case .headline: return "headlinerSetTime"
+        case .packOut: return "packOut"
+        default: return nil
+        }
+    }
 }

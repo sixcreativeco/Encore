@@ -8,8 +8,10 @@ struct HotelsSection: View {
     @Binding var sortField: String
     @Binding var sortAscending: Bool
 
-    @State private var hotels: [HotelModel] = []
+    // FIX: The state now uses our new, top-level 'Hotel' model.
+    @State private var hotels: [Hotel] = []
     @State private var isLoading: Bool = true
+    @State private var listener: ListenerRegistration?
 
     var body: some View {
         VStack {
@@ -18,74 +20,39 @@ struct HotelsSection: View {
                 ProgressView().progressViewStyle(.circular)
                 Spacer()
             } else {
+                // This will cause an error in HotelTableView next, which is expected.
                 HotelTableView(hotels: filteredAndSorted(), sortField: $sortField, sortAscending: $sortAscending)
             }
         }
-        .onAppear(perform: loadHotels)
+        .onAppear(perform: setupListener)
+        .onDisappear { listener?.remove() }
     }
 
-    private func loadHotels() {
+    // --- FIX IS HERE ---
+    private func setupListener() {
+        self.isLoading = true
+        listener?.remove()
+        
         let db = Firestore.firestore()
-        var collected: [HotelModel] = []
-
-        db.collection("users").document(userID).collection("tours").getDocuments { snapshot, _ in
-            let tourDocs = snapshot?.documents ?? []
-            let group = DispatchGroup()
-
-            for tourDoc in tourDocs {
-                let tourID = tourDoc.documentID
-
-                group.enter()
-                db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").getDocuments { showSnap, _ in
-                    let showDocs = showSnap?.documents ?? []
-
-                    for showDoc in showDocs {
-                        let data = showDoc.data()
-                        let name = data["hotelName"] as? String ?? ""
-                        let address = data["hotelAddress"] as? String ?? ""
-                        let city = data["city"] as? String ?? ""
-                        let bookingReference = data["bookingReference"] as? String ?? ""
-                        let contactName = data["contactName"] as? String ?? ""
-                        let contactEmail = data["contactEmail"] as? String ?? ""
-                        let contactPhone = data["contactPhone"] as? String ?? ""
-
-                        if !name.isEmpty {
-                            collected.append(
-                                HotelModel(
-                                    name: name,
-                                    address: address,
-                                    city: city,
-                                    bookingReference: bookingReference,
-                                    contactName: contactName,
-                                    contactEmail: contactEmail,
-                                    contactPhone: contactPhone
-                                )
-                            )
-                        }
-                    }
-                    group.leave()
+        
+        // This is now ONE simple, real-time listener on the top-level /hotels collection.
+        listener = db.collection("hotels")
+            .whereField("ownerId", isEqualTo: userID)
+            .addSnapshotListener { snapshot, error in
+                guard let documents = snapshot?.documents else {
+                    print("Error loading hotels: \(error?.localizedDescription ?? "Unknown")")
+                    self.isLoading = false
+                    return
                 }
-            }
-
-            group.notify(queue: .main) {
-                self.hotels = deduplicate(collected)
+                
+                self.hotels = documents.compactMap { try? $0.data(as: Hotel.self) }
                 self.isLoading = false
             }
-        }
     }
 
-    private func deduplicate(_ models: [HotelModel]) -> [HotelModel] {
-        var dict: [String: HotelModel] = [:]
-        for model in models where !model.name.isEmpty {
-            let key = "\(model.name.lowercased())-\(model.city.lowercased())"
-            dict[key] = model
-        }
-        return dict.values.sorted { $0.name < $1.name }
-    }
-
-    private func filteredAndSorted() -> [HotelModel] {
+    private func filteredAndSorted() -> [Hotel] {
         let filtered = hotels.filter { hotel in
-            let matchesFilter = selectedFilter == "All" || hotel.city == selectedFilter
+            let matchesFilter = selectedFilter == "All" || (hotel.city ?? "") == selectedFilter
             let matchesSearch = searchText.isEmpty || hotel.name.lowercased().contains(searchText.lowercased())
             return matchesFilter && matchesSearch
         }
@@ -97,9 +64,9 @@ struct HotelsSection: View {
         }
     }
 
-    private func sortFieldValue(_ hotel: HotelModel) -> String {
+    private func sortFieldValue(_ hotel: Hotel) -> String {
         switch sortField {
-        case "City": return hotel.city
+        case "City": return hotel.city ?? ""
         default: return hotel.name
         }
     }

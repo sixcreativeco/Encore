@@ -1,7 +1,9 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct ContactFormBody: View {
-    @Binding var contact: ContactModel
+    // FIX: The view now accepts a binding to our new, top-level 'Contact' model.
+    @Binding var contact: Contact
     var isDisabled: Bool
 
     // MARK: - State
@@ -9,6 +11,7 @@ struct ContactFormBody: View {
     @State private var isEmergencyDetailsExpanded: Bool = true
     @State private var roleInput: String = ""
     
+    // These local state variables are fine as they don't interact with the main model directly.
     @State private var homeAirport: String = ""
     @State private var loyaltyAirline: String = ""
     @State private var loyaltyMembership: String = ""
@@ -39,27 +42,29 @@ struct ContactFormBody: View {
             rolesInputView
 
             HStack(alignment: .lastTextBaseline, spacing: 16) {
-                CustomDateInputView(label: "Date of Birth", date: binding(for: $contact.dateOfBirth))
+                // FIX: This binding helper now works with the new Timestamp property.
+                CustomDateInputView(label: "Date of Birth", date: timestampBinding(for: $contact.dateOfBirth))
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Country of Birth").font(.subheadline).foregroundColor(.gray)
-                    StyledInputField(placeholder: "Country of Birth", text: binding(for: $contact.countryOfBirth))
+                    StyledInputField(placeholder: "Country of Birth", text: optionalStringBinding(for: $contact.countryOfBirth))
                 }
             }
 
             CollapsibleSection(isExpanded: $isTravelDetailsExpanded, title: "Travel Details") {
                 VStack(alignment: .leading, spacing: 16) {
-                    StyledInputField(placeholder: "Passport Number", text: passportBinding(for: \.passportNumber))
+                    // FIX: All passport bindings now correctly handle the optional PassportInfo struct.
+                    StyledInputField(placeholder: "Passport Number", text: passportStringBinding(for: \.passportNumber))
                     HStack(spacing: 16) {
-                        CustomDateInputView(label: "Issued Date", date: passportDateBinding(for: \.issuedDate))
-                        CustomDateInputView(label: "Expiry Date", date: passportDateBinding(for: \.expiryDate))
+                        CustomDateInputView(label: "Issued Date", date: passportTimestampBinding(for: \.issuedDate))
+                        CustomDateInputView(label: "Expiry Date", date: passportTimestampBinding(for: \.expiryDate))
                     }
-                    StyledInputField(placeholder: "Issuing Country", text: passportBinding(for: \.issuingCountry))
+                    StyledInputField(placeholder: "Issuing Country", text: passportStringBinding(for: \.issuingCountry))
                     StyledInputField(placeholder: "Home Airport", text: $homeAirport)
 
                     Text("Loyalty Program").font(.headline).padding(.top)
                     HStack(spacing: 16) {
-                         StyledInputField(placeholder: "Type Airline", text: $loyaltyAirline)
-                         StyledInputField(placeholder: "Enter Membership", text: $loyaltyMembership)
+                        StyledInputField(placeholder: "Type Airline", text: $loyaltyAirline)
+                        StyledInputField(placeholder: "Enter Membership", text: $loyaltyMembership)
                     }
                     
                     Text("Documents").font(.headline).padding(.top)
@@ -79,8 +84,8 @@ struct ContactFormBody: View {
                         StyledInputField(placeholder: "Emergency Contact", text: emergencyBinding(for: \.name))
                         StyledInputField(placeholder: "Phone Number", text: emergencyBinding(for: \.phone))
                     }
-                    StyledInputField(placeholder: "Allergies", text: binding(for: $contact.allergies))
-                    StyledInputField(placeholder: "Medications", text: binding(for: $contact.medications))
+                    StyledInputField(placeholder: "Allergies", text: optionalStringBinding(for: $contact.allergies))
+                    StyledInputField(placeholder: "Medications", text: optionalStringBinding(for: $contact.medications))
                 }
             }
             .padding(.bottom)
@@ -92,9 +97,9 @@ struct ContactFormBody: View {
         HStack(alignment: .top, spacing: 24) {
             VStack(spacing: 12) {
                 StyledInputField(placeholder: "Full Name*", text: $contact.name)
-                StyledInputField(placeholder: "Location (e.g. Auckland, NZ)", text: binding(for: $contact.location))
-                StyledInputField(placeholder: "Email", text: binding(for: $contact.email))
-                StyledInputField(placeholder: "Phone Number", text: binding(for: $contact.phone))
+                StyledInputField(placeholder: "Location (e.g. Auckland, NZ)", text: optionalStringBinding(for: $contact.location))
+                StyledInputField(placeholder: "Email", text: optionalStringBinding(for: $contact.email))
+                StyledInputField(placeholder: "Phone Number", text: optionalStringBinding(for: $contact.phone))
             }
             
             Image(systemName: "person.crop.rectangle.fill")
@@ -166,34 +171,42 @@ struct ContactFormBody: View {
     }
 
     // MARK: - Bindings
-    private func binding(for optionalString: Binding<String?>) -> Binding<String> {
-        Binding<String>( get: { optionalString.wrappedValue ?? "" }, set: { optionalString.wrappedValue = $0.isEmpty ? nil : $0 } )
-    }
-    private func binding(for optionalDate: Binding<Date?>) -> Binding<Date> {
-        Binding<Date>( get: { optionalDate.wrappedValue ?? Date() }, set: { optionalDate.wrappedValue = $0 } )
+    private func optionalStringBinding(for binding: Binding<String?>) -> Binding<String> {
+        Binding<String>( get: { binding.wrappedValue ?? "" }, set: { binding.wrappedValue = $0.isEmpty ? nil : $0 } )
     }
     
-    // FIXED: The binding logic is now more explicit to avoid compiler confusion.
-    private func passportBinding(for keyPath: WritableKeyPath<PassportInfo, String>) -> Binding<String> {
+    private func timestampBinding(for optionalTimestamp: Binding<Timestamp?>) -> Binding<Date> {
+        Binding<Date>(
+            get: { optionalTimestamp.wrappedValue?.dateValue() ?? Date() },
+            set: { optionalTimestamp.wrappedValue = Timestamp(date: $0) }
+        )
+    }
+    
+    private func passportStringBinding(for keyPath: WritableKeyPath<PassportInfo, String>) -> Binding<String> {
         Binding<String>(
             get: { self.contact.passport?[keyPath: keyPath] ?? "" },
             set: { newValue in
                 if self.contact.passport == nil {
-                    self.contact.passport = PassportInfo(passportNumber: "", issuedDate: Date(), expiryDate: Date(), issuingCountry: "")
+                    self.contact.passport = PassportInfo(passportNumber: "", issuedDate: Timestamp(date: Date()), expiryDate: Timestamp(date: Date()), issuingCountry: "")
                 }
                 self.contact.passport?[keyPath: keyPath] = newValue
             }
         )
     }
     
-    private func passportDateBinding(for keyPath: WritableKeyPath<PassportInfo, Date>) -> Binding<Date> {
+    private func passportTimestampBinding(for keyPath: WritableKeyPath<PassportInfo, Timestamp>) -> Binding<Date> {
         Binding<Date>(
-            get: { self.contact.passport?[keyPath: keyPath] ?? Date() },
+            get: {
+                if let date = self.contact.passport?[keyPath: keyPath].dateValue() {
+                    return date
+                }
+                return Date()
+            },
             set: { newValue in
                 if self.contact.passport == nil {
-                    self.contact.passport = PassportInfo(passportNumber: "", issuedDate: Date(), expiryDate: Date(), issuingCountry: "")
+                    self.contact.passport = PassportInfo(passportNumber: "", issuedDate: Timestamp(date: Date()), expiryDate: Timestamp(date: Date()), issuingCountry: "")
                 }
-                self.contact.passport?[keyPath: keyPath] = newValue
+                self.contact.passport?[keyPath: keyPath] = Timestamp(date: newValue)
             }
         )
     }

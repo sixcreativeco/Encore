@@ -1,10 +1,10 @@
 import SwiftUI
 
 // This file contains the SwiftUI Views that will be rendered as PDF pages.
-
 struct ShowTimingPDFView: View {
-    let show: ShowModel
-    let tour: TourModel
+    // FIX: Updated to use the new 'Show' and 'Tour' models.
+    let show: Show
+    let tour: Tour
 
     private var eventTimeFormatter: DateFormatter {
         let formatter = DateFormatter()
@@ -22,7 +22,8 @@ struct ShowTimingPDFView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
             VStack(alignment: .leading) {
-                Text("\(tour.artist) - \(tour.name)")
+                // FIX: Using new property names
+                Text("\(tour.artist) - \(tour.tourName)")
                     .font(.largeTitle.bold())
                 Text("Show Day Sheet: \(show.city)")
                     .font(.title2)
@@ -34,13 +35,14 @@ struct ShowTimingPDFView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Date").font(.headline)
-                    Text(fullDateFormatter.string(from: show.date))
+                    // FIX: Using .dateValue() on the Timestamp
+                    Text(fullDateFormatter.string(from: show.date.dateValue()))
                 }
                 Spacer()
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Venue").font(.headline)
-                    Text(show.venue)
-                    Text(show.address)
+                    Text(show.venueName)
+                    Text(show.venueAddress)
                 }
                 Spacer()
                 VStack(alignment: .leading, spacing: 8) {
@@ -54,27 +56,23 @@ struct ShowTimingPDFView: View {
             // Timeline
             VStack(alignment: .leading, spacing: 12) {
                 Text("Schedule").font(.title.bold())
-                EventRow(title: "Venue Access", time: show.venueAccess)
-                EventRow(title: "Load In", time: show.loadIn)
+                // FIX: Using .dateValue() on Timestamps
+                EventRow(title: "Venue Access", time: show.venueAccess?.dateValue())
+                EventRow(title: "Load In", time: show.loadIn?.dateValue())
                 
-                // Support Acts
+                // Note: Support Acts would need to be fetched separately based on the new schema.
+                // For now, this part is commented out. We can add it back later.
+                /*
                 ForEach(show.supportActs) { act in
                     EventRow(title: "\(act.name) Soundcheck", time: act.soundCheck)
                     EventRow(title: "\(act.name) Set", time: act.setTime)
                 }
+                */
                 
-                // Headliner
-                if let headliner = show.headliner {
-                    EventRow(title: "Headliner Soundcheck", time: headliner.soundCheck)
-                }
-                
-                EventRow(title: "Doors Open", time: show.doorsOpen)
-                
-                if let headliner = show.headliner {
-                    EventRow(title: "Headliner Set", time: headliner.setTime)
-                }
-                
-                EventRow(title: "Pack Out", time: show.packOut)
+                EventRow(title: "Headliner Soundcheck", time: show.soundCheck?.dateValue())
+                EventRow(title: "Doors Open", time: show.doorsOpen?.dateValue())
+                EventRow(title: "Headliner Set", time: show.headlinerSetTime?.dateValue())
+                EventRow(title: "Pack Out", time: show.packOut?.dateValue())
             }
             
             Spacer()
@@ -84,7 +82,7 @@ struct ShowTimingPDFView: View {
     }
 
     private func EventRow(title: String, time: Date?) -> some View {
-        HStack {
+      HStack {
             Text(time != nil ? eventTimeFormatter.string(from: time!) : "TBC")
                 .font(.system(size: 14, weight: .bold))
                 .frame(width: 100, alignment: .leading)

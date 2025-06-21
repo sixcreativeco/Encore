@@ -1,12 +1,14 @@
 import SwiftUI
-import Kingfisher
+import Kingfisher // Or SDWebImageSwiftUI, depending on your library
 
 struct TourCard: View {
-    let tour: TourModel
+    // This now accepts our new Tour struct
+    let tour: Tour
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             GeometryReader { geo in
+                // Using Kingfisher, but you can use your preferred image loading library
                 KFImage(URL(string: tour.posterURL ?? ""))
                     .placeholder {
                         ZStack {
@@ -24,12 +26,12 @@ struct TourCard: View {
             .aspectRatio(2/3, contentMode: .fit)
             .cornerRadius(8)
 
-
             Text(tour.artist)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.primary)
 
-            Text(tour.name)
+            // Using the new 'tourName' property
+            Text(tour.tourName)
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
         }

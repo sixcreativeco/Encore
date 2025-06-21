@@ -1,17 +1,19 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
-import Combine // Required for objectWillChange
+import Combine
 
 class AppState: ObservableObject {
     @Published var userID: String? = nil
     @Published var selectedTab: String = "Dashboard"
-    @Published var selectedTour: TourModel? = nil
-    @Published var selectedShow: ShowModel? = nil
-    @Published var tours: [TourModel] = []
+    
+    // FIX: State properties now use the new 'Tour' and 'Show' models.
+    @Published var selectedTour: Tour? = nil
+    @Published var selectedShow: Show? = nil
+    @Published var tours: [Tour] = []
 
     private var authStateHandle: AuthStateDidChangeListenerHandle?
-
+    
     init() {
         registerAuthStateHandler()
     }
@@ -23,27 +25,20 @@ class AppState: ObservableObject {
     }
 
     private func registerAuthStateHandler() {
-        print("LOG: AppState registering auth state listener.")
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] (_, user) in
-            print("LOG: AuthStateDidChangeListener fired.")
-            
-            // FIXED: Manually send the objectWillChange notification before the state update.
-            // This explicitly tells SwiftUI that this object's data is about to change
-            // and that any views observing it need to be refreshed.
             self?.objectWillChange.send()
             
             DispatchQueue.main.async {
-                if let user = user {
-                    print("LOG: Listener received signed-in user with UID: \(user.uid). Updating state.")
-                    self?.userID = user.uid
+                self?.userID = user?.uid
+                if user == nil {
+                    // Clear all data on sign out
+                    self?.tours.removeAll()
+                    self?.selectedTour = nil
+                    self?.selectedShow = nil
                 } else {
-                    print("LOG: Listener received nil user (signed out). Updating state.")
-                    self?.userID = nil
+                    // Load data on sign in
+                    self?.loadTours()
                 }
-            }
-
-            if user == nil {
-                self?.tours.removeAll()
             }
         }
     }
@@ -54,48 +49,46 @@ class AppState: ObservableObject {
         }
     }
 
+    // FIX: Rewritten to use the new flat structure and be more efficient.
     func loadTours() {
         guard let userID = userID else { return }
         let db = Firestore.firestore()
-        var allTours: [TourModel] = []
+        var allTours: [Tour] = []
         let group = DispatchGroup()
 
+        // 1. Fetch tours the user owns
         group.enter()
-        db.collection("users").document(userID).collection("tours")
-            .order(by: "startDate", descending: false)
+        db.collection("tours")
+            .whereField("ownerId", isEqualTo: userID)
             .getDocuments { snapshot, _ in
-                let tours = snapshot?.documents.compactMap { TourModel(from: $0, ownerUserID: userID) } ?? []
-                allTours.append(contentsOf: tours)
+                let ownedTours = snapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []
+                allTours.append(contentsOf: ownedTours)
                 group.leave()
             }
 
+        // 2. Fetch tours that have been shared with the user
         group.enter()
-        db.collection("users").document(userID).collection("sharedTours")
-            .getDocuments { snapshot, _ in
-                let sharedDocs = snapshot?.documents ?? []
-                let nestedGroup = DispatchGroup()
-                for doc in sharedDocs {
-                    let tourID = doc.documentID
-                    let ownerUserID = doc.data()["creatorUserID"] as? String ?? ""
-                    guard !ownerUserID.isEmpty else { continue }
-                    nestedGroup.enter()
-                    db.collection("users").document(ownerUserID).collection("tours").document(tourID)
-                        .getDocument { tourDoc, _ in
-                            if let tourDoc = tourDoc, tourDoc.exists, let tour = TourModel(from: tourDoc, ownerUserID: ownerUserID) {
-                                allTours.append(tour)
-                            }
-                            nestedGroup.leave()
-                        }
-                }
-                nestedGroup.notify(queue: .main) {
+        db.collection("users").document(userID).collection("sharedTours").getDocuments { snapshot, _ in
+            guard let documents = snapshot?.documents, !documents.isEmpty else {
+                group.leave()
+                return
+            }
+            
+            let tourIDs = documents.map { $0.documentID }
+            
+            // Fetch all shared tours in a single efficient query
+            db.collection("tours").whereField(FieldPath.documentID(), in: tourIDs)
+                .getDocuments { tourSnapshot, _ in
+                    let sharedTours = tourSnapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []
+                    allTours.append(contentsOf: sharedTours)
                     group.leave()
                 }
-            }
+        }
 
+        // 3. Once all fetching is complete, update the main tours array.
         group.notify(queue: .main) {
-            DispatchQueue.main.async {
-                self.tours = allTours
-            }
+            // Sort all tours together by start date
+            self.tours = allTours.sorted(by: { $0.startDate.dateValue() < $1.startDate.dateValue() })
         }
     }
 }

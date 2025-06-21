@@ -8,15 +8,21 @@ struct ContactsSection: View {
     @Binding var sortField: String
     @Binding var sortAscending: Bool
 
-    @State private var contacts: [ContactModel] = []
+    // FIX: The state now uses our new, top-level 'Contact' model.
+    @State private var contacts: [Contact] = []
     @State private var isLoading: Bool = true
-    @State private var contactToEdit: ContactModel?
+    @State private var contactToEdit: Contact?
+    
+    // FIX: Add a listener registration state variable to manage its lifecycle.
+    @State private var listener: ListenerRegistration?
 
     var body: some View {
         Group {
             if isLoading {
                 VStack { Spacer(); ProgressView().progressViewStyle(.circular); Spacer() }
             } else {
+                // This will cause a build error next, which is expected.
+                // We will fix ContactsTableView in the next step.
                 ContactsTableView(
                     contacts: filteredAndSorted,
                     sortField: $sortField,
@@ -27,110 +33,67 @@ struct ContactsSection: View {
                 )
             }
         }
-        .onAppear(perform: loadContacts)
+        .onAppear(perform: setupListener)
+        .onDisappear { listener?.remove() } // Clean up the listener
         .sheet(item: $contactToEdit) { contact in
+            // This will cause a build error next, which is expected.
+            // We will fix ContactEditView after we fix the table view.
             ContactEditView(contact: contact)
         }
     }
 
-    private var filteredAndSorted: [ContactModel] {
-        contacts
-            .filter { contact in
-                (selectedFilter == "All" || contact.roles.contains(selectedFilter)) &&
-                (searchText.isEmpty || contact.matches(searchText))
-            }
+    private var filteredAndSorted: [Contact] {
+        // This filtering logic is now much simpler.
+        let filteredByRole = contacts.filter { contact in
+            selectedFilter == "All" || contact.roles.contains(selectedFilter)
+        }
+        
+        let filteredBySearch = filteredByRole.filter { contact in
+            searchText.isEmpty ||
+            contact.name.lowercased().contains(searchText.lowercased()) ||
+            (contact.email ?? "").lowercased().contains(searchText.lowercased()) ||
+            contact.roles.joined(separator: " ").lowercased().contains(searchText.lowercased())
+        }
+        
+        // Sorting logic can be simplified if needed, but this works.
+        return filteredBySearch.sorted { lhs, rhs in
+            let lhsValue = sortFieldValue(lhs)
+            let rhsValue = sortFieldValue(rhs)
+            return sortAscending ? lhsValue < rhsValue : lhsValue > rhsValue
+        }
+    }
+    
+    private func sortFieldValue(_ contact: Contact) -> String {
+        switch sortField {
+        case "Name": return contact.name
+        case "Role": return contact.roles.joined()
+        case "Email": return contact.email ?? ""
+        case "Phone": return contact.phone ?? ""
+        default: return contact.name
+        }
     }
 
-    private func loadContacts() {
+    // --- FIX IS HERE ---
+    private func setupListener() {
+        self.isLoading = true
+        listener?.remove() // Prevent duplicate listeners
+        
         let db = Firestore.firestore()
-        var collected: [ContactModel] = []
-        let group = DispatchGroup()
-
-        // 1. Load from the master 'contacts' collection
-        group.enter()
-        db.collection("users").document(userID).collection("contacts").getDocuments { snapshot, _ in
-            if let docs = snapshot?.documents {
-                let masterContacts = docs.compactMap { ContactModel(from: $0) }
-                collected.append(contentsOf: masterContacts)
-            }
-            group.leave()
-        }
-
-        // 2. Load from various other locations (tours, crew, shows)
-        group.enter()
-        db.collection("users").document(userID).collection("tours").getDocuments { snapshot, _ in
-            let tourDocs = snapshot?.documents ?? []
-            let tourGroup = DispatchGroup()
-
-            if tourDocs.isEmpty {
-                tourGroup.leave()
-            } else {
-                for tourDoc in tourDocs {
-                    let tourID = tourDoc.documentID
-                    let artistName = tourDoc.data()["artist"] as? String ?? ""
-
-                    if !artistName.isEmpty {
-                        collected.append(ContactModel(name: artistName, roles: ["Artist"]))
-                    }
-
-                    tourGroup.enter()
-                    db.collection("users").document(userID).collection("tours").document(tourID).collection("crew").getDocuments { crewSnap, _ in
-                        for doc in crewSnap?.documents ?? [] {
-                            let name = doc.data()["name"] as? String ?? ""
-                            let roles = doc.data()["roles"] as? [String] ?? []
-                            let email = doc.data()["email"] as? String
-                            collected.append(ContactModel(name: name, roles: roles, email: email))
-                        }
-                        tourGroup.leave()
-                    }
-
-                    tourGroup.enter()
-                    db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").getDocuments { showSnap, _ in
-                        let showDocs = showSnap?.documents ?? []
-                        let showGroup = DispatchGroup()
-                        
-                        if showDocs.isEmpty {
-                            showGroup.leave()
-                        } else {
-                            for showDoc in showDocs {
-                                let showID = showDoc.documentID
-
-                                showGroup.enter()
-                                db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").document(showID).collection("supportActs").getDocuments { supportSnap, _ in
-                                    for supDoc in supportSnap?.documents ?? [] {
-                                        let name = supDoc.data()["name"] as? String ?? ""
-                                        collected.append(ContactModel(name: name, roles: ["Support Act"]))
-                                    }
-                                    showGroup.leave()
-                                }
-
-                                showGroup.enter()
-                                db.collection("users").document(userID).collection("tours").document(tourID).collection("shows").document(showID).collection("guestlist").getDocuments { guestSnap, _ in
-                                    for guestDoc in guestSnap?.documents ?? [] {
-                                        let name = guestDoc.data()["name"] as? String ?? ""
-                                        let note = guestDoc.data()["note"] as? String
-                                        collected.append(ContactModel(name: name, roles: ["Guest"], notes: note))
-                                    }
-                                    showGroup.leave()
-                                }
-                            }
-                        }
-
-                        showGroup.notify(queue: .main) {
-                            tourGroup.leave()
-                        }
-                    }
+        
+        // This is now ONE simple, efficient query to the top-level /contacts collection.
+        // It only fetches contacts created by the current user.
+        listener = db.collection("contacts")
+            .whereField("ownerId", isEqualTo: userID)
+            .addSnapshotListener { snapshot, error in
+                guard let documents = snapshot?.documents else {
+                    print("Error loading contacts: \(error?.localizedDescription ?? "Unknown")")
+                    self.isLoading = false
+                    return
                 }
+                
+                // We use Codable to automatically decode into our new [Contact] model.
+                self.contacts = documents.compactMap { try? $0.data(as: Contact.self) }
+                self.isLoading = false
             }
-            
-            tourGroup.notify(queue: .main) {
-                group.leave()
-            }
-        }
-
-        group.notify(queue: .main) {
-            self.contacts = collected
-            self.isLoading = false
-        }
     }
 }
