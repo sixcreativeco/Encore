@@ -21,7 +21,6 @@ struct AddEditSetlistItemView: View {
     }
 
     var body: some View {
-        // We will use the simple, non-scrolling VStack with a fixed frame that we know works.
         VStack(alignment: .leading, spacing: 20) {
             header
             
@@ -44,10 +43,11 @@ struct AddEditSetlistItemView: View {
             footerButtons
         }
         .padding(32)
-        .frame(width: 650, height: 900) // Using the stable, fixed-size window approach
+        .frame(minWidth: 600, idealWidth: 650, minHeight: 700, idealHeight: 850) // Replaced fixed frame with a flexible one
         .background(Color(nsColor: .windowBackgroundColor))
         .onChange(of: isSong) { _, newIsSong in
-            // This logic is now much simpler. We just change the type and move the title.
+            // This logic is now much simpler.
+            // We just change the type and move the title.
             if newIsSong {
                 item.type = .song
                 item.songTitle = item.markerDescription ?? ""
@@ -149,8 +149,6 @@ struct AddEditSetlistItemView: View {
     }
 
     // --- Binding helpers for optional values ---
-    // These are now much simpler because we don't need complex KeyPaths.
-    
     private func optionalStringBinding(for binding: Binding<String?>) -> Binding<String> {
         Binding<String>(
             get: { binding.wrappedValue ?? "" },

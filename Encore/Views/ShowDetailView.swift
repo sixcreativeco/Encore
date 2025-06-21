@@ -6,15 +6,33 @@ struct ShowDetailView: View {
     let tour: Tour
     @State var show: Show
 
+    // Map State
     @State private var mapRegion: MKCoordinateRegion = MKCoordinateRegion()
     @State private var mapItem: MKMapItem?
-    @State private var guestList: [GuestListItemModel] = [] // This old model will be refactored later
     
+    // Guest List State
+    @State private var guestList: [GuestListItemModel] = []
+    
+    // Timeline State
+    @State private var timelineEvents: [ShowTimelineEvent] = []
+
+    // Sheet Presentation State
     @State private var showAddGuest = false
     @State private var showEditShow = false
     @State private var showContactDetails = false
 
     @EnvironmentObject var appState: AppState
+
+    // A local struct to hold all timeline events for sorting
+    struct ShowTimelineEvent: Identifiable, Comparable {
+        let id = UUID()
+        var time: Date
+        var label: String
+
+        static func < (lhs: ShowTimelineEvent, rhs: ShowTimelineEvent) -> Bool {
+            lhs.time < rhs.time
+        }
+    }
 
     init(tour: Tour, show: Show) {
         self.tour = tour
@@ -29,8 +47,7 @@ struct ShowDetailView: View {
                 
                 HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 16) {
-                        showTimingsPanel
-                        // VenueNotesPanel has been temporarily removed until its data model is refactored.
+                        showTimingsPanel // This panel is now dynamic
                     }
                     .frame(minWidth: 0, maxWidth: .infinity)
                     
@@ -49,9 +66,7 @@ struct ShowDetailView: View {
             }
             .padding()
             .onAppear {
-                loadMapForAddress()
-                // FIX: Removed call to the old loadVenueNotes() function.
-                loadGuestList()
+                loadAllShowDetails()
             }
             .sheet(isPresented: $showAddGuest) {
                 AddGuestView(userID: tour.ownerId, tourID: tour.id ?? "", showID: show.id ?? "") {
@@ -176,17 +191,29 @@ struct ShowDetailView: View {
 
     private var showTimingsPanel: some View {
         VStack(alignment: .leading) {
-            HStack { Text("Show Timings").font(.headline); Spacer() }.padding(.bottom, 4)
-            VStack(alignment: .leading, spacing: 8) {
-                timingRow("Load In", show.loadIn?.dateValue())
-                timingRow("Soundcheck", show.soundCheck?.dateValue())
-                timingRow("Doors", show.doorsOpen?.dateValue())
-                timingRow("Headliner Set", show.headlinerSetTime?.dateValue())
-                timingRow("Pack Out", show.packOut?.dateValue())
+            HStack {
+                Text("Show Timings").font(.headline)
+                Spacer()
+                // You could add an "Add Custom Timing" button here if needed
+            }.padding(.bottom, 4)
+
+            if timelineEvents.isEmpty {
+                Text("No timings scheduled.")
+                    .foregroundColor(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(timelineEvents) { event in
+                        timingRow(event.label, event.time)
+                    }
+                }
             }
             Spacer()
         }
-        .frame(minHeight: 200).frame(maxWidth: .infinity).padding().background(Color(nsColor: .controlBackgroundColor)).cornerRadius(10)
+        .frame(minHeight: 200)
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color(nsColor: .controlBackgroundColor))
+        .cornerRadius(10)
     }
 
     private func timingRow(_ label: String, _ time: Date?) -> some View {
@@ -225,6 +252,49 @@ struct ShowDetailView: View {
         .frame(minHeight: 200).frame(maxWidth: .infinity).padding().background(Color(nsColor: .controlBackgroundColor)).cornerRadius(10)
     }
 
+    // MARK: - Data Loading
+
+    private func loadAllShowDetails() {
+        loadMapForAddress()
+        loadGuestList()
+        buildTimeline()
+    }
+
+    private func buildTimeline() {
+        Task {
+            guard let showID = show.id else { return }
+            let db = Firestore.firestore()
+            var events: [ShowTimelineEvent] = []
+
+            // Fetch all related itinerary items for this show
+            let itinerarySnapshot = try? await db.collection("itineraryItems")
+                .whereField("showId", isEqualTo: showID)
+                .getDocuments()
+
+            let itineraryItems = itinerarySnapshot?.documents.compactMap {
+                try? $0.data(as: ItineraryItem.self)
+            } ?? []
+            
+            // Add all itinerary items to the timeline
+            for item in itineraryItems {
+                events.append(ShowTimelineEvent(time: item.timeUTC.dateValue(), label: item.title))
+            }
+
+            // Manually add events from the Show document if they don't already exist
+            // This prevents duplicates if they were also created as itinerary items.
+            if let time = show.venueAccess?.dateValue(), !events.contains(where: { $0.label == "Venue Access" }) {
+                events.append(ShowTimelineEvent(time: time, label: "Venue Access"))
+            }
+
+            // Sort all events chronologically
+            events.sort()
+
+            await MainActor.run {
+                self.timelineEvents = events
+            }
+        }
+    }
+
     private func loadGuestList() {
         guard let showID = show.id else { return }
         let db = Firestore.firestore()
@@ -244,10 +314,12 @@ struct ShowDetailView: View {
             self.mapRegion = MKCoordinateRegion(center: mapItem.placemark.coordinate, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
         }
     }
+
     private func annotationItems() -> [MapItemWrapper] {
         guard let item = mapItem else { return [] }
         return [MapItemWrapper(coordinate: item.placemark.coordinate)]
     }
+
     struct MapItemWrapper: Identifiable {
         let id = UUID()
         let coordinate: CLLocationCoordinate2D
