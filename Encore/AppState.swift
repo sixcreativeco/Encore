@@ -7,7 +7,6 @@ class AppState: ObservableObject {
     @Published var userID: String? = nil
     @Published var selectedTab: String = "Dashboard"
     
-    // FIX: State properties now use the new 'Tour' and 'Show' models.
     @Published var selectedTour: Tour? = nil
     @Published var selectedShow: Show? = nil
     @Published var tours: [Tour] = []
@@ -27,7 +26,7 @@ class AppState: ObservableObject {
     private func registerAuthStateHandler() {
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] (_, user) in
             self?.objectWillChange.send()
-            
+          
             DispatchQueue.main.async {
                 self?.userID = user?.uid
                 if user == nil {
@@ -49,7 +48,6 @@ class AppState: ObservableObject {
         }
     }
 
-    // FIX: Rewritten to use the new flat structure and be more efficient.
     func loadTours() {
         guard let userID = userID else { return }
         let db = Firestore.firestore()
@@ -76,7 +74,13 @@ class AppState: ObservableObject {
             
             let tourIDs = documents.map { $0.documentID }
             
-            // Fetch all shared tours in a single efficient query
+            // FIX: This explicit guard prevents the app from sending an empty array
+            // to Firestore, which was causing the "BloomFilter" error and stopping the load process.
+            guard !tourIDs.isEmpty else {
+                group.leave()
+                return
+            }
+            
             db.collection("tours").whereField(FieldPath.documentID(), in: tourIDs)
                 .getDocuments { tourSnapshot, _ in
                     let sharedTours = tourSnapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []

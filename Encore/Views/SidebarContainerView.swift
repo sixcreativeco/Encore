@@ -49,6 +49,10 @@ struct SidebarContainerView: View {
                 case "Tours":
                     TourListView(onTourSelected: { tour in appState.selectedTour = tour })
                         .environmentObject(appState)
+                // ADDED: Case to show the new TicketsDashboardView
+                case "Tickets":
+                    TicketsDashboardView()
+                        .environmentObject(appState)
                 case "Database":
                     DatabaseView(userID: appState.userID ?? "")
                 case "Team":
@@ -61,7 +65,7 @@ struct SidebarContainerView: View {
                 case "NewTour":
                     NewTourFlowView().environmentObject(appState)
                 default:
-                     Text("Unknown")
+                    Text("Unknown")
                 }
             }
         }
@@ -90,7 +94,6 @@ struct SidebarContainerView: View {
         .animation(.easeInOut(duration: 0.25), value: isSidebarVisible)
     }
 
-    // FIX: Restored the missing helper property.
     private var currentSidebarBackground: Color {
         let activeColorScheme = overrideColorScheme ?? systemColorScheme
         return activeColorScheme == .dark
@@ -112,6 +115,10 @@ struct SidebarContainerView: View {
                 }
                 SidebarLabel(icon: "calendar", title: "Tours", isSelected: appState.selectedTab == "Tours", spacing: 16.5) {
                     appState.selectedTab = "Tours"; appState.selectedTour = nil; appState.selectedShow = nil
+                }
+                // ADDED: Sidebar item for Tickets
+                SidebarLabel(icon: "ticket.fill", title: "Tickets", isSelected: appState.selectedTab == "Tickets", spacing: 16.5) {
+                    appState.selectedTab = "Tickets"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
                 SidebarLabel(icon: "book.fill", title: "Database", isSelected: appState.selectedTab == "Database", spacing: 16) {
                     appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
@@ -154,6 +161,10 @@ struct SidebarContainerView: View {
                 SidebarIcon(icon: "calendar", isSelected: appState.selectedTab == "Tours") {
                     appState.selectedTab = "Tours"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
+                // ADDED: Collapsed sidebar icon for Tickets
+                SidebarIcon(icon: "ticket.fill", isSelected: appState.selectedTab == "Tickets") {
+                    appState.selectedTab = "Tickets"; appState.selectedTour = nil; appState.selectedShow = nil
+                }
                 SidebarIcon(icon: "book.fill", isSelected: appState.selectedTab == "Database") {
                     appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
@@ -184,7 +195,7 @@ struct SidebarContainerView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 120)
-                .foregroundColor(currentLogoColor) // This now works
+                .foregroundColor(currentLogoColor)
                 .padding(.top, 10)
                 .padding(.bottom, 20)
         }
@@ -198,13 +209,12 @@ struct SidebarContainerView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 24, height: 24)
-                .foregroundColor(currentLogoColor) // This now works
+                .foregroundColor(currentLogoColor)
                 .padding(.top, 4)
         }
         .buttonStyle(PlainButtonStyle())
     }
     
-    // FIX: Restored the missing helper property.
     private var currentLogoColor: Color {
         return Color(red: 237/255, green: 237/255, blue: 237/255)
     }

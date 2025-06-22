@@ -13,10 +13,14 @@ struct CustomSegmentedPicker<T: Hashable & CustomStringConvertible>: View {
                 }) {
                     Text(labels?[options.firstIndex(of: option) ?? 0] ?? option.description)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(selected == option ? .white : .black)
+                        // FIX: Added frame to make buttons expand to fill space
+                        .frame(maxWidth: .infinity)
+                        // FIX: Updated colors to match new design
+                        .foregroundColor(selected == option ? .black : .white.opacity(0.7))
                         .padding(.vertical, 10)
                         .padding(.horizontal, 16)
-                        .background(selected == option ? Color.black : Color.gray.opacity(0.2))
+                        // FIX: Updated backgrounds to match new design
+                        .background(selected == option ? Color.white : Color.white.opacity(0.1))
                         .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
