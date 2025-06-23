@@ -6,15 +6,13 @@ struct ShowGridView: View {
     var ownerUserID: String
     var artistName: String
     
-    // The closure correctly uses the new 'Show' model
     var onShowSelected: (Show) -> Void
 
     @State private var shows: [Show] = []
     @State private var isShowingAddShowView = false
     
-    // FIX: Added state for the listener registration to manage it properly
     @State private var listener: ListenerRegistration?
-
+    
     private let columns = [
         GridItem(.flexible(), spacing: 20),
         GridItem(.flexible(), spacing: 20),
@@ -35,7 +33,7 @@ struct ShowGridView: View {
                         }
                         .frame(height: 120)
                         .frame(maxWidth: .infinity)
-                        .background(Color.gray.opacity(0.15))
+                        .background(Color.black.opacity(0.15))
                         .cornerRadius(12)
                     }
                     .buttonStyle(.plain)
@@ -48,7 +46,7 @@ struct ShowGridView: View {
                     }
                     .frame(height: 120)
                     .frame(maxWidth: .infinity)
-                    .background(Color.gray.opacity(0.10))
+                    .background(Color.black.opacity(0.15))
                     .cornerRadius(12)
                 }
                 .buttonStyle(.plain)
@@ -56,18 +54,17 @@ struct ShowGridView: View {
             .padding(.horizontal)
         }
         .sheet(isPresented: $isShowingAddShowView) {
-            // We use the already-refactored AddShowView
             AddShowView(tourID: tourID, userID: ownerUserID, artistName: artistName) { }
         }
         .onAppear { listenForShows() }
-        .onDisappear { listener?.remove() } // FIX: Clean up the listener when the view disappears
+        .onDisappear { listener?.remove() }
     }
 
     private func listenForShows() {
-        listener?.remove() // Remove any existing listener to prevent duplicates
+        listener?.remove()
+        
         let db = Firestore.firestore()
         
-        // FIX: This now uses addSnapshotListener for real-time, automatic updates.
         listener = db.collection("shows")
             .whereField("tourId", isEqualTo: tourID)
             .order(by: "date")

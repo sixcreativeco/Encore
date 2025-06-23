@@ -4,7 +4,6 @@ import Foundation
 import FirebaseFirestore
 import GoogleSignIn
 
-// FIX: AppKit is specific to macOS. Use a compiler directive to only import it for the Mac build.
 #if os(macOS)
 import AppKit
 #endif
@@ -22,7 +21,35 @@ class AuthManager: ObservableObject {
 
     @Published var user: User?
 
-    // The logic inside this function is wrapped to ensure it only compiles for macOS.
+    func handleEmailSignIn(email: String, password: String) async throws -> User? {
+        do {
+            let authResult = try await Auth.auth().signIn(withEmail: email, password: password)
+            self.user = authResult.user
+            return authResult.user
+        } catch {
+            print("LOG: ❌ ERROR in AuthManager.handleEmailSignIn: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    func handleEmailSignUp(email: String, password: String, displayName: String) async throws -> User? {
+        do {
+            let authResult = try await Auth.auth().createUser(withEmail: email, password: password)
+            
+            let changeRequest = authResult.user.createProfileChangeRequest()
+            changeRequest.displayName = displayName
+            try await changeRequest.commitChanges()
+
+            self.user = Auth.auth().currentUser
+            await self.createUserDocumentIfNeeded(userID: authResult.user.uid)
+            
+            return authResult.user
+        } catch {
+            print("LOG: ❌ ERROR in AuthManager.handleEmailSignUp: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
     #if os(macOS)
     func handleGoogleSignIn(presentingWindow: NSWindow) async -> User? {
         print("LOG: 1. AuthManager.handleGoogleSignIn called.")

@@ -1,31 +1,35 @@
 import SwiftUI
 import FirebaseFirestore
 
+struct UnifiedContact: Identifiable, Hashable {
+    let id: String
+    var name: String
+    var email: String?
+    var phone: String?
+    var roles: [String]
+    var source: String
+}
+
 struct ContactsTableView: View {
-    // FIX: The view now accepts an array of our new 'Contact' model.
-    let contacts: [Contact]
+    let contacts: [UnifiedContact]
     @Binding var sortField: String
     @Binding var sortAscending: Bool
     
-    // FIX: The closure now provides the new 'Contact' model.
-    var onContactSelected: (Contact) -> Void
+    var onContactSelected: (UnifiedContact) -> Void
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
-                // Header row remains the same
                 HStack {
                     sortableHeader("Name")
                     sortableHeader("Role")
                     sortableHeader("Email")
                     sortableHeader("Phone")
-                    sortableHeader("Notes")
+                    sortableHeader("Source")
                 }
                 .padding(.vertical, 8)
                 Divider()
 
-                // FIX: The ForEach now iterates directly over the sorted contacts array.
-                // The complex merging logic has been removed.
                 ForEach(sortedContacts) { contact in
                     Button(action: { onContactSelected(contact) }) {
                         HStack {
@@ -33,10 +37,10 @@ struct ContactsTableView: View {
                             Text(contact.roles.joined(separator: ", ")).frame(maxWidth: .infinity, alignment: .leading)
                             Text(contact.email ?? "").frame(maxWidth: .infinity, alignment: .leading)
                             Text(contact.phone ?? "").frame(maxWidth: .infinity, alignment: .leading)
-                            Text(contact.notes ?? "").frame(maxWidth: .infinity, alignment: .leading)
+                            Text(contact.source).frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(.vertical, 4)
-                        .contentShape(Rectangle()) // Ensure the whole area is tappable
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     Divider()
@@ -46,8 +50,7 @@ struct ContactsTableView: View {
         }
     }
 
-    // FIX: This computed property now sorts the new [Contact] array directly.
-    private var sortedContacts: [Contact] {
+    private var sortedContacts: [UnifiedContact] {
         contacts.sorted { a, b in
             let comparison: Bool
             switch sortField {
@@ -59,6 +62,8 @@ struct ContactsTableView: View {
                 comparison = (a.email ?? "") < (b.email ?? "")
             case "Phone":
                 comparison = (a.phone ?? "") < (b.phone ?? "")
+            case "Source":
+                comparison = a.source < b.source
             default:
                 comparison = a.name < b.name
             }

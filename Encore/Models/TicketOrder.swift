@@ -4,7 +4,7 @@ import FirebaseFirestore
 struct TicketOrder: Codable, Identifiable {
     @DocumentID var id: String?
     
-    // Links to the event and the specific type of ticket purchased
+    let ownerId: String // ADDED: To associate the order with the event owner.
     let eventId: String
     let ticketTypeId: String
     

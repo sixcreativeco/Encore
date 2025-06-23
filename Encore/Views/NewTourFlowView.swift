@@ -28,15 +28,15 @@ struct NewTourFlowView: View {
                         CustomTextField(placeholder: "Artist Name", text: $artistName)
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Start Date").font(.subheadline).foregroundColor(.gray)
+                                Text("Start Date").font(.subheadline).foregroundColor(.secondary)
                                 CustomDateField(date: $startDate)
                             }
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("End Date").font(.subheadline).foregroundColor(.gray)
+                                Text("End Date").font(.subheadline).foregroundColor(.secondary)
                                 CustomDateField(date: $endDate)
                             }
                         }
-                        Text("Including Travel/Extra Days").font(.footnote).foregroundColor(.gray)
+                        Text("Including Travel/Extra Days").font(.footnote).foregroundColor(.secondary)
                         Picker("", selection: $tourScope) {
                             Text("National").tag("national")
                             Text("International").tag("international")
@@ -58,7 +58,7 @@ struct NewTourFlowView: View {
                     VStack {
                         ZStack {
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.gray.opacity(0.05))
+                                .fill(Color.black.opacity(0.15))
                                 .frame(width: 200, height: 240)
                             if let img = posterImage {
                                 Image(nsImage: img)
@@ -78,7 +78,6 @@ struct NewTourFlowView: View {
                     .padding(.top, 40)
                 }
 
-                // FIX: These 'if let' statements now correctly check for the 'newTour' state object.
                 if let tour = newTour, let tourID = tour.id {
                     AddCrewSectionView(tourID: tourID)
                     Divider()
@@ -94,11 +93,9 @@ struct NewTourFlowView: View {
                         )
                         Spacer()
                     }
-                    .padding()
                 }
             }
-            .padding(.leading, 20)
-            .padding(.trailing, 20)
+            .padding(30)
         }
     }
 
@@ -141,7 +138,6 @@ struct NewTourFlowView: View {
         do {
             let ref = try Firestore.firestore().collection("tours").addDocument(from: newTourData)
             newTourData.id = ref.documentID
-            // This sets the state object that unhides the rest of the view
             self.newTour = newTourData
         } catch {
             print("❌ Error saving tour: \(error.localizedDescription)")

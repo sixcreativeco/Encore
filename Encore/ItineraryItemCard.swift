@@ -1,30 +1,23 @@
 import SwiftUI
 
 struct ItineraryItemCard: View {
-    // FIX: Updated to use the new 'ItineraryItem' model.
     let item: ItineraryItem
-    
-    // These properties are kept for API compatibility with the parent view.
     let isExpanded: Bool
     let onExpandToggle: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
-        // The overall UI structure is preserved.
         Button(action: onExpandToggle) {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        // FIX: Gets the icon by converting the 'type' string into our ItineraryItemType enum.
-                        // This resolves the "no member 'iconName'" error.
                         Image(systemName: ItineraryItemType(rawValue: item.type)?.iconName ?? "questionmark.circle")
                             .font(.title2)
                         
                         Text(item.title).font(.headline)
                         Spacer()
                         
-                        // FIX: Uses the new timeUTC property and gets its dateValue().
                         Text(item.timeUTC.dateValue().formatted(date: .omitted, time: .shortened))
                     }
 
@@ -32,7 +25,6 @@ struct ItineraryItemCard: View {
                         Text(subtitle).font(.subheadline).foregroundColor(.gray)
                     }
                     
-                    // FIX: Uses the new 'notes' property (plural).
                     if let note = item.notes, !note.isEmpty {
                         Text(note).font(.subheadline).foregroundColor(.gray)
                     }
@@ -40,11 +32,10 @@ struct ItineraryItemCard: View {
                 .padding()
 
                 if isExpanded {
-                    // The expanded view with Edit/Delete buttons remains unchanged.
                     expandedActionView
                 }
             }
-            .background(Color.gray.opacity(0.1))
+            .background(Color.black.opacity(0.15))
             .cornerRadius(20)
         }
         .buttonStyle(.plain)

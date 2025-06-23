@@ -19,7 +19,7 @@ struct CustomTextField: View {
                 .background(Color.clear)
                 .textFieldStyle(PlainTextFieldStyle())
         }
-        .background(Color.gray.opacity(0.05))
+        .background(Color.black.opacity(0.15))
         .cornerRadius(8)
     }
 }

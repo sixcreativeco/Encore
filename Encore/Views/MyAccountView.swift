@@ -1,205 +1,247 @@
 import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
+import Kingfisher
 
 struct MyAccountView: View {
     @EnvironmentObject var appState: AppState
-    @Environment(\.colorScheme) private var systemColorScheme
-    @State private var overrideColorScheme: ColorScheme? = nil
-    @State private var isDarkMode: Bool = false
+    @StateObject private var syncManager = OfflineSyncManager.shared
+
+    // User Profile State
+    @State private var userName: String = "Loading..."
+    @State private var userEmail: String = ""
+    @State private var userPhone: String = ""
+    @State private var userProfileImageURL: URL?
+
+    // Stats State
     @State private var totalTours: Int = 0
     @State private var totalShows: Int = 0
-    @State private var totalFlights: Int = 0
-    @State private var userEmail: String = ""
+    @State private var totalTicketsSold: Int = 0
+    
+    @State private var isLoading = true
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
-                accountInfoSection
-                preferencesSection
-                usageStatsSection
+            VStack(alignment: .leading, spacing: 30) {
+                Text("Account")
+                    .font(.largeTitle.bold())
+
+                accountCard
+                
+                statsSection
+                
                 supportSection
-                devToolsSection
-                versionSection
+
+                Spacer()
             }
-            .padding()
-            .onAppear {
-                loadStats()
-                loadUserEmail()
+            .padding(30)
+        }
+        .onAppear {
+            Task {
+                await loadAllUserData()
             }
         }
-        .navigationTitle("My Account")
     }
 
-    // MARK: - Account Info
+    // MARK: - Main UI Sections
 
-    private var accountInfoSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Account")
-                .font(.title2.bold())
+    private var accountCard: some View {
+        ZStack {
+            HStack(alignment: .top) {
+                // Left side: User Info
+                HStack(spacing: 16) {
+                    KFImage(userProfileImageURL)
+                        .placeholder {
+                            Image(systemName: "person.crop.circle.fill")
+                                .resizable()
+                                .foregroundColor(.gray)
+                        }
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 60, height: 60)
+                        .clipShape(Circle())
 
-            HStack(alignment: .center) {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    if !userEmail.isEmpty {
-                        Text(userEmail)
-                            .font(.headline)
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(userName)
+                                .font(.title2.bold())
+                            Text("userid: \(appState.userID ?? "N/A")")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Label(userEmail, systemImage: "envelope.fill")
+                            .font(.subheadline)
+                        
+                        Label(userPhone, systemImage: "phone.fill")
+                            .font(.subheadline)
                     }
-
-                    Text("User ID: \(appState.userID ?? "Unknown")")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-
-                    Text("Online Status: \(OfflineSyncManager.shared.isOnline ? "Online" : "Offline")")
-                        .font(.subheadline)
-                        .foregroundColor(OfflineSyncManager.shared.isOnline ? .green : .gray)
                 }
 
                 Spacer()
 
-                Button("Sign Out", role: .destructive) {
-                    signOut()
+                // Right side: Status and Plan
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack {
+                        Circle()
+                            .fill(syncManager.isOnline ? Color.green : Color.gray)
+                            .frame(width: 8, height: 8)
+                        Text("Online")
+                            .font(.caption)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing) {
+                        Text("encore indie")
+                            .font(.headline.bold())
+                        Button("Upgrade") {}
+                            .buttonStyle(PrimaryButtonStyle(color: .white, textColor: .black))
+                    }
                 }
-                .font(.headline)
-                .foregroundColor(.red)
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding(.top, 8)
-        }
-    }
-
-    // MARK: - Preferences
-
-    private var preferencesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Preferences")
-                .font(.title2.bold())
-
-            Toggle("Dark Mode", isOn: $isDarkMode)
-                .onChange(of: isDarkMode) { value in
-                    overrideColorScheme = value ? .dark : .light
-                }
-        }
-    }
-
-    // MARK: - Usage Stats
-
-    private var usageStatsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Usage Stats")
-                .font(.title2.bold())
-
-            HStack {
-                statBlock(label: "Tours", count: totalTours)
-                statBlock(label: "Shows", count: totalShows)
-                statBlock(label: "Flights", count: totalFlights)
             }
         }
+        .padding(24)
+        .background(Color.black.opacity(0.15))
+        .cornerRadius(16)
     }
 
-    private func statBlock(label: String, count: Int) -> some View {
-        VStack {
-            Text("\(count)")
+    private var statsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Stats")
+                .font(.title2.bold())
+            
+            HStack(spacing: 16) {
+                statBlock(count: totalTours, label: "Tours", icon: "airplane")
+                statBlock(count: totalShows, label: "Shows", icon: "music.mic")
+                statBlock(count: totalTicketsSold, label: "Tickets Sold", icon: "ticket.fill")
+            }
+        }
+    }
+
+    private func statBlock(count: Int, label: String, icon: String) -> some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text("\(count)")
+                    .font(.system(size: 36, weight: .bold))
+                Text(label)
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            Image(systemName: icon)
                 .font(.title)
-                .bold()
-            Text(label)
-                .font(.subheadline)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
         }
-        .frame(maxWidth: .infinity)
         .padding()
-        .background(Color.gray.opacity(0.1))
+        .background(Color.black.opacity(0.15))
         .cornerRadius(12)
     }
-
-    // MARK: - Support
 
     private var supportSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Support")
                 .font(.title2.bold())
-
-            Button("Contact Support") { }
-            Button("Privacy Policy") { }
-            Button("Terms of Service") { }
-        }
-    }
-
-    // MARK: - Dev Tools
-
-    private var devToolsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Developer Tools")
-                .font(.title2.bold())
-
-            Button(role: .destructive) {
-                // Add wipe cache logic here
-            } label: {
-                Text("Wipe Local Cache")
+            
+            HStack {
+                supportButton(title: "Contact Support") {}
+                supportButton(title: "Terms of Service") {}
+                supportButton(title: "Privacy Policy") {}
             }
+            
+            supportButton(title: "Clear Local Cache", width: 180) {}
+            
+            Button("Sign Out", role: .destructive) {
+                AuthManager.shared.signOut()
+            }
+            .buttonStyle(PrimaryButtonStyle(color: .red.opacity(0.7)))
+            .padding(.top, 20)
         }
     }
 
-    // MARK: - Version
-
-    private var versionSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("App Version: 1.8.8") // This can be updated as needed
-                .font(.footnote)
-                .foregroundColor(.gray)
+    private func supportButton(title: String, width: CGFloat? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .frame(width: width)
+                .background(Color.black.opacity(0.15))
+                .cornerRadius(8)
         }
+        .buttonStyle(.plain)
     }
 
-    // MARK: - Load Stats Logic
+    // MARK: - Data Loading Logic
 
-    private func loadStats() {
-        guard let userID = appState.userID else { return }
+    private func loadAllUserData() async {
+        guard let userID = appState.userID else {
+            isLoading = false
+            return
+        }
 
+        isLoading = true
         let db = Firestore.firestore()
-        db.collection("users").document(userID).collection("tours").getDocuments { snapshot, _ in
-            self.totalTours = snapshot?.documents.count ?? 0
 
-            var showCount = 0
-            var flightCount = 0
+        // Fetch User Profile
+        async let userProfileTask = db.collection("users").document(userID).getDocument()
+        
+        // Fetch Tours to get IDs
+        async let toursTask = db.collection("tours").whereField("ownerId", isEqualTo: userID).getDocuments()
 
-            let group = DispatchGroup()
-
-            snapshot?.documents.forEach { tourDoc in
-                group.enter()
-                db.collection("users").document(userID).collection("tours").document(tourDoc.documentID).collection("shows").getDocuments { showSnapshot, _ in
-                    showCount += showSnapshot?.documents.count ?? 0
-                    group.leave()
-                }
-
-                group.enter()
-                db.collection("users").document(userID).collection("tours").document(tourDoc.documentID).collection("flights").getDocuments { flightSnapshot, _ in
-                    flightCount += flightSnapshot?.documents.count ?? 0
-                    group.leave()
+        do {
+            let userDocument = try await userProfileTask
+            if let userData = userDocument.data() {
+                await MainActor.run {
+                    self.userName = userData["displayName"] as? String ?? "No Name"
+                    self.userEmail = userData["email"] as? String ?? ""
+                    self.userPhone = userData["phone"] as? String ?? ""
+                    if let urlString = userData["profileImageURL"] as? String {
+                        self.userProfileImageURL = URL(string: urlString)
+                    }
                 }
             }
 
-            group.notify(queue: .main) {
-                self.totalShows = showCount
-                self.totalFlights = flightCount
+            let toursSnapshot = try await toursTask
+            let tourIDs = toursSnapshot.documents.compactMap { $0.documentID }
+            await MainActor.run { self.totalTours = tourIDs.count }
+
+            if !tourIDs.isEmpty {
+                // Fetch stats based on tour IDs
+                await fetchStats(for: tourIDs, db: db)
+            } else {
+                await MainActor.run { isLoading = false }
             }
+
+        } catch {
+            print("Error loading user data: \(error.localizedDescription)")
+            await MainActor.run { isLoading = false }
         }
     }
+    
+    private func fetchStats(for tourIDs: [String], db: Firestore) async {
+        // Fetch Show Count
+        async let showsTask = db.collection("shows").whereField("tourId", in: tourIDs).getDocuments()
+        
+        // Fetch Ticketed Events to then get Ticket Sales
+        async let ticketedEventsTask = db.collection("ticketedEvents").whereField("tourId", in: tourIDs).getDocuments()
 
-    // MARK: - Load User Email
+        do {
+            let showsSnapshot = try await showsTask
+            await MainActor.run { self.totalShows = showsSnapshot.count }
+            
+            let ticketedEventsSnapshot = try await ticketedEventsTask
+            let eventIDs = ticketedEventsSnapshot.documents.compactMap { $0.documentID }
 
-    private func loadUserEmail() {
-        if let currentUser = Auth.auth().currentUser {
-            self.userEmail = currentUser.email ?? ""
+            if !eventIDs.isEmpty {
+                let salesSnapshot = try await db.collection("ticketSales").whereField("ticketedEventId", in: eventIDs).getDocuments()
+                let totalSold = salesSnapshot.documents.reduce(0) { $0 + ($1.data()["quantity"] as? Int ?? 0) }
+                await MainActor.run { self.totalTicketsSold = totalSold }
+            }
+        } catch {
+            print("Error fetching stats: \(error.localizedDescription)")
         }
-    }
-
-    // MARK: - Sign Out Logic
-
-    private func signOut() {
-        // FIXED: This now correctly calls the shared AuthManager to perform a full sign-out from Firebase.
-        AuthManager.shared.signOut()
+        
+        await MainActor.run { isLoading = false }
     }
 }

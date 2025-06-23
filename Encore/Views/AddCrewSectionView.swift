@@ -5,7 +5,6 @@ struct AddCrewSectionView: View {
     let tourID: String
     @EnvironmentObject var appState: AppState
 
-    // FIX: The State variable now uses our new, Codable TourCrew model.
     @State private var crewMembers: [TourCrew] = []
     @State private var newCrewName: String = ""
     @State private var newCrewEmail: String = ""
@@ -18,7 +17,6 @@ struct AddCrewSectionView: View {
     @State private var emailValidationState: EmailValidationState = .none
     @State private var emailCheckTask: Task<Void, Never>? = nil
     
-    // This will hold the listener so we can detach it when the view disappears.
     @State private var listener: ListenerRegistration?
 
     private enum EmailValidationState { case none, checking, valid, invalid }
@@ -57,7 +55,7 @@ struct AddCrewSectionView: View {
                         case .checking:
                             ProgressView().scaleEffect(0.5)
                         case .valid:
-                            Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                             Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
                         default:
                             EmptyView().frame(width: 20)
                         }
@@ -80,7 +78,7 @@ struct AddCrewSectionView: View {
                                     }.buttonStyle(.plain)
                                 }
                                 .padding(.horizontal, 8).padding(.vertical, 4)
-                                .background(Color.gray.opacity(0.2)).cornerRadius(6)
+                                .background(Color.black.opacity(0.2)).cornerRadius(6)
                             }
                             TextField("Type a role", text: $roleInput)
                                 .textFieldStyle(PlainTextFieldStyle()).frame(minWidth: 100)
@@ -90,7 +88,9 @@ struct AddCrewSectionView: View {
                         }
                         .padding(.horizontal, 8).padding(.vertical, 6)
                     }
-                    .frame(height: 42).background(Color.gray.opacity(0.05)).cornerRadius(8)
+                    .frame(height: 42)
+                    .background(Color.black.opacity(0.15))
+                    .cornerRadius(8)
 
                     ZStack {
                         if showRoleSuggestions && !filteredRoles.isEmpty {
@@ -111,53 +111,20 @@ struct AddCrewSectionView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Visibility").font(.subheadline).bold()
-                    VStack(spacing: 0) {
-                        Button(action: { withAnimation { showVisibilityOptions.toggle() } }) {
-                            HStack {
-                                Text(visibilityTitle(for: selectedVisibility))
-                                    .font(.subheadline).foregroundColor(.primary)
-                                Spacer()
-                                Image(systemName: showVisibilityOptions ? "chevron.up" : "chevron.down")
-                                    .font(.system(size: 12, weight: .bold)).foregroundColor(.gray)
-                            }
-                            .padding(.horizontal, 12).padding(.vertical, 12)
-                            .background(Color.gray.opacity(0.05)).cornerRadius(8)
-                        }.frame(width: 200)
-
-                        if showVisibilityOptions {
-                            VStack(spacing: 0) {
-                                ForEach(visibilityOptions, id: \.self) { option in
-                                    Button(action: {
-                                        selectedVisibility = option
-                                        showVisibilityOptions = false
-                                    }) {
-                                        Text(visibilityTitle(for: option))
-                                            .padding(.vertical, 12).padding(.horizontal, 12)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                    .buttonStyle(.plain).foregroundColor(.primary)
-                                }
-                            }
-                            .background(Color(NSColor.windowBackgroundColor)).cornerRadius(8).shadow(radius: 2).padding(.top, 4)
-                        }
-                    }
-                    Text(visibilityDescription(for: selectedVisibility))
-                        .font(.footnote).foregroundColor(.gray).lineLimit(3)
-                        .multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
-                }
                 Button(action: { saveCrewMember() }) {
                     HStack {
                         Image(systemName: "plus")
                         Text("Add Crew Member")
                     }
-                }.font(.subheadline)
+                }
+                .font(.subheadline)
             }
+            .padding()
+            .background(Color.black.opacity(0.15))
+            .cornerRadius(12)
 
             // This is the list that provides the visual confirmation.
             VStack(alignment: .leading, spacing: 8) {
-                // FIX: This now iterates over the new [TourCrew] model.
                 ForEach(crewMembers) { member in
                     VStack(alignment: .leading) {
                         Text("\(member.name) • \(member.roles.joined(separator: ", "))").font(.subheadline)
@@ -165,13 +132,15 @@ struct AddCrewSectionView: View {
                             Text(email).font(.caption).foregroundColor(.gray)
                         }
                     }
-                    .padding(8).background(Color.gray.opacity(0.05)).cornerRadius(8)
+                    .padding(8)
+                    .background(Color.black.opacity(0.15))
+                    .cornerRadius(8)
                 }
             }
         }
         .padding(.top, 12)
         .onAppear { loadCrew() }
-        .onDisappear { listener?.remove() } // Make sure to clean up the listener
+        .onDisappear { listener?.remove() }
     }
 
     private func checkEmailWithDebounce(email: String) {
@@ -196,25 +165,6 @@ struct AddCrewSectionView: View {
                     self.emailValidationState = .none
                 }
             }
-        }
-    }
-
-    private func visibilityTitle(for option: String) -> String {
-        switch option {
-        case "full": return "Full"
-        case "limited": return "Limited"
-        case "temporary": return "Temporary"
-        default: return option
-        }
-    }
-
-    private func visibilityDescription(for option: String) -> String {
-        let name = newCrewName.isEmpty ? "They" : newCrewName
-        switch option {
-        case "full": return "\(name) can see the full itinerary. Best for core crew, admins, and agents."
-        case "limited": return "\(name) can see most details. Good for production and show crew."
-        case "temporary": return "\(name) can see show times and assigned items only. Best for support acts and one-offs."
-        default: return ""
         }
     }
 
@@ -243,19 +193,17 @@ struct AddCrewSectionView: View {
         )
         do {
             _ = try Firestore.firestore().collection("tourCrew").addDocument(from: newCrew)
-            newCrewName = ""; newCrewEmail = ""; roleInput = ""; selectedRoles = []; selectedVisibility = "full"
+            newCrewName = ""; newCrewEmail = ""; roleInput = ""; selectedRoles = [];
+            selectedVisibility = "full"
         } catch {
             print("❌ Error saving new crew member: \(error.localizedDescription)")
         }
     }
     
-    // --- FIX IS HERE ---
     private func loadCrew() {
-        listener?.remove() // Prevent duplicate listeners
+        listener?.remove()
         let db = Firestore.firestore()
         
-        // This now listens for real-time updates on the top-level /tourCrew collection
-        // and filters for the current tour. This will make the list update instantly.
         listener = db.collection("tourCrew")
             .whereField("tourId", isEqualTo: tourID)
             .order(by: "createdAt", descending: true)
@@ -264,7 +212,6 @@ struct AddCrewSectionView: View {
                     print("Error loading crew: \(error?.localizedDescription ?? "Unknown")")
                     return
                 }
-                // We use Codable to automatically decode into our new TourCrew model.
                 self.crewMembers = documents.compactMap { try? $0.data(as: TourCrew.self) }
             }
     }

@@ -8,43 +8,37 @@ struct ContactsSection: View {
     @Binding var sortField: String
     @Binding var sortAscending: Bool
 
-    // FIX: The state now uses our new, top-level 'Contact' model.
-    @State private var contacts: [Contact] = []
+    @State private var unifiedContacts: [UnifiedContact] = []
     @State private var isLoading: Bool = true
     @State private var contactToEdit: Contact?
-    
-    // FIX: Add a listener registration state variable to manage its lifecycle.
-    @State private var listener: ListenerRegistration?
 
     var body: some View {
         Group {
             if isLoading {
                 VStack { Spacer(); ProgressView().progressViewStyle(.circular); Spacer() }
             } else {
-                // This will cause a build error next, which is expected.
-                // We will fix ContactsTableView in the next step.
                 ContactsTableView(
                     contacts: filteredAndSorted,
                     sortField: $sortField,
                     sortAscending: $sortAscending,
-                    onContactSelected: { contact in
-                        self.contactToEdit = contact
+                    onContactSelected: { unifiedContact in
+                        // Future navigation to a unified detail view can be handled here.
+                        // For now, only contacts from the 'contacts' source can be edited.
+                        if unifiedContact.source == "Contacts" {
+                             // This part needs a fuller implementation to fetch the original Contact model for editing.
+                        }
                     }
                 )
             }
         }
-        .onAppear(perform: setupListener)
-        .onDisappear { listener?.remove() } // Clean up the listener
+        .onAppear(perform: fetchAndMergeContacts)
         .sheet(item: $contactToEdit) { contact in
-            // This will cause a build error next, which is expected.
-            // We will fix ContactEditView after we fix the table view.
             ContactEditView(contact: contact)
         }
     }
 
-    private var filteredAndSorted: [Contact] {
-        // This filtering logic is now much simpler.
-        let filteredByRole = contacts.filter { contact in
+    private var filteredAndSorted: [UnifiedContact] {
+        let filteredByRole = unifiedContacts.filter { contact in
             selectedFilter == "All" || contact.roles.contains(selectedFilter)
         }
         
@@ -55,45 +49,78 @@ struct ContactsSection: View {
             contact.roles.joined(separator: " ").lowercased().contains(searchText.lowercased())
         }
         
-        // Sorting logic can be simplified if needed, but this works.
         return filteredBySearch.sorted { lhs, rhs in
-            let lhsValue = sortFieldValue(lhs)
-            let rhsValue = sortFieldValue(rhs)
+            let lhsValue: String
+            switch sortField {
+            case "Name": lhsValue = lhs.name
+            case "Role": lhsValue = lhs.roles.joined()
+            case "Email": lhsValue = lhs.email ?? ""
+            case "Phone": lhsValue = lhs.phone ?? ""
+            case "Source": lhsValue = lhs.source
+            default: lhsValue = lhs.name
+            }
+
+            let rhsValue: String
+            switch sortField {
+            case "Name": rhsValue = rhs.name
+            case "Role": rhsValue = rhs.roles.joined()
+            case "Email": rhsValue = rhs.email ?? ""
+            case "Phone": rhsValue = rhs.phone ?? ""
+            case "Source": rhsValue = rhs.source
+            default: rhsValue = rhs.name
+            }
             return sortAscending ? lhsValue < rhsValue : lhsValue > rhsValue
         }
     }
     
-    private func sortFieldValue(_ contact: Contact) -> String {
-        switch sortField {
-        case "Name": return contact.name
-        case "Role": return contact.roles.joined()
-        case "Email": return contact.email ?? ""
-        case "Phone": return contact.phone ?? ""
-        default: return contact.name
-        }
-    }
-
-    // --- FIX IS HERE ---
-    private func setupListener() {
+    private func fetchAndMergeContacts() {
         self.isLoading = true
-        listener?.remove() // Prevent duplicate listeners
         
         let db = Firestore.firestore()
-        
-        // This is now ONE simple, efficient query to the top-level /contacts collection.
-        // It only fetches contacts created by the current user.
-        listener = db.collection("contacts")
-            .whereField("ownerId", isEqualTo: userID)
-            .addSnapshotListener { snapshot, error in
-                guard let documents = snapshot?.documents else {
-                    print("Error loading contacts: \(error?.localizedDescription ?? "Unknown")")
-                    self.isLoading = false
-                    return
-                }
-                
-                // We use Codable to automatically decode into our new [Contact] model.
-                self.contacts = documents.compactMap { try? $0.data(as: Contact.self) }
-                self.isLoading = false
+        let group = DispatchGroup()
+        var allContacts: [UnifiedContact] = []
+        var seenEmails = Set<String>()
+
+        // 1. Fetch from main 'contacts' collection
+        group.enter()
+        db.collection("contacts").whereField("ownerId", isEqualTo: userID).getDocuments { snapshot, _ in
+            let contacts = snapshot?.documents.compactMap { try? $0.data(as: Contact.self) } ?? []
+            for contact in contacts {
+                if let email = contact.email, !email.isEmpty, seenEmails.contains(email) { continue }
+                allContacts.append(UnifiedContact(id: contact.id ?? UUID().uuidString, name: contact.name, email: contact.email, phone: contact.phone, roles: contact.roles, source: "Contacts"))
+                if let email = contact.email, !email.isEmpty { seenEmails.insert(email) }
             }
+            group.leave()
+        }
+
+        // 2. Fetch from 'venues' collection
+        group.enter()
+        db.collection("venues").whereField("ownerId", isEqualTo: userID).getDocuments { snapshot, _ in
+            let venues = snapshot?.documents.compactMap { try? $0.data(as: Venue.self) } ?? []
+            for venue in venues {
+                guard let name = venue.contactName, !name.isEmpty else { continue }
+                if let email = venue.contactEmail, !email.isEmpty, seenEmails.contains(email) { continue }
+                allContacts.append(UnifiedContact(id: venue.id ?? UUID().uuidString, name: name, email: venue.contactEmail, phone: venue.contactPhone, roles: ["Venue Contact"], source: "Venues"))
+                if let email = venue.contactEmail, !email.isEmpty { seenEmails.insert(email) }
+            }
+            group.leave()
+        }
+
+        // 3. Fetch from 'tourCrew' collection
+        group.enter()
+        db.collection("tourCrew").whereField("invitedBy", isEqualTo: userID).getDocuments { snapshot, _ in
+            let crew = snapshot?.documents.compactMap { try? $0.data(as: TourCrew.self) } ?? []
+            for member in crew {
+                if let email = member.email, !email.isEmpty, seenEmails.contains(email) { continue }
+                allContacts.append(UnifiedContact(id: member.id ?? UUID().uuidString, name: member.name, email: member.email, phone: nil, roles: member.roles, source: "Tour Crew"))
+                if let email = member.email, !email.isEmpty { seenEmails.insert(email) }
+            }
+            group.leave()
+        }
+
+        group.notify(queue: .main) {
+            self.unifiedContacts = allContacts
+            self.isLoading = false
+        }
     }
 }

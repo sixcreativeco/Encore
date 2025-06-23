@@ -3,7 +3,6 @@ import SDWebImageSwiftUI
 import FirebaseFirestore
 
 struct TourHeaderView: View {
-    // FIX: Changed from TourModel to our new Tour struct.
     let tour: Tour
     @EnvironmentObject var appState: AppState
     @State private var offsetY: CGFloat = 0
@@ -11,14 +10,13 @@ struct TourHeaderView: View {
     @State private var showEditTour = false
 
     var body: some View {
-        // NOTE: All UI code below is identical to your original file.
         ZStack(alignment: .bottomLeading) {
             GeometryReader { geo in
                 if let posterURL = tour.posterURL, let url = URL(string: posterURL) {
                     WebImage(url: url)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: geo.size.width, height: geo.size.height)
+                        .frame(width: geo.size.width, height: geo.size.height + max(0, offsetY)) // Allow stretching down
                         .offset(y: offsetY)
                         .clipped()
                         .overlay(
@@ -27,7 +25,7 @@ struct TourHeaderView: View {
                                     Color.black.opacity(0.0),
                                     Color.black.opacity(0.9)
                                 ]),
-                                startPoint: .top,
+                                startPoint: .center,
                                 endPoint: .bottom
                             )
                             .opacity(0.85)
@@ -43,7 +41,6 @@ struct TourHeaderView: View {
                     .fontWeight(.regular)
                     .foregroundColor(.white.opacity(0.9))
 
-                // FIX: Updated to use the 'tourName' property from our new model.
                 Text(tour.tourName)
                     .font(.system(size: 48, weight: .bold))
                     .foregroundColor(.white)
@@ -76,36 +73,46 @@ struct TourHeaderView: View {
         .frame(height: 200)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(radius: 10)
-        .padding(.top, -10)
         .gesture(
             DragGesture()
-                .onChanged { value in offsetY = initialOffsetY + value.translation.height }
-                .onEnded { _ in initialOffsetY = offsetY; savePosterOffset() }
+                .onChanged { value in
+                    let newOffsetY = initialOffsetY + value.translation.height
+                    // Prevent dragging up past the initial position
+                    offsetY = min(newOffsetY, 200)
+                }
+                .onEnded { _ in
+                    initialOffsetY = offsetY
+                    savePosterOffset()
+                }
         )
-        .onAppear { loadPosterOffset() }
+        .onAppear {
+            loadPosterOffset()
+        }
         .sheet(isPresented: $showEditTour) {
-            // This will now pass the new Tour object to the edit view.
-            // We will need to refactor TourEditView later.
             TourEditView(tour: tour).environmentObject(appState)
         }
     }
 
     private func savePosterOffset() {
-        guard let userID = appState.userID, let tourID = tour.id else { return }
+        guard let tourID = tour.id else { return }
         let db = Firestore.firestore()
-        db.collection("users")
-            .document(userID)
-            .collection("tours")
+        
+        // Save to the top-level 'tours' collection using merge to avoid "Not Found" errors.
+        db.collection("tours")
             .document(tourID)
-            .updateData(["posterOffsetY": Double(offsetY)])
+            .setData(["posterOffsetY": Double(offsetY)], merge: true) { error in
+                if let error = error {
+                    print("Error saving poster offset: \(error.localizedDescription)")
+                }
+            }
     }
 
     private func loadPosterOffset() {
-        guard let userID = appState.userID, let tourID = tour.id else { return }
+        guard let tourID = tour.id else { return }
         let db = Firestore.firestore()
-        db.collection("users")
-            .document(userID)
-            .collection("tours")
+
+        // Load from the top-level 'tours' collection.
+        db.collection("tours")
             .document(tourID)
             .getDocument { document, _ in
                 if let data = document?.data(), let y = data["posterOffsetY"] as? Double {

@@ -4,6 +4,7 @@ import FirebaseFirestore
 struct TicketedEvent: Codable, Identifiable {
     @DocumentID var id: String?
     
+    let ownerId: String // ADDED: To track the user who owns this event.
     let tourId: String
     let showId: String
     
@@ -24,13 +25,11 @@ struct TicketedEvent: Codable, Identifiable {
         case cancelled = "Cancelled"
     }
 
-    // FIX: Added conformance to CustomStringConvertible
     enum Restriction: String, Codable, CaseIterable, CustomStringConvertible {
         case allAges = "All Ages"
         case r18 = "18+"
         case r21 = "21+"
         
-        // This 'description' property satisfies the protocol requirement
         var description: String {
             return self.rawValue
         }

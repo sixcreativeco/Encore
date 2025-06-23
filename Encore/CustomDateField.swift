@@ -7,7 +7,7 @@ struct CustomDateField: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.05))
+                .fill(Color.black.opacity(0.15))
 
             Button(action: {
                 isShowingCalendar.toggle()
@@ -35,9 +35,9 @@ struct CustomDateField: View {
                     )
                     .datePickerStyle(GraphicalDatePickerStyle())
                     .labelsHidden()
-                    .scaleEffect(1.2) // 👈 Only scales the calendar
+                    .scaleEffect(1.2)
                 }
-                .frame(width: 190, height: 200) // 👈 Adjusted to suit scaled calendar
+                .frame(width: 190, height: 200)
             }
         }
         .frame(height: 36)

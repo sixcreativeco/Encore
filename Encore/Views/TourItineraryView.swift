@@ -54,13 +54,14 @@ struct TourItineraryView: View {
                     .padding(.bottom, 8)
                 }
             }
-            .background(Color(.windowBackgroundColor))
+            .background(.clear)
         }
         .onAppear { setupListeners() }
         .onDisappear { listeners.forEach { $0.remove() } }
         // FIX: This sheet modifier for editing is now fully implemented.
         .sheet(item: $itemToEdit) { item in
-            // Find the index of the item to create a binding. This is crucial for editing.
+            // Find the index of the item to create a binding.
+            // This is crucial for editing.
             if let index = allItems.firstIndex(where: { $0.id == item.id }) {
                 ItineraryItemEditView(
                     item: $allItems[index],

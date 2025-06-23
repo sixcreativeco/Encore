@@ -8,16 +8,23 @@ struct SignInView: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var showSignUp: Bool = false
+    @State private var isLoading = false
+    @State private var errorMessage: String?
 
     var body: some View {
         HStack(spacing: 0) {
             signInForm
                 .frame(width: 450)
+                .background(.regularMaterial)
             
             SignInDynamicContentView()
         }
-        .background(Color(.windowBackgroundColor))
         .ignoresSafeArea()
+        .alert("Sign In Error", isPresented: .constant(errorMessage != nil), actions: {
+            Button("OK") { errorMessage = nil }
+        }, message: {
+            Text(errorMessage ?? "An unknown error occurred.")
+        })
     }
     
     private var signInForm: some View {
@@ -51,17 +58,26 @@ struct SignInView: View {
                 CustomSecureField(placeholder: "Password", text: $password)
                 
                 Button(action: handleEmailSignIn) {
-                    Text("Sign In")
-                        .fontWeight(.semibold).frame(maxWidth: .infinity).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
+                    HStack {
+                        Spacer()
+                        if isLoading {
+                            ProgressView().colorInvert()
+                        } else {
+                            Text("Sign In")
+                        }
+                        Spacer()
+                    }
+                    .fontWeight(.semibold).frame(maxWidth: .infinity).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
                 }
                 .buttonStyle(.plain)
+                .disabled(isLoading || email.isEmpty || password.isEmpty)
             }
             .frame(width: 280)
 
             VStack(spacing: 6) {
                 Text("Don't have an account?").font(.footnote)
                 Button("Sign Up") { showSignUp = true }.font(.footnote.bold())
-                    .sheet(isPresented: $showSignUp) { SignUpView().environmentObject(appState) }
+                    .sheet(isPresented: $showSignUp) { SignUpView() }
             }
             Spacer()
         }
@@ -69,7 +85,6 @@ struct SignInView: View {
     }
 
     private func handleGoogleSignIn() async {
-        // ADDED: Log the initial button press action.
         print("LOG: 0. Google Sign-In button pressed in SignInView.")
         
         guard let presentingWindow = NSApplication.shared.keyWindow else {
@@ -79,14 +94,29 @@ struct SignInView: View {
         
         let user = await AuthManager.shared.handleGoogleSignIn(presentingWindow: presentingWindow)
         
-        // ADDED: Log the result from the AuthManager and the subsequent state change.
         if let user = user {
             print("LOG: 4. AuthManager returned user. Updating appState with UID: \(user.uid)")
-            appState.userID = user.uid
+            // AppState listener will handle the transition
         } else {
             print("LOG: 4. AuthManager returned nil. No state change.")
         }
     }
     
-    private func handleEmailSignIn() {}
+    private func handleEmailSignIn() {
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                _ = try await AuthManager.shared.handleEmailSignIn(email: email, password: password)
+                // AppState listener will handle successful sign-in
+                await MainActor.run { isLoading = false }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    isLoading = false
+                }
+            }
+        }
+    }
 }

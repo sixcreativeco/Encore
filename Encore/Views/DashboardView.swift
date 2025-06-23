@@ -59,7 +59,7 @@ struct DashboardView: View {
                 Image(systemName: "plus")
                     .fontWeight(.semibold).foregroundColor(.primary)
                     .frame(width: 36, height: 36)
-                    .background(Color(nsColor: .controlBackgroundColor)).clipShape(Circle())
+                    .background(Color.black.opacity(0.15)).clipShape(Circle())
             }.buttonStyle(.plain)
         }
     }
@@ -81,10 +81,16 @@ struct DashboardView: View {
     @ViewBuilder
     private var sharedWithYouSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Shared With Me").font(.title2.bold())
+            Text("Shared With Me")
+                .font(.title2.bold())
+                .padding(.horizontal)
+                .padding(.top)
+
             if sharedTours.isEmpty {
-                Text("No tours have been shared with you.").foregroundColor(.secondary).padding()
-                    .frame(maxWidth: .infinity, alignment: .center).background(Color(nsColor: .controlBackgroundColor)).cornerRadius(12)
+                Text("No tours have been shared with you.")
+                    .foregroundColor(.secondary)
+                    .padding()
+                    .frame(maxWidth: .infinity, minHeight: 100, alignment: .center)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
@@ -96,9 +102,13 @@ struct DashboardView: View {
                             }.buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal)
+                    .padding(.bottom)
                 }
             }
-        }.padding(.top)
+        }
+        .background(Color.black.opacity(0.15))
+        .cornerRadius(12)
     }
 
     // MARK: - Panel Subviews
@@ -112,7 +122,7 @@ struct DashboardView: View {
                     .foregroundColor(.secondary)
                     .padding()
                     .frame(maxWidth: .infinity, minHeight: 300, alignment: .center)
-                    .background(Color(nsColor: .controlBackgroundColor))
+                    .background(Color.black.opacity(0.15))
                     .cornerRadius(12)
             } else {
                 ScrollView {
@@ -145,7 +155,7 @@ struct DashboardView: View {
             
             HStack(alignment: .bottom, spacing: 16) {
                  DashboardTourCard(posterURL: tour.posterURL)
-                    .frame(width: 200, height: 280)
+                    .frame(width: 180)
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text(tour.tourName)
@@ -182,10 +192,10 @@ struct DashboardView: View {
                         }.buttonStyle(.plain)
                     }
                 }
-                .frame(height: 280)
+                .frame(height: 270)
             }
             .padding()
-            .background(Color(nsColor: .controlBackgroundColor))
+            .background(Color.black.opacity(0.15))
             .cornerRadius(12)
         }
     }
@@ -196,8 +206,7 @@ struct DashboardView: View {
             KFImage(URL(string: posterURL ?? ""))
                 .placeholder { ZStack { Color.gray.opacity(0.1); Image(systemName: "photo") } }
                 .resizable()
-                .scaledToFill()
-                .aspectRatio(contentMode: .fill)
+                .aspectRatio(2/3, contentMode: .fit)
                 .cornerRadius(8)
         }
     }
@@ -209,7 +218,7 @@ struct DashboardView: View {
                 .foregroundColor(.secondary)
                 .padding()
                 .frame(maxWidth: .infinity, minHeight: 300, alignment: .center)
-                .background(Color(nsColor: .controlBackgroundColor))
+                .background(Color.black.opacity(0.15))
                 .cornerRadius(12)
         }
     }

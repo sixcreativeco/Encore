@@ -34,9 +34,9 @@ struct TourFlightsView: View {
 
     private var placeholderView: some View {
         Text("No flights yet.")
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 50)
             .padding()
-            .background(Color(nsColor: .controlBackgroundColor))
+            .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
     }
 

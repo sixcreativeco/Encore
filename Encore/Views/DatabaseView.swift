@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct DatabaseView: View {
     let userID: String
@@ -7,6 +8,7 @@ struct DatabaseView: View {
         case contacts = "Contacts"
         case venues = "Venues"
         case hotels = "Hotels"
+        case customers = "Customers"
     }
 
     private enum ActiveSheet: Identifiable {
@@ -20,7 +22,6 @@ struct DatabaseView: View {
     @State private var sortField: String = ""
     @State private var sortAscending: Bool = true
     @State private var activeSheet: ActiveSheet?
-    // State to force a refresh of the contacts list
     @State private var contactsKey = UUID()
 
     var body: some View {
@@ -34,7 +35,6 @@ struct DatabaseView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .addContact:
-                // FIXED: Correctly pass the onContactAdded closure to the initializer.
                 ContactAddView {
                     self.contactsKey = UUID()
                 }
@@ -62,19 +62,22 @@ struct DatabaseView: View {
             
             Spacer()
             
-            Button(action: {
-                switch selectedSection {
-                case .contacts: activeSheet = .addContact
-                case .venues: activeSheet = .addVenue
-                case .hotels: activeSheet = .addHotel
+            if selectedSection != .customers {
+                Button(action: {
+                    switch selectedSection {
+                    case .contacts: activeSheet = .addContact
+                    case .venues: activeSheet = .addVenue
+                    case .hotels: activeSheet = .addHotel
+                    case .customers: break
+                    }
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title)
+                        .foregroundColor(.accentColor)
                 }
-            }) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title)
-                    .foregroundColor(.accentColor)
+                .buttonStyle(.plain)
+                .padding(.bottom, 10)
             }
-            .buttonStyle(.plain)
-            .padding(.bottom, 10)
         }
     }
 
@@ -99,11 +102,13 @@ struct DatabaseView: View {
         switch selectedSection {
         case .contacts:
             ContactsSection(userID: userID, searchText: searchText, selectedFilter: selectedFilter, sortField: $sortField, sortAscending: $sortAscending)
-                .id(contactsKey) // This makes the view refresh when the key changes.
+                .id(contactsKey)
         case .venues:
             VenuesSection(userID: userID, searchText: searchText, selectedFilter: selectedFilter, sortField: $sortField, sortAscending: $sortAscending)
         case .hotels:
             HotelsSection(userID: userID, searchText: searchText, selectedFilter: selectedFilter, sortField: $sortField, sortAscending: $sortAscending)
+        case .customers:
+            CustomersSection(userID: userID, searchText: searchText, selectedFilter: selectedFilter, sortField: $sortField, sortAscending: $sortAscending)
         }
     }
 
@@ -112,6 +117,7 @@ struct DatabaseView: View {
         case .contacts: return ContactFilter.allCases.map { $0.displayName }
         case .venues: return VenueFilter.allCases.map { $0.displayName }
         case .hotels: return HotelFilter.allCases.map { $0.displayName }
+        case .customers: return ["All"]
         }
     }
 }

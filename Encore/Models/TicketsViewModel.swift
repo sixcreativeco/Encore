@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import FirebaseFirestore
+import AppKit
 
 class TicketsViewModel: ObservableObject {
     
@@ -8,13 +9,12 @@ class TicketsViewModel: ObservableObject {
     
     @Published var summaryStats = SummaryStats()
     @Published var primaryEvent: TicketedEvent?
-    @Published var recentActivity: [TicketOrder] = []
     @Published var recentTicketSales: [TicketSale] = []
     @Published var allTicketSales: [TicketSale] = []
     @Published var publishedEvents: [TicketedEvent] = []
     @Published var allShows: [Show] = []
     @Published var tour: Tour?
-    
+    @Published var userTours: [Tour] = []
     @Published var isLoading = true
     @Published var selectedTimeframe: Timeframe = .thisYear {
         didSet {
@@ -32,10 +32,10 @@ class TicketsViewModel: ObservableObject {
     // MARK: - Properties
     
     var allTicketedEvents: [TicketedEvent] = []
-    var allOrders: [TicketOrder] = []
     
     private var listeners: [ListenerRegistration] = []
     private let db = Firestore.firestore()
+    private let currentUserID: String?
     
     // MARK: - Structs and Enums
     
@@ -99,7 +99,8 @@ class TicketsViewModel: ObservableObject {
     
     // MARK: - Lifecycle
     
-    init() {
+    init(userID: String?) {
+        self.currentUserID = userID
         fetchData()
     }
     
@@ -110,56 +111,75 @@ class TicketsViewModel: ObservableObject {
     // MARK: - Data Fetching and Processing
     
     func fetchData() {
+        guard let userID = currentUserID else {
+            isLoading = false
+            return
+        }
+        
         isLoading = true
         listeners.forEach { $0.remove() }
         listeners.removeAll()
 
         let group = DispatchGroup()
-        
+
+        // 1. Fetch user's tours first
         group.enter()
-        db.collection("shows").getDocuments { snapshot, error in
-            if let documents = snapshot?.documents {
-                self.allShows = documents.compactMap { try? $0.data(as: Show.self) }
+        db.collection("tours")
+            .whereField("ownerId", isEqualTo: userID)
+            .getDocuments { tourSnapshot, error in
+                defer { group.leave() }
+                guard let tourDocs = tourSnapshot?.documents else { return }
+                self.userTours = tourDocs.compactMap { try? $0.data(as: Tour.self) }
             }
-            group.leave()
-        }
-        
-        group.enter()
-        db.collection("tours").getDocuments { snapshot, error in
-            if let documents = snapshot?.documents {
-                self.tour = documents.compactMap { try? $0.data(as: Tour.self) }.first
-            }
-            group.leave()
-        }
-        
+
+        // 2. Once tours are fetched, fetch their corresponding shows
         group.notify(queue: .main) {
-            self.attachListeners()
-            self.isLoading = false
+            let tourIDs = self.userTours.compactMap { $0.id }
+            if tourIDs.isEmpty {
+                // If the user has no tours, they can't have shows or events
+                self.allShows = []
+                self.attachListeners(for: userID)
+                self.isLoading = false
+                return
+            }
+
+            self.db.collection("shows")
+                .whereField("tourId", in: tourIDs)
+                .getDocuments { showSnapshot, error in
+                    if let showDocs = showSnapshot?.documents {
+                        self.allShows = showDocs.compactMap { try? $0.data(as: Show.self) }
+                    }
+                    // 3. Now that we have all necessary data, attach listeners
+                    self.attachListeners(for: userID)
+                    self.isLoading = false
+                }
         }
     }
     
-    private func attachListeners() {
-        let eventListener = self.db.collection("ticketedEvents").addSnapshotListener { snapshot, error in
-            guard let documents = snapshot?.documents else { return }
-            self.allTicketedEvents = documents.compactMap { try? $0.data(as: TicketedEvent.self) }
-            self.processFetchedData()
-        }
+    private func attachListeners(for userID: String) {
+        // Listen to ticketed events owned by this user
+        let eventListener = self.db.collection("ticketedEvents")
+            .whereField("ownerId", isEqualTo: userID)
+            .addSnapshotListener { snapshot, error in
+                guard let documents = snapshot?.documents else { return }
+                self.allTicketedEvents = documents.compactMap { try? $0.data(as: TicketedEvent.self) }
+                self.processFetchedData()
+            }
         self.listeners.append(eventListener)
         
-        let orderListener = self.db.collection("ticketOrders").addSnapshotListener { snapshot, error in
-            guard let documents = snapshot?.documents else { return }
-            self.allOrders = documents.compactMap { try? $0.data(as: TicketOrder.self) }
-            self.processFetchedData()
-        }
-        self.listeners.append(orderListener)
-        
-        // NEW: Listen to ticket sales
-        let salesListener = self.db.collection("ticketSales").addSnapshotListener { snapshot, error in
-            guard let documents = snapshot?.documents else { return }
-            self.allTicketSales = documents.map { TicketSale(from: $0) }
-            self.recentTicketSales = Array(self.allTicketSales.sorted { $0.purchaseDate > $1.purchaseDate }.prefix(10))
-            self.processFetchedData()
-        }
+        // Listen to ALL ticket sales, then filter by user's events
+        let salesListener = self.db.collection("ticketSales")
+            .addSnapshotListener { snapshot, error in
+                guard let documents = snapshot?.documents else { return }
+                let allSales = documents.map { TicketSale(from: $0) }
+                
+                // Filter sales to only include tickets for this user's events
+                let userEventIds = Set(self.allTicketedEvents.compactMap { $0.id })
+                self.allTicketSales = allSales.filter { userEventIds.contains($0.ticketedEventId) }
+                self.recentTicketSales = Array(self.allTicketSales.sorted { $0.purchaseDate > $1.purchaseDate }.prefix(10))
+                
+                self.processFetchedData()
+            }
         self.listeners.append(salesListener)
     }
     
@@ -175,7 +195,18 @@ class TicketsViewModel: ObservableObject {
                 ticketsIssued: totalTickets,
                 totalRevenue: totalRevenue
             )
-            self.primaryEvent = self.findPrimaryEvent()
+            
+            // Set primary event only if it's not already set by user interaction
+            if self.primaryEvent == nil {
+                self.primaryEvent = self.findPrimaryEvent()
+            }
+
+            if let primaryEvent = self.primaryEvent {
+                self.tour = self.userTours.first { $0.id == primaryEvent.tourId }
+            } else {
+                self.tour = nil
+            }
+            
             self.publishedEvents = self.allTicketedEvents.filter { $0.status == .published }
         }
     }
@@ -211,6 +242,18 @@ class TicketsViewModel: ObservableObject {
         }
     }
     
+    func setPrimaryEvent(to event: TicketedEvent) {
+        self.primaryEvent = event
+        self.tour = self.userTours.first { $0.id == event.tourId }
+    }
+    
+    // Helper function to get tickets sold for a specific event
+    func getTicketsSoldForEvent(_ eventId: String) -> Int {
+        return allTicketSales
+            .filter { $0.ticketedEventId == eventId }
+            .reduce(0) { $0 + $1.quantity }
+    }
+    
     func updateEventStatus(for event: TicketedEvent, to newStatus: TicketedEvent.Status) {
         guard let eventID = event.id else { return }
         db.collection("ticketedEvents").document(eventID).updateData(["status": newStatus.rawValue])
@@ -226,32 +269,17 @@ class TicketsViewModel: ObservableObject {
         
         isPublishingToWeb = true
         
-        // Update local Firebase status first for immediate UI feedback
         updateEventStatus(for: event, to: .published)
         
-        // Then call the web API
         TicketingAPI.shared.publishTickets(ticketedEventId: eventID) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isPublishingToWeb = false
                 
                 switch result {
                 case .success(let response):
-                    print("✅ Tickets published successfully!")
-                    print("🎫 Ticket sale URL: \(response.ticketSaleUrl)")
-                    
-                    // Copy URL to clipboard
-                    TicketingAPI.shared.copyToClipboard(response.ticketSaleUrl)
-                    
-                    // Show success alert
                     self?.showPublishSuccess(url: response.ticketSaleUrl)
-                    
                 case .failure(let error):
-                    print("❌ Failed to publish tickets: \(error.localizedDescription)")
-                    
-                    // Revert the status change if API call failed
-                    self?.updateEventStatus(for: event, to: .unpublished)
-                    
-                    // Show error alert
+                    self?.updateEventStatus(for: event, to: .draft)
                     self?.showPublishError(message: error.localizedDescription)
                 }
             }
@@ -259,12 +287,7 @@ class TicketsViewModel: ObservableObject {
     }
     
     func unpublishTickets(for event: TicketedEvent) {
-        // For unpublishing, just update the local Firebase status
         updateEventStatus(for: event, to: .unpublished)
-        
-        // Optionally, you could also call an API to unpublish from web
-        // but for now, we'll just update the local status
-        print("🔒 Tickets unpublished locally")
     }
     
     // MARK: - Alert Helper Functions
@@ -272,10 +295,8 @@ class TicketsViewModel: ObservableObject {
     private func showPublishSuccess(url: String) {
         publishedURL = url
         publishAlertTitle = "Tickets Published!"
-        publishAlertMessage = "Your ticket sale website is ready and has been copied to your clipboard.\n\n\(url)"
+        publishAlertMessage = "Your ticket sale website is ready and the URL has been copied to your clipboard."
         showingPublishAlert = true
-        
-        // Automatically open the website
         TicketingAPI.shared.openURL(url)
     }
     

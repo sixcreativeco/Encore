@@ -11,25 +11,25 @@ struct SidebarContainerView: View {
         NavigationStack {
             HStack(spacing: 0) {
                 floatingSidebar
+                
                 VStack(spacing: 0) {
                     HStack {
                         Button(action: { withAnimation { isSidebarVisible.toggle() } }) {
                             Image(systemName: isSidebarVisible ? "sidebar.left" : "sidebar.right")
-                                .foregroundColor(.gray)
+                                .font(.title3)
+                                .foregroundColor(.white.opacity(0.8))
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .padding(.leading, 20)
+                        .padding(.leading, 16)
                         .padding(.top, 30)
                         Spacer()
                     }
                     contentView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(nsColor: .windowBackgroundColor))
                 }
             }
         }
         .preferredColorScheme(overrideColorScheme ?? systemColorScheme)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     @ViewBuilder
@@ -47,19 +47,13 @@ struct SidebarContainerView: View {
                     DashboardView()
                         .environmentObject(appState)
                 case "Tours":
-                    TourListView(onTourSelected: { tour in appState.selectedTour = tour })
+                     TourListView(onTourSelected: { tour in appState.selectedTour = tour })
                         .environmentObject(appState)
-                // ADDED: Case to show the new TicketsDashboardView
                 case "Tickets":
                     TicketsDashboardView()
                         .environmentObject(appState)
                 case "Database":
                     DatabaseView(userID: appState.userID ?? "")
-                case "Team":
-                    Text("Team View")
-                case "Export":
-                    ExportView()
-                        .environmentObject(appState)
                 case "MyAccount":
                     MyAccountView().environmentObject(appState)
                 case "NewTour":
@@ -73,33 +67,32 @@ struct SidebarContainerView: View {
     }
 
     private var floatingSidebar: some View {
-        VStack(alignment: .center, spacing: 0) {
-            if isSidebarVisible {
-                expandedSidebarContent
-            } else {
-                collapsedSidebarContent
+            VStack(alignment: .leading, spacing: 0) {
+                if isSidebarVisible {
+                    expandedSidebarContent
+                } else {
+                    VStack(alignment: .center) {
+                        collapsedSidebarContent
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
+            .padding(.vertical, 10)
+            .frame(width: isSidebarVisible ? 240 : 72)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(.regularMaterial)
+                    
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color(red: 31/255, green: 46/255, blue: 52/255).opacity(0.85))
+                }
+                .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
+            )
+            .padding(.leading, 20)
+            .padding(.vertical, 20)
+            .animation(.easeInOut(duration: 0.25), value: isSidebarVisible)
         }
-        .padding(.top, 10)
-        .padding(.bottom, 10)
-        .frame(width: isSidebarVisible ? 220 : 72)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(currentSidebarBackground)
-                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-        )
-        .padding(.leading, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 20)
-        .animation(.easeInOut(duration: 0.25), value: isSidebarVisible)
-    }
-
-    private var currentSidebarBackground: Color {
-        let activeColorScheme = overrideColorScheme ?? systemColorScheme
-        return activeColorScheme == .dark
-            ? Color(red: 47/255, green: 56/255, blue: 60/255)
-            : Color(red: 178/255, green: 203/255, blue: 206/255)
-    }
 
     private var expandedSidebarContent: some View {
         VStack(alignment: .leading) {
@@ -116,18 +109,11 @@ struct SidebarContainerView: View {
                 SidebarLabel(icon: "calendar", title: "Tours", isSelected: appState.selectedTab == "Tours", spacing: 16.5) {
                     appState.selectedTab = "Tours"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
-                // ADDED: Sidebar item for Tickets
                 SidebarLabel(icon: "ticket.fill", title: "Tickets", isSelected: appState.selectedTab == "Tickets", spacing: 16.5) {
                     appState.selectedTab = "Tickets"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
                 SidebarLabel(icon: "book.fill", title: "Database", isSelected: appState.selectedTab == "Database", spacing: 16) {
                     appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
-                }
-                SidebarLabel(icon: "person.2.fill", title: "Team", isSelected: appState.selectedTab == "Team", spacing: 13.9) {
-                    appState.selectedTab = "Team"; appState.selectedTour = nil; appState.selectedShow = nil
-                }
-                SidebarLabel(icon: "square.and.arrow.up.fill", title: "Export", isSelected: appState.selectedTab == "Export", spacing: 18.8) {
-                    appState.selectedTab = "Export"
                 }
                 SidebarLabel(icon: "person.crop.circle", title: "My Account", isSelected: appState.selectedTab == "MyAccount", spacing: 17.0) {
                     appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
@@ -141,13 +127,13 @@ struct SidebarContainerView: View {
                 addTourButtonExpanded
                 HStack(spacing: 6) {
                     Circle().fill(syncManager.isOnline ? Color.green : Color.gray).frame(width: 10, height: 10)
-                    Text("Online").font(.footnote).foregroundColor(.gray)
+                    Text("Online").font(.footnote).foregroundColor(.secondary)
                 }.padding(.top, 4)
             }
             .padding(.bottom, 20)
-            .padding(.leading, 30)
+            .padding(.horizontal, 30)
         }
-        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
     }
 
     private var collapsedSidebarContent: some View {
@@ -161,18 +147,11 @@ struct SidebarContainerView: View {
                 SidebarIcon(icon: "calendar", isSelected: appState.selectedTab == "Tours") {
                     appState.selectedTab = "Tours"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
-                // ADDED: Collapsed sidebar icon for Tickets
                 SidebarIcon(icon: "ticket.fill", isSelected: appState.selectedTab == "Tickets") {
                     appState.selectedTab = "Tickets"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
                 SidebarIcon(icon: "book.fill", isSelected: appState.selectedTab == "Database") {
                     appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
-                }
-                SidebarIcon(icon: "person.2.fill", isSelected: appState.selectedTab == "Team") {
-                    appState.selectedTab = "Team"; appState.selectedTour = nil; appState.selectedShow = nil
-                }
-                SidebarIcon(icon: "square.and.arrow.up.fill", isSelected: appState.selectedTab == "Export") {
-                    appState.selectedTab = "Export"
                 }
                 SidebarIcon(icon: "person.crop.circle", isSelected: appState.selectedTab == "MyAccount") {
                     appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
@@ -185,7 +164,6 @@ struct SidebarContainerView: View {
                 .frame(width: 10, height: 10)
                 .padding(.bottom, 16)
         }
-        .frame(maxWidth: .infinity)
     }
 
     private var logoSectionExpanded: some View {
@@ -195,7 +173,7 @@ struct SidebarContainerView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 120)
-                .foregroundColor(currentLogoColor)
+                .foregroundColor(.primary)
                 .padding(.top, 10)
                 .padding(.bottom, 20)
         }
@@ -209,16 +187,12 @@ struct SidebarContainerView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 24, height: 24)
-                .foregroundColor(currentLogoColor)
+                .foregroundColor(.primary)
                 .padding(.top, 4)
         }
         .buttonStyle(PlainButtonStyle())
     }
     
-    private var currentLogoColor: Color {
-        return Color(red: 237/255, green: 237/255, blue: 237/255)
-    }
-
     private var addTourButtonExpanded: some View {
         Button(action: { appState.selectedTab = "NewTour"; appState.selectedTour = nil; appState.selectedShow = nil }) {
             HStack {
@@ -226,23 +200,19 @@ struct SidebarContainerView: View {
                 Text("Add Tour").fontWeight(.semibold)
             }
             .padding(.vertical, 10)
-            .padding(.horizontal, 20)
-            .frame(width: 190)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white))
+            .frame(maxWidth: .infinity, alignment: .center)
+            .background(Color.white)
+            .foregroundColor(.black)
+            .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
-        .foregroundColor(.black)
-        .padding(.trailing, 30)
     }
 
     private var addTourButtonCollapsed: some View {
         Button(action: { appState.selectedTab = "NewTour"; appState.selectedTour = nil; appState.selectedShow = nil }) {
             Image(systemName: "plus.circle.fill")
-                .font(.system(size: 18))
-                .padding(10)
-                .background(Color.white)
-                .clipShape(Circle())
-                .foregroundColor(.black)
+                .font(.system(size: 24))
+                .foregroundColor(.primary)
         }
         .buttonStyle(PlainButtonStyle())
     }

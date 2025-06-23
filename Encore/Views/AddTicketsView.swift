@@ -3,8 +3,9 @@ import FirebaseFirestore
 import Kingfisher
 
 struct AddTicketsView: View {
+    @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
-    var onSave: () -> Void // Completion handler to trigger a refresh
+    var onSave: () -> Void
     
     // Form State
     @State private var selectedShowID: String = ""
@@ -13,23 +14,23 @@ struct AddTicketsView: View {
     @State private var restriction: TicketedEvent.Restriction = .allAges
     
     // Data for Picker
-    @State private var upcomingShows: [Show] = []
-    @State private var allTours: [Tour] = []
+    @State private var availableShows: [Show] = []
+    @State private var userTours: [Tour] = []
     
     @State private var isSaving = false
     
     private var selectedShow: Show? {
-        upcomingShows.first { $0.id == selectedShowID }
+        availableShows.first { $0.id == selectedShowID }
     }
     
     private var selectedTour: Tour? {
         guard let show = selectedShow else { return nil }
-        return allTours.first { $0.id == show.tourId }
+        return userTours.first { $0.id == show.tourId }
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 30) { // Increased spacing
+            VStack(alignment: .leading, spacing: 30) {
                 headerView
                 
                 showSelector
@@ -70,10 +71,9 @@ struct AddTicketsView: View {
     
     @ViewBuilder
     private var showSelector: some View {
-        // FIX: Replaced standard Picker with a custom styled Menu
         Menu {
-            ForEach(upcomingShows) { show in
-                let tour = allTours.first { $0.id == show.tourId }
+            ForEach(availableShows) { show in
+                let tour = userTours.first { $0.id == show.tourId }
                 Button("\(tour?.artist ?? "N/A") - \(show.city)") {
                     selectedShowID = show.id ?? ""
                 }
@@ -83,7 +83,7 @@ struct AddTicketsView: View {
                 if let show = selectedShow, let tour = selectedTour {
                     Text("\(tour.artist) - \(show.city)")
                 } else {
-                    Text("Select a show...").foregroundColor(.secondary)
+                    Text(availableShows.isEmpty ? "No available shows" : "Select a show...").foregroundColor(.secondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.down")
@@ -93,6 +93,7 @@ struct AddTicketsView: View {
             .cornerRadius(8)
         }
         .pickerStyle(.menu)
+        .disabled(availableShows.isEmpty)
     }
     
     @ViewBuilder
@@ -111,10 +112,10 @@ struct AddTicketsView: View {
                     Text(show.venueName).font(.caption).bold()
                     Text(show.venueAddress).font(.caption).foregroundColor(.secondary)
                 }
-                Spacer() // Ensures content is aligned left
+                Spacer()
             }
             .padding()
-            .frame(maxWidth: .infinity) // FIX: Makes container full-width
+            .frame(maxWidth: .infinity)
             .background(Material.regular)
             .cornerRadius(12)
         }
@@ -158,7 +159,6 @@ struct AddTicketsView: View {
     private var restrictionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Restrictions").font(.headline)
-            // FIX: Using the updated CustomSegmentedPicker which now handles this styling
             CustomSegmentedPicker(selected: $restriction, options: TicketedEvent.Restriction.allCases)
         }
     }
@@ -169,7 +169,6 @@ struct AddTicketsView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding()
-                // FIX: Updated button style
                 .background(Color.white)
                 .foregroundColor(.black)
                 .cornerRadius(12)
@@ -181,27 +180,76 @@ struct AddTicketsView: View {
     // MARK: - Functions
     
     private func loadPrerequisites() {
+        guard let ownerId = appState.userID else { return }
         let db = Firestore.firestore()
         let today = Timestamp(date: Date())
-
-        db.collection("shows").whereField("date", isGreaterThanOrEqualTo: today).getDocuments { showSnapshot, error in
-            guard let showDocs = showSnapshot?.documents else { return }
-            self.upcomingShows = showDocs.compactMap { try? $0.data(as: Show.self) }
-        }
+        let group = DispatchGroup()
         
-        db.collection("tours").getDocuments { tourSnapshot, error in
-            guard let tourDocs = tourSnapshot?.documents else { return }
-            self.allTours = tourDocs.compactMap { try? $0.data(as: Tour.self) }
+        var allUpcomingShows: [Show] = []
+        var existingEventShowIDs = Set<String>()
+        var fetchedTours: [Tour] = []
+
+        // 1. Fetch all tours owned by the user
+        group.enter()
+        db.collection("tours")
+            .whereField("ownerId", isEqualTo: ownerId)
+            .getDocuments { tourSnapshot, error in
+                defer { group.leave() }
+                if let tourDocs = tourSnapshot?.documents {
+                    fetchedTours = tourDocs.compactMap { try? $0.data(as: Tour.self) }
+                    self.userTours = fetchedTours
+                }
+            }
+
+        // 2. Fetch all ticketed events for the user to find which shows are already used
+        group.enter()
+        db.collection("ticketedEvents")
+            .whereField("ownerId", isEqualTo: ownerId)
+            .getDocuments { eventSnapshot, error in
+                defer { group.leave() }
+                if let eventDocs = eventSnapshot?.documents {
+                    existingEventShowIDs = Set(eventDocs.compactMap { $0["showId"] as? String })
+                }
+            }
+        
+        // 3. After fetching tours, fetch all shows associated with those tours
+        group.notify(queue: .main) {
+            let tourIDs = fetchedTours.compactMap { $0.id }
+            if tourIDs.isEmpty {
+                self.availableShows = []
+                return
+            }
+            
+            db.collection("shows")
+                .whereField("tourId", in: tourIDs)
+                .whereField("date", isGreaterThanOrEqualTo: today)
+                .getDocuments { showSnapshot, error in
+                    if let showDocs = showSnapshot?.documents {
+                        allUpcomingShows = showDocs.compactMap { try? $0.data(as: Show.self) }
+                        
+                        // Now filter out the shows that already have ticketed events
+                        self.availableShows = allUpcomingShows.filter { show in
+                            !existingEventShowIDs.contains(show.id ?? "")
+                        }
+                    }
+                }
         }
     }
     
     private func saveTicketedEvent() {
-        guard let show = selectedShow, let tour = selectedTour else { return }
+        guard let ownerId = appState.userID,
+              let show = selectedShow,
+              let tour = selectedTour else {
+            print("Error: Missing required data to save event.")
+            return
+        }
+        
         isSaving = true
         
         let validTicketTypes = ticketTypes.filter { !$0.name.isEmpty && $0.allocation > 0 }
         
         let newEvent = TicketedEvent(
+            ownerId: ownerId,
             tourId: tour.id!,
             showId: show.id!,
             status: .draft,
@@ -215,7 +263,7 @@ struct AddTicketsView: View {
                 if let error = error {
                     print("Error saving ticketed event: \(error.localizedDescription)")
                 } else {
-                    self.onSave() // Call the completion handler to trigger refresh
+                    self.onSave()
                     dismiss()
                 }
                 isSaving = false
