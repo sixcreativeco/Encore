@@ -1,6 +1,8 @@
 import SwiftUI
 import FirebaseFirestore
 
+// --- VIEW ---
+
 struct TourCrewView: View {
     var tourID: String
     var ownerUserID: String
@@ -8,6 +10,7 @@ struct TourCrewView: View {
     @State private var crewMembers: [TourCrew] = []
     @State private var showAddCrew = false
     @State private var listener: ListenerRegistration?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SectionHeader(title: "Crew", onAdd: {
@@ -18,13 +21,20 @@ struct TourCrewView: View {
             }
 
             VStack(spacing: 8) {
-                ForEach(crewMembers) { member in
-                    HStack {
-                        Text(member.roles.joined(separator: ", ")).font(.subheadline)
-                        Spacer()
-                        Text(member.name).font(.subheadline).bold()
+                if crewMembers.isEmpty {
+                    Text("No crew members added.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding()
+                } else {
+                    ForEach(crewMembers) { member in
+                        HStack {
+                            Text(member.roles.joined(separator: ", ")).font(.subheadline)
+                            Spacer()
+                            Text(member.name).font(.subheadline).bold()
+                        }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
                 }
             }
             .padding(16)
@@ -46,7 +56,8 @@ struct TourCrewView: View {
         listener = db.collection("tourCrew")
             .whereField("tourId", isEqualTo: tourID)
             .addSnapshotListener { snapshot, error in
-                guard let documents = snapshot?.documents else {
+            
+            guard let documents = snapshot?.documents else {
                     print("Error loading crew: \(error?.localizedDescription ?? "Unknown")")
                     return
                 }

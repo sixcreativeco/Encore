@@ -4,28 +4,67 @@ struct SidebarContainerView: View {
     @StateObject private var syncManager = OfflineSyncManager.shared
     @EnvironmentObject var appState: AppState
     @Environment(\.colorScheme) private var systemColorScheme
+    
     @State private var overrideColorScheme: ColorScheme? = nil
     @State private var isSidebarVisible = true
+    @State private var isNotificationsPanelVisible = false
 
     var body: some View {
         NavigationStack {
             HStack(spacing: 0) {
-                floatingSidebar
+                // Main left sidebar
+                if isSidebarVisible {
+                    floatingSidebar
+                        .transition(.move(edge: .leading))
+                }
                 
+                // Center content area
                 VStack(spacing: 0) {
+                    // Top bar
                     HStack {
                         Button(action: { withAnimation { isSidebarVisible.toggle() } }) {
                             Image(systemName: isSidebarVisible ? "sidebar.left" : "sidebar.right")
-                                .font(.title3)
+                                .font(.title2)
                                 .foregroundColor(.white.opacity(0.8))
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .padding(.leading, 16)
-                        .padding(.top, 30)
+                        
                         Spacer()
+                        
+                        // Notifications Button
+                        Button(action: { withAnimation { isNotificationsPanelVisible.toggle() } }) {
+                            Image(systemName: "bell.fill")
+                                .font(.title2)
+                                .foregroundColor(.white.opacity(0.8))
+                                .overlay(alignment: .topTrailing) {
+                                    if !appState.notifications.isEmpty {
+                                        Text("\(appState.notifications.count)")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(5)
+                                            .background(Color.red)
+                                            .clipShape(Circle())
+                                            .offset(x: 8, y: -8)
+                                    }
+                                }
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
+                    .padding(.leading, 24)
+                    .padding(.trailing, 40)
+                    .padding(.top, 30)
+                    .padding(.bottom, 10)
+
+                    // Main Content View
                     contentView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                
+                // New right-side notifications panel
+                if isNotificationsPanelVisible {
+                    NotificationsView(isPresented: $isNotificationsPanelVisible)
+                        .frame(width: 320)
+                        .transition(.move(edge: .trailing))
                 }
             }
         }
@@ -92,7 +131,7 @@ struct SidebarContainerView: View {
             .padding(.leading, 20)
             .padding(.vertical, 20)
             .animation(.easeInOut(duration: 0.25), value: isSidebarVisible)
-        }
+    }
 
     private var expandedSidebarContent: some View {
         VStack(alignment: .leading) {
@@ -230,6 +269,7 @@ struct SidebarLabel: View {
     let icon: String
     let title: String
     let isSelected: Bool
+    var badgeCount: Int = 0
     let spacing: CGFloat
     let action: () -> Void
 
@@ -252,6 +292,7 @@ struct SidebarLabel: View {
 struct SidebarIcon: View {
     let icon: String
     let isSelected: Bool
+    var badgeCount: Int = 0
     let action: () -> Void
 
     var body: some View {

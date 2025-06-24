@@ -7,9 +7,14 @@ struct SignInView: View {
     @Environment(\.colorScheme) var colorScheme
     @State private var email: String = ""
     @State private var password: String = ""
+    @State private var inviteCode: String = ""
     @State private var showSignUp: Bool = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+    
+    // State for the Join with Code flow
+    @State private var showJoinView = false
+    @State private var invitationDetails: InvitationService.InvitationDetails?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -20,11 +25,16 @@ struct SignInView: View {
             SignInDynamicContentView()
         }
         .ignoresSafeArea()
-        .alert("Sign In Error", isPresented: .constant(errorMessage != nil), actions: {
+        .alert("Error", isPresented: .constant(errorMessage != nil), actions: {
             Button("OK") { errorMessage = nil }
         }, message: {
             Text(errorMessage ?? "An unknown error occurred.")
         })
+        .sheet(isPresented: $showJoinView) {
+            if let details = invitationDetails {
+                JoinTourView(invitationDetails: details)
+            }
+        }
     }
     
     private var signInForm: some View {
@@ -39,13 +49,8 @@ struct SignInView: View {
                 .foregroundColor(.primary)
 
             VStack(spacing: 16) {
-                GoogleSignInButton {
-                    Task {
-                        await handleGoogleSignIn()
-                    }
-                }
-                .frame(width: 280, height: 44)
-
+                GoogleSignInButton { Task { await handleGoogleSignIn() } }
+                    .frame(width: 280, height: 44)
                 SignInWithAppleButton( .signIn, onRequest: { _ in }, onCompletion: { _ in } )
                     .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                     .frame(width: 280, height: 44)
@@ -60,17 +65,20 @@ struct SignInView: View {
                 Button(action: handleEmailSignIn) {
                     HStack {
                         Spacer()
-                        if isLoading {
-                            ProgressView().colorInvert()
-                        } else {
-                            Text("Sign In")
-                        }
+                        if isLoading && inviteCode.isEmpty { ProgressView().colorInvert() }
+                        else { Text("Sign In") }
                         Spacer()
                     }
                     .fontWeight(.semibold).frame(maxWidth: .infinity).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
                 }
-                .buttonStyle(.plain)
-                .disabled(isLoading || email.isEmpty || password.isEmpty)
+                .buttonStyle(.plain).disabled(isLoading || email.isEmpty || password.isEmpty)
+                
+                HStack(spacing: 8) {
+                    CustomTextField(placeholder: "Join with Code", text: $inviteCode)
+                    Button("Join") { handleJoinWithCode() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isLoading || inviteCode.isEmpty)
+                }
             }
             .frame(width: 280)
 
@@ -83,23 +91,39 @@ struct SignInView: View {
         }
         .padding(32)
     }
+    
+    private func handleJoinWithCode() {
+        isLoading = true
+        errorMessage = nil
+        let code = inviteCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        
+        InvitationService.shared.fetchInvitationDetails(with: code) { result in
+            isLoading = false
+            switch result {
+            case .success(let details):
+                self.invitationDetails = details
+                self.showJoinView = true
+            case .failure(let error as InvitationService.InvitationError):
+                switch error {
+                case .notFound:
+                    self.errorMessage = "Invitation code not found."
+                case .expired:
+                    self.errorMessage = "This invitation code has expired."
+                default:
+                    self.errorMessage = "There was a problem with this invitation code. Please contact the tour manager."
+                }
+            case .failure(let error):
+                self.errorMessage = error.localizedDescription
+            }
+        }
+    }
 
     private func handleGoogleSignIn() async {
-        print("LOG: 0. Google Sign-In button pressed in SignInView.")
-        
         guard let presentingWindow = NSApplication.shared.keyWindow else {
-            print("LOG: ❌ Could not get key window.")
             return
         }
         
-        let user = await AuthManager.shared.handleGoogleSignIn(presentingWindow: presentingWindow)
-        
-        if let user = user {
-            print("LOG: 4. AuthManager returned user. Updating appState with UID: \(user.uid)")
-            // AppState listener will handle the transition
-        } else {
-            print("LOG: 4. AuthManager returned nil. No state change.")
-        }
+        _ = await AuthManager.shared.handleGoogleSignIn(presentingWindow: presentingWindow)
     }
     
     private func handleEmailSignIn() {
@@ -109,7 +133,6 @@ struct SignInView: View {
         Task {
             do {
                 _ = try await AuthManager.shared.handleEmailSignIn(email: email, password: password)
-                // AppState listener will handle successful sign-in
                 await MainActor.run { isLoading = false }
             } catch {
                 await MainActor.run {

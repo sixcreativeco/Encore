@@ -1,8 +1,10 @@
 import SwiftUI
 import FirebaseFirestore
+import FirebaseAuth
 
 struct AddCrewPopupView: View {
     let tourID: String
+    
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var appState: AppState
 
@@ -11,10 +13,16 @@ struct AddCrewPopupView: View {
     @State private var roleInput: String = ""
     @State private var selectedRoles: [String] = []
     @State private var showRoleSuggestions: Bool = false
-    @State private var selectedVisibility: String = "full"
+    @State private var selectedVisibility: CrewVisibility = .full
     @State private var showVisibilityOptions: Bool = false
+    @State private var startDate = Date()
+    @State private var endDate = Date()
     
-    private enum EmailValidationState { case none, checking, valid, invalid }
+    @State private var foundUserId: String?
+    @State private var generatedCode: String?
+    @State private var isSaving = false
+    
+    private enum EmailValidationState { case none, checking, valid, invalid, info }
     @State private var emailValidationState: EmailValidationState = .none
     @State private var emailCheckTask: Task<Void, Never>? = nil
 
@@ -29,9 +37,7 @@ struct AddCrewPopupView: View {
         "Street Team", "Promoter Rep", "Merch Staff", "Translator", "Drone Op",
         "Content Creator", "Custom"
     ]
-
-    let visibilityOptions: [String] = ["full", "limited", "temporary"]
-
+    
     var filteredRoles: [String] {
         guard !roleInput.isEmpty else { return [] }
         let lowercaseInput = roleInput.lowercased()
@@ -43,6 +49,12 @@ struct AddCrewPopupView: View {
         VStack(alignment: .leading, spacing: 24) {
             headerView
             inputFields
+            if selectedVisibility == .temporary {
+                dateRangePicker
+            }
+            if let code = generatedCode {
+                invitationCodeView(code: code)
+            }
             Spacer()
             addButton
         }
@@ -66,7 +78,7 @@ struct AddCrewPopupView: View {
 
     private var addButton: some View {
         Button(action: { saveCrewMember() }) {
-            Text("Add Crew Member")
+            Text(isSaving ? "Saving..." : "Send Invite")
                 .font(.title3.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -76,25 +88,43 @@ struct AddCrewPopupView: View {
         .foregroundColor(.white)
         .cornerRadius(12)
         .padding(.top, 24)
+        .disabled(isSaving || newCrewName.isEmpty || newCrewEmail.isEmpty || selectedRoles.isEmpty)
+    }
+    
+    private var dateRangePicker: some View {
+        VStack(alignment: .leading) {
+             Text("Temporary Access Range")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            HStack {
+                CustomDateField(date: $startDate)
+                Text("to")
+                CustomDateField(date: $endDate)
+            }
+        }
+        .padding(.top)
+    }
+    
+    private func invitationCodeView(code: String) -> some View {
+        VStack(alignment: .leading) {
+            Text("Invite code for new user:").font(.headline)
+            Text(code).font(.title.bold()).foregroundColor(.green)
+            Text("User can enter this code on the sign in screen.")
+        }.padding().background(Color.black.opacity(0.2)).cornerRadius(10)
     }
 
     private var inputFields: some View {
         VStack(spacing: 16) {
             HStack(spacing: 16) {
                 CustomTextField(placeholder: "Name", text: $newCrewName)
-                
                 HStack(spacing: 8) {
                     CustomTextField(placeholder: "Email", text: $newCrewEmail)
-                    
                     switch emailValidationState {
-                    case .checking:
-                        ProgressView().scaleEffect(0.5)
-                    case .valid:
-                        Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
-                    case .invalid:
-                        EmptyView().frame(width: 20)
-                    case .none:
-                        EmptyView().frame(width: 20)
+                    case .checking: ProgressView().scaleEffect(0.5)
+                    case .valid: Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                    case .invalid: Image(systemName: "person.badge.plus").foregroundColor(.orange)
+                    case .info: Image(systemName: "info.circle").foregroundColor(.blue)
+                    case .none: EmptyView().frame(width: 20)
                     }
                 }
             }
@@ -102,169 +132,60 @@ struct AddCrewPopupView: View {
                 checkEmailWithDebounce(email: newValue)
             }
 
-            VStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(selectedRoles, id: \.self) { role in
-                                HStack(spacing: 6) {
-                                    Text(role).font(.subheadline)
-                                    Button(action: { selectedRoles.removeAll { $0 == role } }) {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.gray)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.gray.opacity(0.2))
-                                .cornerRadius(6)
+            VStack(spacing: 4) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(selectedRoles, id: \.self) { role in
+                            HStack(spacing: 6) {
+                                Text(role).font(.subheadline)
+                                Button(action: { selectedRoles.removeAll { $0 == role } }) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.gray)
+                                }.buttonStyle(.plain)
                             }
-
-                            TextField("Type a role", text: $roleInput)
-                                .textFieldStyle(PlainTextFieldStyle())
-                                .frame(minWidth: 100)
-                                .onChange(of: roleInput) { _, value in
-                                    showRoleSuggestions = !value.isEmpty
-                                }
-                                .onSubmit { addCustomRole() }
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Color.black.opacity(0.2)).cornerRadius(6)
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
+                        TextField("Type a role", text: $roleInput)
+                            .textFieldStyle(PlainTextFieldStyle()).frame(minWidth: 100)
+                            .onChange(of: roleInput) { _, value in
+                                showRoleSuggestions = !value.isEmpty
+                            }.onSubmit { addCustomRole() }
                     }
-                    .frame(height: 42)
-                    .background(Color(nsColor: .controlBackgroundColor))
-                    .cornerRadius(8)
+                    .padding(.horizontal, 8).padding(.vertical, 6)
                 }
+                .frame(height: 42)
+                .background(Color.black.opacity(0.15))
+                .cornerRadius(8)
 
-                if showRoleSuggestions && !filteredRoles.isEmpty {
-                    VStack(spacing: 0) {
-                        ForEach(filteredRoles.prefix(5), id: \.self) { suggestion in
-                            Button(action: {
-                                selectedRoles.append(suggestion)
-                                roleInput = ""
-                                showRoleSuggestions = false
-                            }) {
-                                Text(suggestion)
-                                    .padding(.vertical, 12)
-                                    .padding(.horizontal, 12)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .foregroundColor(.primary)
-                        }
-                    }
-                    .background(.background)
-                    .cornerRadius(8)
-                    .shadow(radius: 2)
-                    .padding(.top, 8)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Visibility").font(.subheadline).bold()
-
-                ZStack(alignment: .topLeading) {
-                    HStack(alignment: .top, spacing: 8) {
-                        Button(action: { withAnimation { showVisibilityOptions.toggle() } }) {
-                            HStack {
-                                Text(visibilityTitle(for: selectedVisibility))
-                                    .font(.subheadline)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                Image(systemName: showVisibilityOptions ? "chevron.up" : "chevron.down")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.gray)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 12)
-                            .cornerRadius(8)
-                        }
-                        .frame(width: 200)
-
-                        Text(visibilityDescription(for: selectedVisibility))
-                            .font(.footnote)
-                            .foregroundColor(.gray)
-                            .lineLimit(3)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(height: 70)
-
-                    if showVisibilityOptions {
-                        VStack(spacing: 0) {
-                            ForEach(visibilityOptions, id: \.self) { option in
+                ZStack {
+                    if showRoleSuggestions && !filteredRoles.isEmpty {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(filteredRoles.prefix(5), id: \.self) { suggestion in
                                 Button(action: {
-                                    selectedVisibility = option
-                                    showVisibilityOptions = false
+                                    selectedRoles.append(suggestion)
+                                    roleInput = ""
+                                    showRoleSuggestions = false
                                 }) {
-                                    Text(visibilityTitle(for: option))
-                                        .padding(.vertical, 12)
-                                        .padding(.horizontal, 12)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .foregroundColor(.primary)
+                                    Text(suggestion)
+                                        .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                                }.buttonStyle(.plain)
                             }
                         }
-                        .background(.background)
-                        .cornerRadius(8)
-                        .shadow(radius: 2)
-                        .frame(width: 200)
-                        .offset(y: 45)
-                        .zIndex(10)
+                        .background(Color(NSColor.windowBackgroundColor)).cornerRadius(6).shadow(radius: 1).padding(.top, 4)
                     }
                 }
-                .frame(height: 70, alignment: .top)
             }
+            
+            Picker("Visibility", selection: $selectedVisibility) {
+                ForEach(CrewVisibility.allCases, id: \.self) { visibility in
+                    Text(visibility.rawValue.capitalized).tag(visibility)
+                }
+            }.pickerStyle(.segmented)
         }
     }
     
-    private func checkEmailWithDebounce(email: String) {
-        emailCheckTask?.cancel()
-        
-        let trimmedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !trimmedEmail.isEmpty, trimmedEmail.contains("@") else {
-            emailValidationState = .none
-            return
-        }
-
-        emailValidationState = .checking
-        
-        emailCheckTask = Task {
-            do {
-                try await Task.sleep(nanoseconds: 500_000_000)
-                guard !Task.isCancelled else { return }
-                
-                // FirebaseUserService.shared.checkUserExists(...)
-            } catch {
-                DispatchQueue.main.async {
-                    self.emailValidationState = .invalid
-                }
-            }
-        }
-    }
-
-    private func visibilityTitle(for option: String) -> String {
-        switch option {
-        case "full": return "Full"
-        case "limited": return "Limited"
-        case "temporary": return "Temporary"
-        default: return option
-        }
-    }
-
-    private func visibilityDescription(for option: String) -> String {
-        let name = newCrewName.isEmpty ? "They" : newCrewName
-        switch option {
-        case "full": return "\(name) can see the full itinerary. Best for core crew, admins, and agents."
-        case "limited": return "\(name) can see most details. Good for production and show crew."
-        case "temporary": return "\(name) can see show times and assigned items only. Best for support acts and one-offs."
-        default: return ""
-        }
-    }
-
     private func addCustomRole() {
         let trimmedRole = roleInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedRole.isEmpty else { return }
@@ -276,25 +197,98 @@ struct AddCrewPopupView: View {
         showRoleSuggestions = false
     }
 
+    private func checkEmailWithDebounce(email: String) {
+        emailCheckTask?.cancel()
+        foundUserId = nil
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !trimmedEmail.isEmpty, trimmedEmail.contains("@") else {
+            emailValidationState = .none
+            return
+        }
+        emailValidationState = .checking
+        emailCheckTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000)
+                guard !Task.isCancelled else { return }
+                
+                FirebaseUserService.shared.checkUserExists(byEmail: trimmedEmail) { foundID in
+                    DispatchQueue.main.async {
+                        if let id = foundID {
+                            self.foundUserId = id
+                            self.emailValidationState = .valid
+                        } else {
+                            self.emailValidationState = .invalid
+                        }
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async { self.emailValidationState = .none }
+            }
+        }
+    }
+
     private func saveCrewMember() {
-        guard !newCrewName.isEmpty, !selectedRoles.isEmpty, !newCrewEmail.isEmpty, let ownerId = appState.userID else { return }
+        guard !newCrewName.isEmpty, !selectedRoles.isEmpty, !newCrewEmail.isEmpty,
+              let ownerId = appState.userID,
+              let currentTour = appState.tours.first(where: { $0.id == tourID })
+        else { return }
+        
+        isSaving = true
+        let db = Firestore.firestore()
 
         let newCrewMember = TourCrew(
             tourId: self.tourID,
-            userId: nil,
+            userId: self.foundUserId,
             contactId: nil,
             name: newCrewName.trimmingCharacters(in: .whitespaces),
             email: newCrewEmail.trimmingCharacters(in: .whitespaces).lowercased(),
             roles: selectedRoles,
-            visibility: TourCrew.CrewVisibility(rawValue: selectedVisibility) ?? .full,
+            visibility: selectedVisibility,
+            status: foundUserId != nil ? .pending : .invited,
+            invitationCode: nil,
+            startDate: selectedVisibility == .temporary ? Timestamp(date: startDate) : nil,
+            endDate: selectedVisibility == .temporary ? Timestamp(date: endDate) : nil,
             invitedBy: ownerId
         )
 
+        var ref: DocumentReference? = nil
         do {
-            _ = try Firestore.firestore().collection("tourCrew").addDocument(from: newCrewMember)
-            presentationMode.wrappedValue.dismiss()
+            ref = try db.collection("tourCrew").addDocument(from: newCrewMember) { error in
+                if let error = error {
+                    print("❌ Error saving new crew member: \(error.localizedDescription)")
+                    self.isSaving = false
+                    return
+                }
+                
+                guard let crewDocId = ref?.documentID else {
+                    self.isSaving = false
+                    return
+                }
+
+                if let recipientId = self.foundUserId {
+                    FirebaseUserService.shared.createInvitationNotification(
+                        for: currentTour,
+                        recipientId: recipientId,
+                        inviterId: ownerId,
+                        inviterName: Auth.auth().currentUser?.displayName ?? "An Encore User",
+                        crewDocId: crewDocId,
+                        roles: self.selectedRoles
+                    )
+                    self.isSaving = false
+                    self.presentationMode.wrappedValue.dismiss()
+                } else {
+                    FirebaseUserService.shared.createInvitation(for: crewDocId, tourId: self.tourID, inviterId: ownerId) { code in
+                        if let code = code {
+                            db.collection("tourCrew").document(crewDocId).updateData(["invitationCode": code])
+                            self.generatedCode = code
+                        }
+                        self.isSaving = false
+                    }
+                }
+            }
         } catch {
-            print("❌ Error saving new crew member: \(error.localizedDescription)")
+            print("❌ Error adding document: \(error.localizedDescription)")
+            isSaving = false
         }
     }
 }

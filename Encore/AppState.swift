@@ -10,6 +10,10 @@ class AppState: ObservableObject {
     @Published var selectedTour: Tour? = nil
     @Published var selectedShow: Show? = nil
     @Published var tours: [Tour] = []
+    
+    @Published var notifications: [TourInvitationNotification] = []
+    private var notificationListener: ListenerRegistration?
+
 
     private var authStateHandle: AuthStateDidChangeListenerHandle?
 
@@ -21,6 +25,7 @@ class AppState: ObservableObject {
         if let authStateHandle = authStateHandle {
             Auth.auth().removeStateDidChangeListener(authStateHandle)
         }
+        notificationListener?.remove()
     }
 
     private func registerAuthStateHandler() {
@@ -34,12 +39,29 @@ class AppState: ObservableObject {
                     self?.tours.removeAll()
                     self?.selectedTour = nil
                     self?.selectedShow = nil
+                    self?.notifications.removeAll()
+                    self?.notificationListener?.remove()
                 } else {
                     // Load data on sign in
                     self?.loadTours()
+                    self?.listenForNotifications()
                 }
             }
         }
+    }
+    
+    func listenForNotifications() {
+        guard let userID = userID else { return }
+        notificationListener?.remove()
+        
+        let db = Firestore.firestore()
+        notificationListener = db.collection("notifications")
+            .whereField("recipientId", isEqualTo: userID)
+            .addSnapshotListener { snapshot, error in
+                guard let documents = snapshot?.documents else { return }
+                
+                self.notifications = documents.compactMap { try? $0.data(as: TourInvitationNotification.self) }
+            }
     }
  
     func removeTour(tourID: String) {
@@ -68,35 +90,12 @@ class AppState: ObservableObject {
                 group.leave()
             }
 
-        // 2. Fetch tours that have been shared with the user
+        // 2. Fetch tours where the user is an accepted crew member
         group.enter()
-        db.collection("users").document(userID).collection("sharedTours").getDocuments { snapshot, _ in
-            guard let documents = snapshot?.documents, !documents.isEmpty else {
-                group.leave()
-                return
-            }
-            
-            let tourIDs = documents.map { $0.documentID }.filter { !fetchedTourIDs.contains($0) }
-            
-            guard !tourIDs.isEmpty else {
-                group.leave()
-                return
-            }
-            
-            db.collection("tours").whereField(FieldPath.documentID(), in: tourIDs)
-                .getDocuments { tourSnapshot, _ in
-                    let sharedTours = tourSnapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []
-                    for tour in sharedTours {
-                        if let id = tour.id { fetchedTourIDs.insert(id) }
-                    }
-                    allTours.append(contentsOf: sharedTours)
-                    group.leave()
-                }
-        }
-        
-        // 3. Fetch tours where the user is a crew member
-        group.enter()
-        db.collection("tourCrew").whereField("userId", isEqualTo: userID).getDocuments { snapshot, _ in
+        db.collection("tourCrew")
+          .whereField("userId", isEqualTo: userID)
+          .whereField("status", isEqualTo: InviteStatus.accepted.rawValue)
+          .getDocuments { snapshot, _ in
             guard let documents = snapshot?.documents, !documents.isEmpty else {
                 group.leave()
                 return

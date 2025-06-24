@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseFirestore
+import FirebaseAuth
 
 struct AddCrewSectionView: View {
     let tourID: String
@@ -11,16 +12,15 @@ struct AddCrewSectionView: View {
     @State private var roleInput: String = ""
     @State private var selectedRoles: [String] = []
     @State private var showRoleSuggestions: Bool = false
-    @State private var selectedVisibility: String = "full"
-    @State private var showVisibilityOptions: Bool = false
-
+    
+    // State for email validation
+    @State private var foundUserId: String?
+    private enum EmailValidationState { case none, checking, valid, invalid }
     @State private var emailValidationState: EmailValidationState = .none
     @State private var emailCheckTask: Task<Void, Never>? = nil
     
     @State private var listener: ListenerRegistration?
-
-    private enum EmailValidationState { case none, checking, valid, invalid }
-
+    
     @State private var roleOptions: [String] = [
         "Lead Artist", "Support Artist", "DJ", "Dancer", "Guest Performer", "Musician",
         "Content", "Tour Manager", "Artist Manager", "Road Manager", "Assistant Manager",
@@ -32,8 +32,6 @@ struct AddCrewSectionView: View {
         "Street Team", "Promoter Rep", "Merch Staff", "Translator", "Drone Op",
         "Content Creator", "Custom"
     ]
-
-    let visibilityOptions: [String] = ["full", "limited", "temporary"]
 
     var filteredRoles: [String] {
         guard !roleInput.isEmpty else { return [] }
@@ -123,7 +121,6 @@ struct AddCrewSectionView: View {
             .background(Color.black.opacity(0.15))
             .cornerRadius(12)
 
-            // This is the list that provides the visual confirmation.
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(crewMembers) { member in
                     VStack(alignment: .leading) {
@@ -145,6 +142,7 @@ struct AddCrewSectionView: View {
 
     private func checkEmailWithDebounce(email: String) {
         emailCheckTask?.cancel()
+        foundUserId = nil
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
         guard !trimmedEmail.isEmpty, trimmedEmail.contains("@") else {
             emailValidationState = .none
@@ -155,9 +153,10 @@ struct AddCrewSectionView: View {
             do {
                 try await Task.sleep(nanoseconds: 500_000_000)
                 guard !Task.isCancelled else { return }
-                FirebaseUserService.shared.checkUserExists(byEmail: trimmedEmail) { foundUserID in
+                FirebaseUserService.shared.checkUserExists(byEmail: trimmedEmail) { foundID in
                     DispatchQueue.main.async {
-                        self.emailValidationState = (foundUserID != nil) ? .valid : .invalid
+                        self.foundUserId = foundID
+                        self.emailValidationState = (foundID != nil) ? .valid : .invalid
                     }
                 }
             } catch {
@@ -180,21 +179,41 @@ struct AddCrewSectionView: View {
     }
 
     private func saveCrewMember() {
-        guard !newCrewName.isEmpty, !selectedRoles.isEmpty, let ownerId = appState.userID else { return }
+        guard !newCrewName.isEmpty, !selectedRoles.isEmpty, let ownerId = appState.userID, let currentTour = appState.tours.first(where: { $0.id == tourID }) else { return }
+        
         let newCrew = TourCrew(
             tourId: self.tourID,
-            userId: nil,
+            userId: foundUserId,
             contactId: nil,
             name: newCrewName.trimmingCharacters(in: .whitespaces),
             email: newCrewEmail.trimmingCharacters(in: .whitespaces).lowercased(),
             roles: selectedRoles,
-            visibility: TourCrew.CrewVisibility(rawValue: selectedVisibility) ?? .full,
+            visibility: .full, // Defaulting to full, as this view has no picker
+            status: foundUserId != nil ? .pending : .invited, // Set status based on email check
+            invitationCode: nil, // Invitation code generation is handled by AddCrewPopupView
+            startDate: nil,
+            endDate: nil,
             invitedBy: ownerId
         )
+
         do {
-            _ = try Firestore.firestore().collection("tourCrew").addDocument(from: newCrew)
+            let ref = try Firestore.firestore().collection("tourCrew").addDocument(from: newCrew)
+            
+            // If the user exists, send them a notification
+            if let recipientId = foundUserId {
+                FirebaseUserService.shared.createInvitationNotification(
+                    for: currentTour,
+                    recipientId: recipientId,
+                    inviterId: ownerId,
+                    inviterName: Auth.auth().currentUser?.displayName ?? "An Encore User",
+                    crewDocId: ref.documentID,
+                    roles: selectedRoles
+                )
+            }
+            
+            // Reset fields
             newCrewName = ""; newCrewEmail = ""; roleInput = ""; selectedRoles = [];
-            selectedVisibility = "full"
+            foundUserId = nil; emailValidationState = .none
         } catch {
             print("❌ Error saving new crew member: \(error.localizedDescription)")
         }

@@ -6,30 +6,55 @@ class FirebaseUserService {
     static let shared = FirebaseUserService()
     private let db = Firestore.firestore()
     
-    /// Checks if a user document exists for a given email.
-    /// - a `userID` string if found, otherwise `nil`.
     func checkUserExists(byEmail email: String, completion: @escaping (String?) -> Void) {
-        // This query correctly checks the top-level /users collection.
         db.collection("users").whereField("email", isEqualTo: email).getDocuments { snapshot, error in
             if let doc = snapshot?.documents.first {
-                // A user with this email exists, return their ID.
                 completion(doc.documentID)
             } else {
-                // No user found with this email.
                 completion(nil)
             }
         }
     }
     
-    // The shared tour function can remain, though it may need refactoring later.
-    func addSharedTour(for userID: String, tourID: String, creatorUserID: String, role: [String], visibility: String) {
-        let sharedTourRef = db.collection("users").document(userID).collection("sharedTours").document(tourID)
-        let data: [String: Any] = [
-            "creatorUserID": creatorUserID,
-            "dateAdded": Date(),
-            "roles": role,
-            "visibility": visibility
+    func createInvitationNotification(for tour: Tour, recipientId: String, inviterId: String, inviterName: String, crewDocId: String, roles: [String]) {
+        let notification = TourInvitationNotification(
+            recipientId: recipientId,
+            inviterId: inviterId,
+            inviterName: inviterName,
+            tourId: tour.id ?? "",
+            tourName: tour.tourName,
+            artistName: tour.artist,
+            crewDocId: crewDocId,
+            roles: roles
+        )
+        
+        do {
+            try db.collection("notifications").addDocument(from: notification)
+        } catch {
+            print("Error creating notification: \(error.localizedDescription)")
+        }
+    }
+    
+    func createInvitation(for crewDocId: String, tourId: String, inviterId: String, completion: @escaping (String?) -> Void) {
+        // The fix is here: The map closure requires an argument, which we ignore with `_ in`.
+        let code = String((0..<6).map{ _ in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".randomElement()! })
+        let expirationDate = Calendar.current.date(byAdding: .day, value: 7, to: Date())!
+
+        let invitationData: [String: Any] = [
+            "tourId": tourId,
+            "crewDocId": crewDocId,
+            "inviterId": inviterId,
+            "createdAt": Timestamp(date: Date()),
+            "expiresAt": Timestamp(date: expirationDate)
         ]
-        sharedTourRef.setData(data)
+
+        db.collection("invitations").document(code).setData(invitationData) { error in
+            if let error = error {
+                print("Error saving invitation: \(error.localizedDescription)")
+                completion(nil)
+            } else {
+                completion(code)
+            }
+        }
     }
 }
