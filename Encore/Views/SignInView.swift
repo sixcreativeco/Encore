@@ -12,7 +12,6 @@ struct SignInView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     
-    // State for the Join with Code flow
     @State private var showJoinView = false
     @State private var invitationDetails: InvitationService.InvitationDetails?
 
@@ -38,7 +37,7 @@ struct SignInView: View {
     }
     
     private var signInForm: some View {
-        VStack(spacing: 40) {
+        VStack(spacing: 24) {
             Spacer()
 
             Image("EncoreLogo")
@@ -47,18 +46,26 @@ struct SignInView: View {
                 .scaledToFit()
                 .frame(width: 180)
                 .foregroundColor(.primary)
+                .padding(.bottom, 24)
 
             VStack(spacing: 16) {
-                GoogleSignInButton { Task { await handleGoogleSignIn() } }
-                    .frame(width: 280, height: 44)
-                SignInWithAppleButton( .signIn, onRequest: { _ in }, onCompletion: { _ in } )
-                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                    .frame(width: 280, height: 44)
+                CustomTextField(placeholder: "Join with Code", text: $inviteCode)
+                    .onSubmit {
+                        if !inviteCode.isEmpty {
+                            handleJoinWithCode()
+                        }
+                    }
+                    .disabled(isLoading)
                 
                 HStack(spacing: 12) {
-                    VStack { Divider() }; Text("OR").font(.caption).foregroundColor(.secondary).padding(.vertical, 16); VStack { Divider() }
+                    VStack { Divider() }; Text("OR").font(.caption).foregroundColor(.secondary); VStack { Divider() }
                 }
+                .padding(.vertical, 8)
 
+                GoogleSignInButton { Task { await handleGoogleSignIn() } }
+                    .frame(width: 280, height: 44)
+                    .cornerRadius(8) // Added corner radius to match other fields
+                
                 CustomTextField(placeholder: "Email", text: $email)
                 CustomSecureField(placeholder: "Password", text: $password)
                 
@@ -72,13 +79,6 @@ struct SignInView: View {
                     .fontWeight(.semibold).frame(maxWidth: .infinity).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
                 }
                 .buttonStyle(.plain).disabled(isLoading || email.isEmpty || password.isEmpty)
-                
-                HStack(spacing: 8) {
-                    CustomTextField(placeholder: "Join with Code", text: $inviteCode)
-                    Button("Join") { handleJoinWithCode() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isLoading || inviteCode.isEmpty)
-                }
             }
             .frame(width: 280)
 

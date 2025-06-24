@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
+import AppKit // Import AppKit for NSPasteboard
 
 struct AddCrewPopupView: View {
     let tourID: String
@@ -21,6 +22,7 @@ struct AddCrewPopupView: View {
     @State private var foundUserId: String?
     @State private var generatedCode: String?
     @State private var isSaving = false
+    @State private var inviteSentSuccessfully = false
     
     private enum EmailValidationState { case none, checking, valid, invalid, info }
     @State private var emailValidationState: EmailValidationState = .none
@@ -56,7 +58,7 @@ struct AddCrewPopupView: View {
                 invitationCodeView(code: code)
             }
             Spacer()
-            addButton
+            actionButton
         }
         .padding(32)
         .frame(minWidth: 500, minHeight: 600)
@@ -76,9 +78,15 @@ struct AddCrewPopupView: View {
         }
     }
 
-    private var addButton: some View {
-        Button(action: { saveCrewMember() }) {
-            Text(isSaving ? "Saving..." : "Send Invite")
+    private var actionButton: some View {
+        Button(action: {
+            if inviteSentSuccessfully {
+                resetForm()
+            } else {
+                saveCrewMember()
+            }
+        }) {
+            Text(isSaving ? "Saving..." : (inviteSentSuccessfully ? "Add More Crew" : "Send Invite"))
                 .font(.title3.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -88,7 +96,7 @@ struct AddCrewPopupView: View {
         .foregroundColor(.white)
         .cornerRadius(12)
         .padding(.top, 24)
-        .disabled(isSaving || newCrewName.isEmpty || newCrewEmail.isEmpty || selectedRoles.isEmpty)
+        .disabled(isSaving || (!inviteSentSuccessfully && (newCrewName.isEmpty || newCrewEmail.isEmpty || selectedRoles.isEmpty)))
     }
     
     private var dateRangePicker: some View {
@@ -106,11 +114,29 @@ struct AddCrewPopupView: View {
     }
     
     private func invitationCodeView(code: String) -> some View {
-        VStack(alignment: .leading) {
-            Text("Invite code for new user:").font(.headline)
-            Text(code).font(.title.bold()).foregroundColor(.green)
-            Text("User can enter this code on the sign in screen.")
-        }.padding().background(Color.black.opacity(0.2)).cornerRadius(10)
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading) {
+                Text("Invite code for new user:").font(.headline)
+                Text(code).font(.largeTitle.bold()).foregroundColor(.green)
+                Text("User can enter this code on the sign in screen.")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: { copyInviteDetails(code: code) }) {
+                VStack(spacing: 2) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.body)
+                    Text("Copy Invite Details")
+                        .font(.caption2)
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+        }
+        .padding()
+        .background(Color.black.opacity(0.2))
+        .cornerRadius(10)
+        .frame(maxWidth: .infinity)
     }
 
     private var inputFields: some View {
@@ -226,6 +252,20 @@ struct AddCrewPopupView: View {
             }
         }
     }
+    
+    private func copyInviteDetails(code: String) {
+        let tourName = appState.tours.first { $0.id == tourID }?.tourName ?? "the tour"
+        let inviteString = """
+        Join \(tourName) by downloading Encore at:
+        https://en-co.re
+
+        Your joining code is \(code)
+        """
+        
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(inviteString, forType: .string)
+    }
 
     private func saveCrewMember() {
         guard !newCrewName.isEmpty, !selectedRoles.isEmpty, !newCrewEmail.isEmpty,
@@ -274,21 +314,38 @@ struct AddCrewPopupView: View {
                         crewDocId: crewDocId,
                         roles: self.selectedRoles
                     )
-                    self.isSaving = false
-                    self.presentationMode.wrappedValue.dismiss()
+                    self.inviteSentSuccessfully = true
                 } else {
                     FirebaseUserService.shared.createInvitation(for: crewDocId, tourId: self.tourID, inviterId: ownerId) { code in
                         if let code = code {
                             db.collection("tourCrew").document(crewDocId).updateData(["invitationCode": code])
                             self.generatedCode = code
                         }
-                        self.isSaving = false
+                        self.inviteSentSuccessfully = true
                     }
                 }
+                self.isSaving = false
             }
         } catch {
             print("❌ Error adding document: \(error.localizedDescription)")
             isSaving = false
         }
+    }
+    
+    private func resetForm() {
+        newCrewName = ""
+        newCrewEmail = ""
+        roleInput = ""
+        selectedRoles.removeAll()
+        showRoleSuggestions = false
+        selectedVisibility = .full
+        startDate = Date()
+        endDate = Date()
+        foundUserId = nil
+        generatedCode = nil
+        isSaving = false
+        inviteSentSuccessfully = false
+        emailValidationState = .none
+        emailCheckTask?.cancel()
     }
 }

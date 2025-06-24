@@ -12,11 +12,8 @@ struct SidebarContainerView: View {
     var body: some View {
         NavigationStack {
             HStack(spacing: 0) {
-                // Main left sidebar
-                if isSidebarVisible {
-                    floatingSidebar
-                        .transition(.move(edge: .leading))
-                }
+                // Main left sidebar is now always present, and handles its own collapsed state.
+                floatingSidebar
                 
                 // Center content area
                 VStack(spacing: 0) {
@@ -60,7 +57,7 @@ struct SidebarContainerView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 
-                // New right-side notifications panel
+                // Right-side notifications panel
                 if isNotificationsPanelVisible {
                     NotificationsView(isPresented: $isNotificationsPanelVisible)
                         .frame(width: 320)

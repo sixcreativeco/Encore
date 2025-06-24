@@ -10,11 +10,9 @@ struct NewTourFlowView: View {
     @State private var artistName: String = ""
     @State private var startDate: Date = Date()
     @State private var endDate: Date = Date()
-    @State private var tourScope: String = "national"
     @State private var posterImage: NSImage? = nil
     @State private var posterFileURL: URL? = nil
     
-    // This now holds the complete new Tour object once saved
     @State private var newTour: Tour? = nil
     @State private var isSaving = false
 
@@ -37,22 +35,20 @@ struct NewTourFlowView: View {
                             }
                         }
                         Text("Including Travel/Extra Days").font(.footnote).foregroundColor(.secondary)
-                        Picker("", selection: $tourScope) {
-                            Text("National").tag("national")
-                            Text("International").tag("international")
+                        
+                        if newTour == nil {
+                            Button(action: { Task { await saveTour() } }) {
+                                Text(isSaving ? "Saving..." : "Continue")
+                                    .fontWeight(.semibold)
+                                    .frame(width: 200, height: 44)
+                                    .foregroundColor(.black)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .background(Color.white)
+                            .cornerRadius(8)
+                            .disabled(tourName.isEmpty || artistName.isEmpty || isSaving)
+                            .padding(.top, 8)
                         }
-                        .pickerStyle(SegmentedPickerStyle())
-                        .frame(height: 44)
-                        Button(action: { Task { await saveTour() } }) {
-                            Text(isSaving ? "Saving..." : "Continue")
-                                .fontWeight(.semibold)
-                                .frame(width: 200, height: 44)
-                                .foregroundColor(.black)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .background(Color.white)
-                        .cornerRadius(8)
-                        .disabled(tourName.isEmpty || artistName.isEmpty || isSaving)
                     }
 
                     VStack {
@@ -78,13 +74,14 @@ struct NewTourFlowView: View {
                     .padding(.top, 40)
                 }
 
-                if let tour = newTour, let tourID = tour.id {
-                    AddCrewSectionView(tourID: tourID)
+                if let tour = newTour {
+                    // Pass the entire Tour object instead of just the ID
+                    AddCrewSectionView(tour: tour)
                     Divider()
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Add Shows").font(.headline)
                         ShowGridView(
-                            tourID: tourID,
+                            tourID: tour.id ?? "",
                             ownerUserID: tour.ownerId,
                             artistName: tour.artist,
                             onShowSelected: { selectedShow in
@@ -138,6 +135,10 @@ struct NewTourFlowView: View {
         do {
             let ref = try Firestore.firestore().collection("tours").addDocument(from: newTourData)
             newTourData.id = ref.documentID
+            
+            // Add the new tour to the global state so other views are aware of it
+            appState.tours.append(newTourData)
+            
             self.newTour = newTourData
         } catch {
             print("❌ Error saving tour: \(error.localizedDescription)")

@@ -8,7 +8,7 @@ struct CustomSecureField: View {
     var body: some View {
         SecureField(placeholder, text: $text)
             .padding(12)
-            .background(Color(.unemphasizedSelectedContentBackgroundColor))
+            .background(Color.black.opacity(0.15)) // Changed background to match
             .cornerRadius(8)
             .textFieldStyle(.plain)
     }

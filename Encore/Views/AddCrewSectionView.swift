@@ -1,9 +1,11 @@
 import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
+import AppKit
 
 struct AddCrewSectionView: View {
-    let tourID: String
+    // This view now accepts the entire Tour object
+    let tour: Tour
     @EnvironmentObject var appState: AppState
 
     @State private var crewMembers: [TourCrew] = []
@@ -13,8 +15,8 @@ struct AddCrewSectionView: View {
     @State private var selectedRoles: [String] = []
     @State private var showRoleSuggestions: Bool = false
     
-    // State for email validation
     @State private var foundUserId: String?
+    @State private var isSaving = false
     private enum EmailValidationState { case none, checking, valid, invalid }
     @State private var emailValidationState: EmailValidationState = .none
     @State private var emailCheckTask: Task<Void, Never>? = nil
@@ -39,6 +41,10 @@ struct AddCrewSectionView: View {
             !$0.isEmpty && $0.lowercased().contains(roleInput.lowercased()) && !selectedRoles.contains($0)
         }
     }
+    
+    private var isFormValid: Bool {
+        !newCrewName.isEmpty && !newCrewEmail.isEmpty && !selectedRoles.isEmpty
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -54,7 +60,9 @@ struct AddCrewSectionView: View {
                             ProgressView().scaleEffect(0.5)
                         case .valid:
                              Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
-                        default:
+                        case .invalid:
+                             Image(systemName: "person.badge.plus").foregroundColor(.orange)
+                        case .none:
                             EmptyView().frame(width: 20)
                         }
                     }
@@ -92,7 +100,7 @@ struct AddCrewSectionView: View {
 
                     ZStack {
                         if showRoleSuggestions && !filteredRoles.isEmpty {
-                            VStack(spacing: 0) {
+                            VStack(alignment: .leading, spacing: 0) {
                                 ForEach(filteredRoles.prefix(5), id: \.self) { suggestion in
                                     Button(action: {
                                         selectedRoles.append(suggestion)
@@ -109,35 +117,88 @@ struct AddCrewSectionView: View {
                     }
                 }
 
-                Button(action: { saveCrewMember() }) {
+                Button(action: { Task { await saveCrewMember() } }) {
                     HStack {
-                        Image(systemName: "plus")
-                        Text("Add Crew Member")
+                        if isSaving {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .frame(width: 15, height: 15)
+                        } else {
+                            Image(systemName: "plus")
+                        }
+                        Text(isSaving ? "Inviting..." : "Add & Invite Crew Member")
                     }
                 }
+                .disabled(isSaving || !isFormValid)
                 .font(.subheadline)
             }
-            .padding()
-            .background(Color.black.opacity(0.15))
-            .cornerRadius(12)
+            .padding(.top)
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(crewMembers) { member in
-                    VStack(alignment: .leading) {
-                        Text("\(member.name) • \(member.roles.joined(separator: ", "))").font(.subheadline)
-                        if let email = member.email, !email.isEmpty {
-                            Text(email).font(.caption).foregroundColor(.gray)
-                        }
-                    }
-                    .padding(8)
-                    .background(Color.black.opacity(0.15))
-                    .cornerRadius(8)
+                    crewMemberCard(member)
                 }
             }
         }
         .padding(.top, 12)
         .onAppear { loadCrew() }
         .onDisappear { listener?.remove() }
+    }
+    
+    @ViewBuilder
+    private func crewMemberCard(_ member: TourCrew) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(member.name).font(.subheadline.bold())
+                if let email = member.email, !email.isEmpty {
+                    Text(email).font(.caption).foregroundColor(.secondary)
+                }
+                Text(member.roles.joined(separator: ", ")).font(.caption)
+            }
+            
+            Spacer()
+            
+            switch member.status {
+            case .pending:
+                Text("Invite Sent")
+                    .font(.caption.bold()).foregroundColor(.blue)
+            case .accepted:
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("Accepted")
+                }
+                .font(.caption.bold()).foregroundColor(.green)
+            case .invited:
+                if let code = member.invitationCode {
+                    HStack(spacing: 8) {
+                        Text(code)
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundColor(.orange)
+                        
+                        Button(action: { copyInviteDetails(code: code) }) {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.black.opacity(0.15))
+        .cornerRadius(8)
+    }
+    
+    private func copyInviteDetails(code: String) {
+        let inviteString = """
+        Join the \(tour.tourName) tour by downloading Encore at:
+        https://en-co.re
+
+        Your joining code is \(code)
+        """
+        
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(inviteString, forType: .string)
     }
 
     private func checkEmailWithDebounce(email: String) {
@@ -178,48 +239,89 @@ struct AddCrewSectionView: View {
         showRoleSuggestions = false
     }
 
-    private func saveCrewMember() {
-        guard !newCrewName.isEmpty, !selectedRoles.isEmpty, let ownerId = appState.userID, let currentTour = appState.tours.first(where: { $0.id == tourID }) else { return }
+    private func saveCrewMember() async {
+        print("LOG: 'Add & Invite' button clicked. Running saveCrewMember().")
         
-        let newCrew = TourCrew(
-            tourId: self.tourID,
+        // The guard condition now uses the injected 'tour' object directly.
+        guard isFormValid, let ownerId = appState.userID, let tourID = tour.id else {
+            print("LOG: Guard condition failed. isFormValid: \(isFormValid), ownerId: \(appState.userID ?? "nil"), tourID: \(tour.id ?? "nil")")
+            return
+        }
+        
+        await MainActor.run { isSaving = true }
+        print("LOG: isSaving set to true.")
+        
+        let crewToSave = TourCrew(
+            tourId: tourID,
             userId: foundUserId,
             contactId: nil,
             name: newCrewName.trimmingCharacters(in: .whitespaces),
             email: newCrewEmail.trimmingCharacters(in: .whitespaces).lowercased(),
             roles: selectedRoles,
-            visibility: .full, // Defaulting to full, as this view has no picker
-            status: foundUserId != nil ? .pending : .invited, // Set status based on email check
-            invitationCode: nil, // Invitation code generation is handled by AddCrewPopupView
+            visibility: .full,
+            status: foundUserId != nil ? .pending : .invited,
+            invitationCode: nil,
             startDate: nil,
             endDate: nil,
             invitedBy: ownerId
         )
 
         do {
-            let ref = try Firestore.firestore().collection("tourCrew").addDocument(from: newCrew)
+            let ref = try await Firestore.firestore().collection("tourCrew").addDocument(from: crewToSave)
+            print("LOG: Successfully saved new crew document with ID: \(ref.documentID).")
             
-            // If the user exists, send them a notification
             if let recipientId = foundUserId {
+                print("LOG: Existing user found. Sending notification to \(recipientId).")
                 FirebaseUserService.shared.createInvitationNotification(
-                    for: currentTour,
+                    for: tour,
                     recipientId: recipientId,
                     inviterId: ownerId,
                     inviterName: Auth.auth().currentUser?.displayName ?? "An Encore User",
                     crewDocId: ref.documentID,
                     roles: selectedRoles
                 )
+            } else {
+                print("LOG: New user. Generating invitation code.")
+                let code = await withCheckedContinuation { continuation in
+                    FirebaseUserService.shared.createInvitation(for: ref.documentID, tourId: tourID, inviterId: ownerId) { code in
+                        continuation.resume(returning: code)
+                    }
+                }
+                if let code = code {
+                    try await ref.updateData(["invitationCode": code])
+                    print("LOG: Invitation code '\(code)' saved to crew document.")
+                } else {
+                    print("LOG: Failed to generate an invitation code.")
+                }
             }
             
-            // Reset fields
-            newCrewName = ""; newCrewEmail = ""; roleInput = ""; selectedRoles = [];
-            foundUserId = nil; emailValidationState = .none
+            await MainActor.run {
+                print("LOG: Operation complete. Resetting form.")
+                resetForm()
+            }
+            
         } catch {
-            print("❌ Error saving new crew member: \(error.localizedDescription)")
+            print("❌ ERROR in saveCrewMember: \(error.localizedDescription)")
+            await MainActor.run {
+                isSaving = false
+            }
         }
     }
     
+    private func resetForm() {
+        newCrewName = ""
+        newCrewEmail = ""
+        roleInput = ""
+        selectedRoles.removeAll()
+        showRoleSuggestions = false
+        foundUserId = nil
+        emailValidationState = .none
+        emailCheckTask?.cancel()
+        isSaving = false
+    }
+    
     private func loadCrew() {
+        guard let tourID = tour.id else { return }
         listener?.remove()
         let db = Firestore.firestore()
         
@@ -231,6 +333,7 @@ struct AddCrewSectionView: View {
                     print("Error loading crew: \(error?.localizedDescription ?? "Unknown")")
                     return
                 }
+                print("LOG: Firestore listener received \(documents.count) crew members.")
                 self.crewMembers = documents.compactMap { try? $0.data(as: TourCrew.self) }
             }
     }
