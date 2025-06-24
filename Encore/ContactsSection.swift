@@ -4,14 +4,13 @@ import FirebaseFirestore
 struct ContactsSection: View {
     let userID: String
     let searchText: String
-    let selectedFilter: String
+    let hideGuests: Bool
     @Binding var sortField: String
     @Binding var sortAscending: Bool
 
     @State private var unifiedContacts: [UnifiedContact] = []
     @State private var isLoading: Bool = true
     @State private var contactToEdit: Contact?
-
     var body: some View {
         Group {
             if isLoading {
@@ -38,11 +37,13 @@ struct ContactsSection: View {
     }
 
     private var filteredAndSorted: [UnifiedContact] {
-        let filteredByRole = unifiedContacts.filter { contact in
-            selectedFilter == "All" || contact.roles.contains(selectedFilter)
+        var filtered = unifiedContacts
+        
+        if hideGuests {
+            filtered = filtered.filter { $0.source != "Guest List" }
         }
         
-        let filteredBySearch = filteredByRole.filter { contact in
+        let filteredBySearch = filtered.filter { contact in
             searchText.isEmpty ||
             contact.name.lowercased().contains(searchText.lowercased()) ||
             (contact.email ?? "").lowercased().contains(searchText.lowercased()) ||
@@ -81,6 +82,7 @@ struct ContactsSection: View {
         var allContacts: [UnifiedContact] = []
         var seenEmails = Set<String>()
 
+        
         // 1. Fetch from main 'contacts' collection
         group.enter()
         db.collection("contacts").whereField("ownerId", isEqualTo: userID).getDocuments { snapshot, _ in
@@ -117,10 +119,70 @@ struct ContactsSection: View {
             }
             group.leave()
         }
+        
+        // 4. Fetch Guests
+        group.enter()
+        fetchGuests { guests in
+            for guest in guests {
+                // Assuming guest names are unique enough for this view's purpose
+                allContacts.append(guest)
+            }
+            group.leave()
+        }
 
         group.notify(queue: .main) {
             self.unifiedContacts = allContacts
             self.isLoading = false
+        }
+    }
+    
+    private func fetchGuests(completion: @escaping ([UnifiedContact]) -> Void) {
+        let db = Firestore.firestore()
+        var guestContacts: [UnifiedContact] = []
+        
+        // Step 1: Find all tours owned by the current user
+        db.collection("tours").whereField("ownerId", isEqualTo: userID).getDocuments { toursSnapshot, error in
+            guard let tourDocs = toursSnapshot?.documents, !tourDocs.isEmpty else {
+                completion([])
+                return
+            }
+            let tourIDs = tourDocs.compactMap { $0.documentID }
+
+            // Step 2: Find all shows associated with those tours
+            db.collection("shows").whereField("tourId", in: tourIDs).getDocuments { showsSnapshot, error in
+                guard let showDocs = showsSnapshot?.documents, !showDocs.isEmpty else {
+                    completion([])
+                    return
+                }
+
+                let group = DispatchGroup()
+                
+                // Step 3: For each show, fetch its guest list
+                for showDoc in showDocs {
+                    guard let tourId = showDoc["tourId"] as? String else { continue }
+                    group.enter()
+                    // The path to guestlist is nested under users, which is not ideal for querying.
+                    // This path assumes a different structure, let's correct it based on AddGuestView
+                    // Correct Path: db.collection("users").document(userID)...
+                    // This is inefficient. A collectionGroup query on 'guestlist' would be better,
+                    // but requires adding 'ownerId' to each guest document.
+                    // Using the existing inefficient path:
+                    db.collection("users").document(self.userID).collection("tours").document(tourId).collection("shows").document(showDoc.documentID).collection("guestlist").getDocuments { guestSnapshot, error in
+                        
+                        let guests = guestSnapshot?.documents.compactMap { GuestListItemModel(from: $0) } ?? []
+                        for guest in guests {
+                            let roles = ["Guest"]
+                            let contact = UnifiedContact(id: guest.id, name: guest.name, email: nil, phone: nil, roles: roles, source: "Guest List")
+                            guestContacts.append(contact)
+                        }
+                        group.leave()
+                    }
+                }
+                
+                group.notify(queue: .main) {
+                    completion(guestContacts)
+                }
+            }
         }
     }
 }

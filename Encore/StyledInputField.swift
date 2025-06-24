@@ -7,7 +7,7 @@ struct StyledInputField: View {
     var body: some View {
         TextField(placeholder, text: $text)
             .padding(12)
-            .background(Color.gray.opacity(0.06))
+            .background(Color.black.opacity(0.15))
             .cornerRadius(10)
             .font(.body)
             .textFieldStyle(PlainTextFieldStyle())

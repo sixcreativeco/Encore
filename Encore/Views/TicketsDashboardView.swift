@@ -70,15 +70,16 @@ struct TicketsDashboardView: View {
     private var headerView: some View {
         HStack {
             Text("Tickets")
-                .font(.system(size: 48, weight: .bold))
+                .font(.system(size: 40, weight: .bold))
             Spacer()
             Button(action: { showingAddTicketsSheet = true }) {
                 Image(systemName: "plus")
-                    .font(.title3)
-                    .foregroundColor(.white)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
             }
             .frame(width: 40, height: 40)
-            .background(Circle().fill(Color.blue))
+            .background(Color.black.opacity(0.15))
+            .clipShape(Circle())
             .buttonStyle(.plain)
         }
     }
