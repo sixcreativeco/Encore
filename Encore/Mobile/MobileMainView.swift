@@ -2,28 +2,66 @@ import SwiftUI
 
 struct MobileMainView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selectedTabTag = 0 // Used to programmatically switch tabs
+    @State private var selectedTabTag = 0
+    @State private var isShowingNotifications = false
 
     var body: some View {
         TabView(selection: $selectedTabTag) {
+            // MARK: - Dashboard Tab
+            NavigationView {
+                DashboardView()
+                    .navigationTitle("Dashboard")
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            NavigationLink(destination: MyAccountView()) {
+                                Image(systemName: "person.crop.circle")
+                                    .font(.title2)
+                            }
+                        }
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button(action: { isShowingNotifications = true }) {
+                                Image(systemName: "bell")
+                                    .font(.title2)
+                                    .overlay(alignment: .topTrailing) {
+                                        if !appState.notifications.isEmpty {
+                                            Text("\(appState.notifications.count)")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .padding(5)
+                                                .background(Color.red)
+                                                .clipShape(Circle())
+                                                .offset(x: 8, y: -8)
+                                        }
+                                    }
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Dashboard", systemImage: "rectangle.grid.2x2.fill")
+            }
+            .tag(0)
+            .sheet(isPresented: $isShowingNotifications) {
+                NotificationsView(isPresented: $isShowingNotifications)
+            }
+
             // MARK: - Tours Tab
             NavigationView {
                 TourListView(onTourSelected: { tour in
                     appState.selectedTour = tour
-                    self.selectedTabTag = 1 // Switch to Itinerary tab on selection
+                    self.selectedTabTag = 2 // Switch to Itinerary tab on selection
                 })
                 .navigationTitle("Tours")
             }
             .tabItem {
                 Label("Tours", systemImage: "music.mic")
             }
-            .tag(0)
+            .tag(1)
 
             // MARK: - Itinerary Tab
             NavigationView {
-                // This view shows the itinerary for the tour selected in the first tab
                 if let tour = appState.selectedTour {
-                    TourItineraryView(tour: tour)
+                     TourItineraryView(tour: tour)
                         .navigationTitle(tour.tourName)
                 } else {
                     VStack {
@@ -44,16 +82,6 @@ struct MobileMainView: View {
             }
             .tabItem {
                 Label("Itinerary", systemImage: "calendar")
-            }
-            .tag(1)
-
-            // MARK: - My Account Tab
-            NavigationView {
-                MyAccountView()
-                    .navigationTitle("My Account")
-            }
-            .tabItem {
-                Label("My Account", systemImage: "person.crop.circle")
             }
             .tag(2)
         }

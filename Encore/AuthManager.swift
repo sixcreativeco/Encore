@@ -3,6 +3,7 @@ import Foundation
 @preconcurrency import FirebaseAuth
 import FirebaseFirestore
 import GoogleSignIn
+import FirebaseMessaging // Import FirebaseMessaging
 
 #if os(macOS)
 import AppKit
@@ -20,6 +21,39 @@ class AuthManager: ObservableObject {
     }
 
     @Published var user: User?
+    
+    func updateFCMToken() {
+        guard let userID = user?.uid else { return }
+        
+        Messaging.messaging().token { token, error in
+            if let error = error {
+                print("❌ Error fetching FCM registration token: \(error)")
+                return
+            }
+            
+            guard let fcmToken = token else {
+                print("❌ FCM token was nil.")
+                return
+            }
+            
+            print("✅ FCM Registration Token: \(fcmToken)")
+            
+            let db = Firestore.firestore()
+            let ref = db.collection("users").document(userID)
+            
+            // Using arrayUnion prevents duplicate tokens from being added.
+            // We will store FCM tokens in a new field to avoid confusion.
+            ref.updateData([
+                "fcmTokens": FieldValue.arrayUnion([fcmToken])
+            ]) { error in
+                if let error = error {
+                    print("❌ Error saving FCM token: \(error.localizedDescription)")
+                } else {
+                    print("✅ FCM token saved for user: \(userID)")
+                }
+            }
+        }
+    }
 
     func handleEmailSignIn(email: String, password: String) async throws -> User? {
         do {
@@ -101,7 +135,7 @@ class AuthManager: ObservableObject {
             
             let userData: [String: Any] = [ "uid": userID, "email": self.user?.email ?? "", "displayName": self.user?.displayName ?? "", "createdAt": Timestamp(date: Date()) ]
             try await ref.setData(userData)
-            print("LOG: ✅ User document created for UID: \(userID)")
+            print("✅ User document created for UID: \(userID)")
 
         } catch {
             print("LOG: ❌ Failed creating user document: \(error.localizedDescription)")

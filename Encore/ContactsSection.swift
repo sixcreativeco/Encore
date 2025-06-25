@@ -11,6 +11,8 @@ struct ContactsSection: View {
     @State private var unifiedContacts: [UnifiedContact] = []
     @State private var isLoading: Bool = true
     @State private var contactToEdit: Contact?
+    @EnvironmentObject var appState: AppState
+
     var body: some View {
         Group {
             if isLoading {
@@ -21,10 +23,8 @@ struct ContactsSection: View {
                     sortField: $sortField,
                     sortAscending: $sortAscending,
                     onContactSelected: { unifiedContact in
-                        // Future navigation to a unified detail view can be handled here.
-                        // For now, only contacts from the 'contacts' source can be edited.
                         if unifiedContact.source == "Contacts" {
-                             // This part needs a fuller implementation to fetch the original Contact model for editing.
+                            fetchFullContact(id: unifiedContact.id)
                         }
                     }
                 )
@@ -33,6 +33,7 @@ struct ContactsSection: View {
         .onAppear(perform: fetchAndMergeContacts)
         .sheet(item: $contactToEdit) { contact in
             ContactEditView(contact: contact)
+                .environmentObject(appState)
         }
     }
 
@@ -74,6 +75,25 @@ struct ContactsSection: View {
         }
     }
     
+    private func fetchFullContact(id: String) {
+        let db = Firestore.firestore()
+        db.collection("contacts").document(id).getDocument { document, error in
+            guard let document = document, document.exists else {
+                print("Error fetching contact document: \(error?.localizedDescription ?? "Not found")")
+                return
+            }
+            
+            do {
+                let fullContact = try document.data(as: Contact.self)
+                DispatchQueue.main.async {
+                    self.contactToEdit = fullContact
+                }
+            } catch {
+                print("Error decoding full contact: \(error)")
+            }
+        }
+    }
+    
     private func fetchAndMergeContacts() {
         self.isLoading = true
         
@@ -82,7 +102,6 @@ struct ContactsSection: View {
         var allContacts: [UnifiedContact] = []
         var seenEmails = Set<String>()
 
-        
         // 1. Fetch from main 'contacts' collection
         group.enter()
         db.collection("contacts").whereField("ownerId", isEqualTo: userID).getDocuments { snapshot, _ in
@@ -124,7 +143,6 @@ struct ContactsSection: View {
         group.enter()
         fetchGuests { guests in
             for guest in guests {
-                // Assuming guest names are unique enough for this view's purpose
                 allContacts.append(guest)
             }
             group.leave()
@@ -140,7 +158,6 @@ struct ContactsSection: View {
         let db = Firestore.firestore()
         var guestContacts: [UnifiedContact] = []
         
-        // Step 1: Find all tours owned by the current user
         db.collection("tours").whereField("ownerId", isEqualTo: userID).getDocuments { toursSnapshot, error in
             guard let tourDocs = toursSnapshot?.documents, !tourDocs.isEmpty else {
                 completion([])
@@ -148,7 +165,6 @@ struct ContactsSection: View {
             }
             let tourIDs = tourDocs.compactMap { $0.documentID }
 
-            // Step 2: Find all shows associated with those tours
             db.collection("shows").whereField("tourId", in: tourIDs).getDocuments { showsSnapshot, error in
                 guard let showDocs = showsSnapshot?.documents, !showDocs.isEmpty else {
                     completion([])
@@ -157,16 +173,9 @@ struct ContactsSection: View {
 
                 let group = DispatchGroup()
                 
-                // Step 3: For each show, fetch its guest list
                 for showDoc in showDocs {
                     guard let tourId = showDoc["tourId"] as? String else { continue }
                     group.enter()
-                    // The path to guestlist is nested under users, which is not ideal for querying.
-                    // This path assumes a different structure, let's correct it based on AddGuestView
-                    // Correct Path: db.collection("users").document(userID)...
-                    // This is inefficient. A collectionGroup query on 'guestlist' would be better,
-                    // but requires adding 'ownerId' to each guest document.
-                    // Using the existing inefficient path:
                     db.collection("users").document(self.userID).collection("tours").document(tourId).collection("shows").document(showDoc.documentID).collection("guestlist").getDocuments { guestSnapshot, error in
                         
                         let guests = guestSnapshot?.documents.compactMap { GuestListItemModel(from: $0) } ?? []

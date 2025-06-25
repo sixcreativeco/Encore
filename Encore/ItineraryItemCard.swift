@@ -13,20 +13,47 @@ struct ItineraryItemCard: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: ItineraryItemType(rawValue: item.type)?.iconName ?? "questionmark.circle")
+                            #if os(iOS)
+                            .font(.headline)
+                            #else
                             .font(.title2)
+                            #endif
                         
-                        Text(item.title).font(.headline)
+                        Text(item.title)
+                            #if os(iOS)
+                            .font(.subheadline.weight(.semibold))
+                            #else
+                            .font(.headline)
+                            #endif
+                        
                         Spacer()
                         
                         Text(item.timeUTC.dateValue().formatted(date: .omitted, time: .shortened))
+                            #if os(iOS)
+                            .font(.caption)
+                            #else
+                            .font(.subheadline)
+                            #endif
                     }
 
                     if let subtitle = item.subtitle, !subtitle.isEmpty {
-                        Text(subtitle).font(.subheadline).foregroundColor(.gray)
+                        Text(subtitle)
+                            #if os(iOS)
+                            .font(.caption)
+                            #else
+                            .font(.subheadline)
+                            #endif
+                            .foregroundColor(.gray)
                     }
                     
                     if let note = item.notes, !note.isEmpty {
-                        Text(note).font(.subheadline).foregroundColor(.gray)
+                        Text(note)
+                            #if os(iOS)
+                            .font(.caption)
+                            #else
+                            .font(.subheadline)
+                            #endif
+                            .foregroundColor(.gray)
                     }
                 }
                 .padding()

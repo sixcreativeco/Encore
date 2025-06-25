@@ -17,72 +17,82 @@ struct TourItineraryView: View {
     let calendar = Calendar.current
     
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 16) {
-                let itemsForSelectedDate = allItems.filter {
-                    calendar.isDate($0.timeUTC.dateValue(), inSameDayAs: selectedDate ?? Date())
-                }
-                if itemsForSelectedDate.isEmpty {
-                    Text("No items for this date.").foregroundColor(.gray).padding(.top, 50)
-                } else {
-                    ForEach(itemsForSelectedDate.sorted(by: { $0.timeUTC.dateValue() < $1.timeUTC.dateValue() })) { item in
-                        ItineraryItemCard(item: item, isExpanded: expandedItemID == item.id, onExpandToggle: { toggleExpanded(item) }, onEdit: { self.itemToEdit = item }, onDelete: { deleteItem(item) })
+        ZStack {
+            #if os(iOS)
+            LinearGradient(
+                gradient: Gradient(colors: [Color(red: 0/255, green: 58/255, blue: 83/255), Color(red: 23/255, green: 17/255, blue: 17/255)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            #endif
+
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    let itemsForSelectedDate = allItems.filter {
+                        calendar.isDate($0.timeUTC.dateValue(), inSameDayAs: selectedDate ?? Date())
                     }
-                }
-            }
-            .padding()
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                SectionHeader(title: "Itinerary", onAdd: { isAddingItem = true }).padding()
-                if !availableDates.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(availableDates, id: \.self) { date in
-                                Text(formattedDate(date))
-                                    .fontWeight(calendar.isDate(date, inSameDayAs: selectedDate ?? Date()) ? .bold : .regular)
-                                    .foregroundColor(calendar.isDate(date, inSameDayAs: selectedDate ?? Date()) ? .white : .primary)
-                                    .padding(.vertical, 6).padding(.horizontal, 14)
-                                    .background(calendar.isDate(date, inSameDayAs: selectedDate ?? Date()) ? Color.accentColor : Color.gray.opacity(0.2))
-                                    .cornerRadius(8)
-                                    .onTapGesture { selectedDate = date }
-                            }
+                    if itemsForSelectedDate.isEmpty {
+                        Text("No items for this date.").foregroundColor(.gray).padding(.top, 50)
+                    } else {
+                        ForEach(itemsForSelectedDate.sorted(by: { $0.timeUTC.dateValue() < $1.timeUTC.dateValue() })) { item in
+                            ItineraryItemCard(item: item, isExpanded: expandedItemID == item.id, onExpandToggle: { toggleExpanded(item) }, onEdit: { self.itemToEdit = item }, onDelete: { deleteItem(item) })
                         }
-                        .padding(.horizontal)
                     }
-                    .frame(height: 50)
-                    .padding(.bottom, 8)
+                }
+                .padding()
+            }
+            #if os(iOS)
+            .background(Color.clear)
+            #endif
+            .safeAreaInset(edge: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    SectionHeader(title: "Itinerary", onAdd: { isAddingItem = true }).padding()
+                    if !availableDates.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(availableDates, id: \.self) { date in
+                                    Text(formattedDate(date))
+                                        .fontWeight(calendar.isDate(date, inSameDayAs: selectedDate ?? Date()) ? .bold : .regular)
+                                        .foregroundColor(calendar.isDate(date, inSameDayAs: selectedDate ?? Date()) ? .white : .primary)
+                                        .padding(.vertical, 6).padding(.horizontal, 14)
+                                        .background(calendar.isDate(date, inSameDayAs: selectedDate ?? Date()) ? Color.accentColor : Color.gray.opacity(0.2))
+                                        .cornerRadius(8)
+                                        .onTapGesture { selectedDate = date }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        .frame(height: 50)
+                        .padding(.bottom, 8)
+                    }
+                }
+                .background(.clear)
+            }
+            .onAppear { setupListeners() }
+            .onDisappear { listeners.forEach { $0.remove() } }
+            .sheet(item: $itemToEdit) { item in
+                if let index = allItems.firstIndex(where: { $0.id == item.id }) {
+                    ItineraryItemEditView(
+                        item: $allItems[index],
+                        onSave: {
+                            let updatedItem = allItems[index]
+                            guard let id = updatedItem.id else { return }
+                            try? Firestore.firestore().collection("itineraryItems").document(id).setData(from: updatedItem)
+                        }
+                    )
                 }
             }
-            .background(.clear)
-        }
-        .onAppear { setupListeners() }
-        .onDisappear { listeners.forEach { $0.remove() } }
-        // FIX: This sheet modifier for editing is now fully implemented.
-        .sheet(item: $itemToEdit) { item in
-            // Find the index of the item to create a binding.
-            // This is crucial for editing.
-            if let index = allItems.firstIndex(where: { $0.id == item.id }) {
-                ItineraryItemEditView(
-                    item: $allItems[index],
+            .sheet(isPresented: $isAddingItem) {
+                ItineraryItemAddView(
+                    tourID: tour.id ?? "",
+                    userID: tour.ownerId,
+                    presetDate: selectedDate ?? Date(),
                     onSave: {
-                        let updatedItem = allItems[index]
-                        guard let id = updatedItem.id else { return }
-                        // Save the updated item to Firestore
-                        try? Firestore.firestore().collection("itineraryItems").document(id).setData(from: updatedItem)
+                        // The listener handles the UI update automatically.
                     }
                 )
             }
-        }
-        .sheet(isPresented: $isAddingItem) {
-            ItineraryItemAddView(
-                tourID: tour.id ?? "",
-                userID: tour.ownerId,
-                presetDate: selectedDate ?? Date(),
-                onSave: {
-                    // The listener handles the UI update automatically.
-                }
-            )
         }
     }
 

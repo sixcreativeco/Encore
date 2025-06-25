@@ -3,6 +3,7 @@ import FirebaseFirestore
 
 struct AddShowView: View {
     @Environment(\.dismiss) var dismiss
+    
     var tourID: String
     var userID: String // This is the ownerId
     var artistName: String
@@ -202,7 +203,12 @@ struct AddShowView: View {
                 StyledTimePicker(label: "Time", time: $packOut)
                 Toggle(isOn: $packOutNextDay) {
                     Text("Next Day")
-                }.toggleStyle(.checkbox)
+                }
+                #if os(macOS)
+                .toggleStyle(.checkbox)
+                #else
+                .toggleStyle(.switch)
+                #endif
             }
         }
     }
@@ -228,7 +234,6 @@ struct AddShowView: View {
         }
     }
     
-    // --- FIX IS HERE ---
     private func createFullDate(for time: Date) -> Date {
         let calendar = Calendar.current
         let dateComponents = calendar.dateComponents([.year, .month, .day], from: self.date)
@@ -244,23 +249,19 @@ struct AddShowView: View {
         return calendar.date(from: combinedComponents) ?? Date()
     }
     
-    // --- FIX IS HERE ---
     private func saveShow() {
-        // Use the helper function to create correct timestamps for all timing fields
         let finalVenueAccess = Timestamp(date: createFullDate(for: venueAccess))
         let finalLoadIn = Timestamp(date: createFullDate(for: loadIn))
         let finalSoundCheck = Timestamp(date: createFullDate(for: soundCheck))
         let finalDoorsOpen = Timestamp(date: createFullDate(for: doorsOpen))
         let finalHeadlinerSetTime = Timestamp(date: createFullDate(for: headlinerSetTime))
         
-        // Handle pack out potentially being on the next day
         var finalPackOutDate = createFullDate(for: packOut)
         if packOutNextDay {
             finalPackOutDate = Calendar.current.date(byAdding: .day, value: 1, to: finalPackOutDate) ?? finalPackOutDate
         }
         let finalPackOut = Timestamp(date: finalPackOutDate)
         
-        // The rest of the saving logic uses these corrected timestamps
         let db = Firestore.firestore()
         var supportActIDsToSave: [String] = []
         let batch = db.batch()
@@ -274,7 +275,7 @@ struct AddShowView: View {
                 contactEmail: nil
             )
             let actRef = db.collection("supportActs").document()
-            try? batch.setData(from: newSupportAct, forDocument: actRef)
+            _ = try? batch.setData(from: newSupportAct, forDocument: actRef)
             supportActIDsToSave.append(actRef.documentID)
         }
 
@@ -300,7 +301,7 @@ struct AddShowView: View {
         )
 
         let showRef = db.collection("shows").document()
-        try? batch.setData(from: newShow, forDocument: showRef)
+        _ = try? batch.setData(from: newShow, forDocument: showRef)
         newShow.id = showRef.documentID
         
         createItineraryItems(for: newShow, batch: batch)
@@ -324,7 +325,7 @@ struct AddShowView: View {
             guard let date = date else { return }
             let item = ItineraryItem(tourId: self.tourID, showId: showId, title: title, type: type.rawValue, timeUTC: date)
             let itemRef = db.collection("itineraryItems").document()
-            try? batch.setData(from: item, forDocument: itemRef)
+            _ = try? batch.setData(from: item, forDocument: itemRef)
         }
         
         createItineraryItem(forDate: show.loadIn, type: .loadIn, title: "Load In")

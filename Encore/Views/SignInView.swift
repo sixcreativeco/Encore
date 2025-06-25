@@ -11,10 +11,9 @@ struct SignInView: View {
     @State private var showSignUp: Bool = false
     @State private var isLoading = false
     @State private var errorMessage: String?
-    
     @State private var showJoinView = false
     @State private var invitationDetails: InvitationService.InvitationDetails?
-
+    
     var body: some View {
         HStack(spacing: 0) {
             signInForm
@@ -62,9 +61,11 @@ struct SignInView: View {
                 }
                 .padding(.vertical, 8)
 
+                #if os(macOS)
                 GoogleSignInButton { Task { await handleGoogleSignIn() } }
                     .frame(width: 280, height: 44)
-                    .cornerRadius(8) // Added corner radius to match other fields
+                    .cornerRadius(8)
+                #endif
                 
                 CustomTextField(placeholder: "Email", text: $email)
                 CustomSecureField(placeholder: "Password", text: $password)
@@ -118,6 +119,7 @@ struct SignInView: View {
         }
     }
 
+    #if os(macOS)
     private func handleGoogleSignIn() async {
         guard let presentingWindow = NSApplication.shared.keyWindow else {
             return
@@ -125,6 +127,7 @@ struct SignInView: View {
         
         _ = await AuthManager.shared.handleGoogleSignIn(presentingWindow: presentingWindow)
     }
+    #endif
     
     private func handleEmailSignIn() {
         isLoading = true

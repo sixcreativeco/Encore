@@ -17,6 +17,12 @@
 		EF2B3F7E2E06FE170055B8D3 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F7D2E06FE170055B8D3 /* GoogleSignInSwift */; };
 		EF2B3F802E06FE170055B8D3 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F7F2E06FE170055B8D3 /* Kingfisher */; };
 		EF2B3F822E06FE230055B8D3 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = EF2B3F812E06FE230055B8D3 /* SDWebImageSwiftUI */; };
+		EF2BC47A2E0B21660055B8D3 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = EF2BC4792E0B21660055B8D3 /* FirebaseMessaging */; };
+		EF2BC47C2E0B2AFA0055B8D3 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = EF2BC47B2E0B2AFA0055B8D3 /* FirebaseFunctions */; };
+		EF2BC47E2E0B2B0D0055B8D3 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = EF2BC47D2E0B2B0D0055B8D3 /* FirebaseFunctions */; };
+		EF2BC4822E0B353A0055B8D3 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = EF2BC4812E0B353A0055B8D3 /* FirebaseAppCheck */; };
+		EF2BC4842E0B35420055B8D3 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = EF2BC4832E0B35420055B8D3 /* FirebaseAppCheck */; };
+		EF2BC4862E0C0E620055B8D3 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = EF2BC4852E0C0E620055B8D3 /* FirebaseMessaging */; };
 		EF56FFD52DFA150A00AA14F3 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */; };
 		EFA43B892DEC9A11004781D4 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = EFA43B882DEC9A11004781D4 /* FirebaseAuth */; };
 		EFA43B8B2DEC9A11004781D4 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = EFA43B8A2DEC9A11004781D4 /* FirebaseCore */; };
@@ -68,6 +74,7 @@
 		EF21B6422DF94D4700C9C916 /* Exceptions for "Encore" folder in "Encore" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"GoogleService-Info-iOS.plist",
 				Info.plist,
 				Mobile/MobileMainView.swift,
 				Mobile/MobileTourItineraryView.swift,
@@ -85,9 +92,15 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				AppState.swift,
+				Assets.xcassets,
 				AuthManager.swift,
+				CustomButtonStyles.swift,
+				CustomSecureField.swift,
+				CustomTextEditor.swift,
+				CustomTextField.swift,
 				EncoreApp.swift,
-				"GoogleService-Info.plist",
+				Extensions.swift,
+				"GoogleService-Info-iOS.plist",
 				ItineraryItemCard.swift,
 				ItineraryItemType.swift,
 				Mobile/MobileMainView.swift,
@@ -112,9 +125,29 @@
 				Models/TourCrew.swift,
 				Models/Venue.swift,
 				OfflineSyncManager.swift,
+				SectionHeader.swift,
+				Services/InvitationService.swift,
+				Services/NotificationService.swift,
+				Services/VenueSearchService.swift,
+				StyledButton.swift,
+				StyledButtonV2.swift,
+				StyledDateField.swift,
+				StyledDropdown.swift,
+				StyledInputField.swift,
+				StyledStepper.swift,
+				StyledTimePicker.swift,
 				TourCard.swift,
+				Views/AddShowView.swift,
+				Views/BroadcastView.swift,
+				Views/DashboardView.swift,
+				Views/ItineraryItemAddView.swift,
+				Views/ItineraryItemEditView.swift,
+				Views/JoinTourView.swift,
 				Views/MyAccountView.swift,
+				Views/NotificationsView.swift,
+				Views/SignInDynamicContentView.swift,
 				Views/SignInView.swift,
+				Views/SignUpView.swift,
 				Views/TourItineraryView.swift,
 				Views/TourListView.swift,
 			);
@@ -167,12 +200,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EF2BC47A2E0B21660055B8D3 /* FirebaseMessaging in Frameworks */,
 				EF2B3F7C2E06FE170055B8D3 /* GoogleSignIn in Frameworks */,
 				EF2B3F742E06FDB20055B8D3 /* FirebaseFirestore in Frameworks */,
+				EF2BC47C2E0B2AFA0055B8D3 /* FirebaseFunctions in Frameworks */,
 				EF2B3F802E06FE170055B8D3 /* Kingfisher in Frameworks */,
 				EF2B3F822E06FE230055B8D3 /* SDWebImageSwiftUI in Frameworks */,
 				EF2B3F7E2E06FE170055B8D3 /* GoogleSignInSwift in Frameworks */,
 				EF2B3F782E06FE0C0055B8D3 /* FirebaseCore in Frameworks */,
+				EF2BC4822E0B353A0055B8D3 /* FirebaseAppCheck in Frameworks */,
 				EF2B3F762E06FE0C0055B8D3 /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -198,10 +234,13 @@
 				EF56FFD52DFA150A00AA14F3 /* SDWebImageSwiftUI in Frameworks */,
 				EF21B63E2DF9479600C9C916 /* GoogleSignIn in Frameworks */,
 				EFA43B8B2DEC9A11004781D4 /* FirebaseCore in Frameworks */,
+				EF2BC47E2E0B2B0D0055B8D3 /* FirebaseFunctions in Frameworks */,
 				EFA43BA82DEEB572004781D4 /* FirebaseStorage in Frameworks */,
 				EF11E75C2E01A1EF0091AB32 /* Kingfisher in Frameworks */,
 				EF21B6402DF9479600C9C916 /* GoogleSignInSwift in Frameworks */,
 				EFA43B892DEC9A11004781D4 /* FirebaseAuth in Frameworks */,
+				EF2BC4842E0B35420055B8D3 /* FirebaseAppCheck in Frameworks */,
+				EF2BC4862E0C0E620055B8D3 /* FirebaseMessaging in Frameworks */,
 				EFA43B8D2DEC9A11004781D4 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -284,6 +323,9 @@
 				EF2B3F7D2E06FE170055B8D3 /* GoogleSignInSwift */,
 				EF2B3F7F2E06FE170055B8D3 /* Kingfisher */,
 				EF2B3F812E06FE230055B8D3 /* SDWebImageSwiftUI */,
+				EF2BC4792E0B21660055B8D3 /* FirebaseMessaging */,
+				EF2BC47B2E0B2AFA0055B8D3 /* FirebaseFunctions */,
+				EF2BC4812E0B353A0055B8D3 /* FirebaseAppCheck */,
 			);
 			productName = "Encore Viewer";
 			productReference = EF2B3F272E06F9F00055B8D3 /* Encore Viewer.app */;
@@ -360,6 +402,9 @@
 				EF21B63F2DF9479600C9C916 /* GoogleSignInSwift */,
 				EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */,
 				EF11E75B2E01A1EF0091AB32 /* Kingfisher */,
+				EF2BC47D2E0B2B0D0055B8D3 /* FirebaseFunctions */,
+				EF2BC4832E0B35420055B8D3 /* FirebaseAppCheck */,
+				EF2BC4852E0C0E620055B8D3 /* FirebaseMessaging */,
 			);
 			productName = Encore;
 			productReference = EFA43B5C2DEC967E004781D4 /* Encore.app */;
@@ -594,25 +639,28 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "Encore Viewer/Encore_Viewer.entitlements";
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = "Encore Viewer/Encore Viewer.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = C6D3VXTZCC;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Encore Viewer/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Encore Viewer";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.8.6;
-				PRODUCT_BUNDLE_IDENTIFIER = "SixCreative.Encore-Viewer";
+				MARKETING_VERSION = 1.9.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sixcreative.encoreviewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -626,25 +674,28 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "Encore Viewer/Encore_Viewer.entitlements";
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = "Encore Viewer/Encore Viewer.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = C6D3VXTZCC;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Encore Viewer/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Encore Viewer";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.8.6;
-				PRODUCT_BUNDLE_IDENTIFIER = "SixCreative.Encore-Viewer";
+				MARKETING_VERSION = 1.9.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sixcreative.encoreviewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -883,7 +934,7 @@
 					"$(PROJECT_DIR)/Encore/encore-ticketing-web/node_modules/@unrs/resolver-binding-darwin-arm64",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.9.2;
+				MARKETING_VERSION = 1.9.4;
 				PRODUCT_BUNDLE_IDENTIFIER = SixCreative.Encore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -923,7 +974,7 @@
 					"$(PROJECT_DIR)/Encore/encore-ticketing-web/node_modules/@unrs/resolver-binding-darwin-arm64",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.9.2;
+				MARKETING_VERSION = 1.9.4;
 				PRODUCT_BUNDLE_IDENTIFIER = SixCreative.Encore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1149,6 +1200,36 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EF56FFD32DFA150A00AA14F3 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
 			productName = SDWebImageSwiftUI;
+		};
+		EF2BC4792E0B21660055B8D3 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		EF2BC47B2E0B2AFA0055B8D3 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+		EF2BC47D2E0B2B0D0055B8D3 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+		EF2BC4812E0B353A0055B8D3 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
+		EF2BC4832E0B35420055B8D3 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
+		EF2BC4852E0C0E620055B8D3 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
 		};
 		EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -23,69 +23,82 @@ struct TourListView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 40) {
+        ZStack {
+            #if os(iOS)
+            LinearGradient(
+                gradient: Gradient(colors: [Color(red: 0/255, green: 58/255, blue: 83/255), Color(red: 23/255, green: 17/255, blue: 17/255)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            #endif
 
-                if !currentTours.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Current Tour")
-                            .font(.title.bold())
-                            .padding(.horizontal)
-                        
-                        ForEach(currentTours) { tour in
-                            CurrentTourCard(tour: tour, onTourSelected: onTourSelected)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 40) {
+
+                    if !currentTours.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Current Tour")
+                                .font(.title.bold())
                                 .padding(.horizontal)
-                        }
-                    }
-                }
-
-                if !upcomingTours.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Upcoming")
-                            .font(.title2.bold())
-                            .padding(.horizontal)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                ForEach(upcomingTours) { tour in
-                                    Button(action: {
-                                        onTourSelected?(tour)
-                                    }) {
-                                        TourCard(tour: tour)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
+                        
+                            ForEach(currentTours) { tour in
+                                CurrentTourCard(tour: tour, onTourSelected: onTourSelected)
+                                    .padding(.horizontal)
                             }
-                            .padding(.horizontal)
                         }
                     }
-                }
 
-                if !pastTours.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Past Tours")
-                            .font(.title2.bold())
-                            .padding(.horizontal)
+                    if !upcomingTours.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Upcoming")
+                                .font(.title2.bold())
+                                .padding(.horizontal)
 
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                ForEach(pastTours) { tour in
-                                    Button(action: {
-                                        onTourSelected?(tour)
-                                    }) {
-                                        TourCard(tour: tour)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(upcomingTours) { tour in
+                                        Button(action: {
+                                            onTourSelected?(tour)
+                                        }) {
+                                            TourCard(tour: tour)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
                                     }
-                                    .buttonStyle(PlainButtonStyle())
                                 }
+                                .padding(.horizontal)
                             }
-                            .padding(.horizontal)
+                        }
+                    }
+
+                    if !pastTours.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Past Tours")
+                                .font(.title2.bold())
+                                .padding(.horizontal)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(pastTours) { tour in
+                                        Button(action: {
+                                            onTourSelected?(tour)
+                                        }) {
+                                            TourCard(tour: tour)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
                         }
                     }
                 }
+                .padding(.vertical)
             }
-            .padding(.vertical)
+            #if os(iOS)
+            .background(Color.clear)
+            #endif
         }
-        .background(.clear)
         .onAppear {
             appState.loadTours()
             preloadPosterImages(for: appState.tours)
@@ -108,7 +121,7 @@ fileprivate struct CurrentTourCard: View {
 
     private var compactDateFormatter: DateFormatter {
         let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM yyyy"
+        formatter.dateFormat = "d MMM"
         return formatter
     }
 
@@ -118,62 +131,68 @@ fileprivate struct CurrentTourCard: View {
                 .placeholder { Color.gray.opacity(0.1) }
                 .resizable()
                 .aspectRatio(contentMode: .fill)
+                #if os(macOS)
                 .frame(width: 130, height: 195)
+                #else
+                .frame(width: 100, height: 150)
+                #endif
                 .cornerRadius(8)
 
             VStack(alignment: .leading) {
                 VStack(alignment: .leading, spacing: 8) {
+                    #if os(macOS)
                     Text(tour.artist.uppercased())
                         .font(.headline)
                         .foregroundColor(.secondary)
                         .tracking(1.5)
+                    #endif
                     
                     Text(tour.tourName)
-                        .font(.system(size: 32, weight: .bold))
+                        .font(.system(size: 22, weight: .bold))
 
                     Label("\(compactDateFormatter.string(from: tour.startDate.dateValue())) - \(compactDateFormatter.string(from: tour.endDate.dateValue()))", systemImage: "calendar")
                         .foregroundColor(.secondary)
+                        .font(.caption)
 
                     if let tourManagerName = tourManagerName {
                         Label(tourManagerName, systemImage: "person.fill")
                             .foregroundColor(.secondary)
+                            .font(.caption)
                     }
                     
                     Label("\(showCount) Shows", systemImage: "music.mic")
                         .foregroundColor(.secondary)
+                        .font(.caption)
 
                     Label("\(crewCount) Crew Members", systemImage: "person.3.fill")
                         .foregroundColor(.secondary)
+                        .font(.caption)
                 }
                 .padding(.top, 5)
 
                 Spacer()
 
                 HStack {
-                    Spacer()
                     Button(action: {
                         onTourSelected?(tour)
                     }) {
-                        Text("Go To Tour")
-                            .fontWeight(.semibold)
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 48)
-                            .padding(.vertical, 12)
-                            .background(Color.white)
-                            .cornerRadius(10)
+                        Text("Go to tour")
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.gray.opacity(0.2))
+                            .cornerRadius(8)
+                            .foregroundColor(.primary)
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
         .padding()
-        .frame(height: 220)
         .background(Color.black.opacity(0.25))
         .cornerRadius(16)
-        .onAppear {
-            Task {
-                await fetchExtraTourInfo()
-            }
+        .task {
+            await fetchExtraTourInfo()
         }
     }
 
@@ -202,9 +221,8 @@ fileprivate struct CurrentTourCard: View {
             if let doc = managerSnapshot.documents.first, let crewMember = try? doc.data(as: TourCrew.self) {
                 await MainActor.run { self.tourManagerName = crewMember.name }
             }
-            print("Successfully fetched tour manager.")
         } catch {
-            print("❗️ ERROR fetching tour manager: \(error.localizedDescription). This may require a composite index in Firestore.")
+            print("❗️ ERROR fetching tour manager: \(error.localizedDescription).")
             await MainActor.run { self.tourManagerName = "Not Assigned" }
         }
         

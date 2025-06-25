@@ -15,6 +15,7 @@ struct DashboardView: View {
     // View State
     @State private var isLoading = true
     @State private var showAddShowView = false
+    @State private var isShowingBroadcastView = false
     @State private var expandedItemID: String? = nil
 
     private var compactDateFormatter: DateFormatter {
@@ -24,25 +25,57 @@ struct DashboardView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                header
-                
-                if isLoading {
-                    ProgressView("Loading Dashboard...")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 100)
-                } else {
-                    topPanels
-                    sharedWithYouSection
+        ZStack {
+            // Background for iOS
+            #if os(iOS)
+            LinearGradient(
+                gradient: Gradient(colors: [Color(red: 0/255, green: 58/255, blue: 83/255), Color(red: 23/255, green: 17/255, blue: 17/255)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            #endif
+
+            // Main Content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    header
+                    
+                    if isLoading {
+                        ProgressView("Loading Dashboard...")
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 100)
+                    } else {
+                        topPanels
+                        sharedWithYouSection
+                    }
                 }
+                #if os(macOS)
+                .padding(30)
+                #else
+                .padding()
+                #endif
             }
-            .padding(30)
+            #if os(iOS)
+            .background(Color.clear)
+            #endif
         }
-        .onAppear(perform: loadDashboardData)
+        .task {
+            await loadDashboardData()
+        }
+        .onChange(of: appState.tours) {
+            Task {
+                await loadDashboardData()
+            }
+        }
         .sheet(isPresented: $showAddShowView) {
             if let tour = currentTour {
                 AddShowView(tourID: tour.id ?? "", userID: tour.ownerId, artistName: tour.artist, onSave: {})
+            }
+        }
+        .sheet(isPresented: $isShowingBroadcastView) {
+            if let tour = currentTour {
+                BroadcastView(tour: tour)
             }
         }
     }
@@ -50,6 +83,7 @@ struct DashboardView: View {
     // MARK: - Main UI Sections
 
     private var header: some View {
+        #if os(macOS)
         HStack {
             Text("Dashboard").font(.largeTitle.bold())
             Spacer()
@@ -62,12 +96,16 @@ struct DashboardView: View {
                     .background(Color.black.opacity(0.15)).clipShape(Circle())
             }.buttonStyle(.plain)
         }
+        #else
+        EmptyView()
+        #endif
     }
 
     private var topPanels: some View {
+        #if os(macOS)
         HStack(alignment: .top, spacing: 24) {
             todaySection
-                .frame(maxWidth: 450) // Constrain the width of the Today section
+                .frame(maxWidth: 450)
 
             if let tour = currentTour {
                 currentTourSection(tour: tour)
@@ -76,6 +114,16 @@ struct DashboardView: View {
             }
         }
         .frame(minHeight: 350)
+        #else
+        VStack(alignment: .leading, spacing: 24) {
+            if let tour = currentTour {
+                currentTourSection(tour: tour)
+            } else {
+                noCurrentTourPlaceholder
+            }
+            todaySection
+        }
+        #endif
     }
 
     @ViewBuilder
@@ -87,7 +135,7 @@ struct DashboardView: View {
                 .padding(.top)
 
             if sharedTours.isEmpty {
-                Text("No tours have been shared with you.")
+                Text("No other tours have been shared with you.")
                     .foregroundColor(.secondary)
                     .padding()
                     .frame(maxWidth: .infinity, minHeight: 100, alignment: .center)
@@ -153,8 +201,9 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Current Tour").font(.title2.bold())
             
+            #if os(macOS)
             HStack(alignment: .bottom, spacing: 16) {
-                 DashboardTourCard(posterURL: tour.posterURL)
+                DashboardTourCard(posterURL: tour.posterURL)
                     .frame(width: 180)
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -182,14 +231,25 @@ struct DashboardView: View {
                                 .cornerRadius(8)
                         }.buttonStyle(.plain)
                         
-                        Button(action: { showAddShowView = true }) {
-                            Text("Add Show")
-                                .fontWeight(.semibold)
-                                .padding(.vertical, 8)
-                                .frame(maxWidth: .infinity)
-                                .background(Color.gray.opacity(0.2))
-                                .cornerRadius(8)
-                        }.buttonStyle(.plain)
+                        if appState.userID == tour.ownerId {
+                            Button(action: { isShowingBroadcastView = true }) {
+                                Text("Broadcast")
+                                    .fontWeight(.semibold)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.accentColor.opacity(0.8))
+                                    .cornerRadius(8)
+                            }.buttonStyle(.plain)
+                            
+                            Button(action: { showAddShowView = true }) {
+                                Text("Add Show")
+                                    .fontWeight(.semibold)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.gray.opacity(0.2))
+                                    .cornerRadius(8)
+                            }.buttonStyle(.plain)
+                        }
                     }
                 }
                 .frame(height: 270)
@@ -197,6 +257,52 @@ struct DashboardView: View {
             .padding()
             .background(Color.black.opacity(0.15))
             .cornerRadius(12)
+            #else
+            HStack(alignment: .top, spacing: 16) {
+                DashboardTourCard(posterURL: tour.posterURL)
+                    .frame(width: 100)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(tour.tourName)
+                        .font(.system(size: 20, weight: .bold))
+
+                    Label(tour.artist, systemImage: "music.mic")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    
+                    Label("\(totalShows) Shows", systemImage: "music.note.list")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Button(action: { appState.selectedTour = tour }) {
+                            Text("Go to tour")
+                                .font(.system(size: 12, weight: .semibold))
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .background(Color.gray.opacity(0.2))
+                                .cornerRadius(8)
+                        }.buttonStyle(.plain)
+                        
+                        if appState.userID == tour.ownerId {
+                            Button(action: { isShowingBroadcastView = true }) {
+                                Text("Broadcast")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.accentColor.opacity(0.8))
+                                    .cornerRadius(8)
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(Color.black.opacity(0.15))
+            .cornerRadius(12)
+            #endif
         }
     }
     
@@ -225,119 +331,89 @@ struct DashboardView: View {
 
     // MARK: - Data Loading
 
-    private func loadDashboardData() {
-        guard let userID = appState.userID else { return }
-        self.isLoading = true
-        
-        let group = DispatchGroup()
-        
-        group.enter()
-        loadCurrentTour(userID: userID) { tour in
-            self.currentTour = tour
-            if let activeTour = tour, let tourID = activeTour.id {
-                loadTourDetails(tourID: tourID)
-                
-                self.loadTodayItems(tourID: tourID) { items in
-                    self.todayItems = items.sorted(by: { $0.timeUTC.dateValue() < $1.timeUTC.dateValue() })
-                    group.leave()
-                }
-            } else {
-                self.todayItems = []
-                group.leave()
+    private func loadDashboardData() async {
+        await MainActor.run { isLoading = true }
+
+        let now = Date()
+        let foundTour = appState.tours.first { tour in
+            let start = tour.startDate.dateValue()
+            let end = tour.endDate.dateValue()
+            if Calendar.current.isDate(start, inSameDayAs: end) {
+                return Calendar.current.isDate(now, inSameDayAs: start)
+            }
+            return (start...end).contains(now)
+        }
+
+        await MainActor.run { self.currentTour = foundTour }
+
+        if let tour = foundTour, let tourID = tour.id {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.loadTodayItems(tourID: tourID) }
+                group.addTask { await self.loadExtraTourDetails(tourID: tourID) }
             }
         }
         
-        group.enter()
-        loadSharedTours(userID: userID) { tours in
-            self.sharedTours = tours
-            group.leave()
-        }
-        
-        group.notify(queue: .main) {
+        await MainActor.run {
+            self.sharedTours = appState.tours.filter { $0.id != self.currentTour?.id }
             self.isLoading = false
         }
     }
     
-    private func loadCurrentTour(userID: String, completion: @escaping (Tour?) -> Void) {
+    private func loadExtraTourDetails(tourID: String) async {
         let db = Firestore.firestore()
-        let now = Timestamp(date: Date())
         
-        db.collection("tours")
-            .whereField("ownerId", isEqualTo: userID)
-            .whereField("startDate", isLessThanOrEqualTo: now)
-            .getDocuments { snapshot, _ in
-                let activeTours = snapshot?.documents
-                    .compactMap { try? $0.data(as: Tour.self) }
-                    .filter { $0.endDate >= now }
-                completion(activeTours?.first)
+        async let managerTask = db.collection("tourCrew")
+            .whereField("tourId", isEqualTo: tourID)
+            .whereField("roles", arrayContains: "Tour Manager")
+            .limit(to: 1)
+            .getDocuments()
+
+        async let showsTask = db.collection("shows")
+            .whereField("tourId", isEqualTo: tourID)
+            .getDocuments()
+
+        do {
+            let managerSnapshot = try await managerTask
+            if let doc = managerSnapshot.documents.first, let crewMember = try? doc.data(as: TourCrew.self) {
+                await MainActor.run { self.tourManagerName = crewMember.name }
+            } else {
+                await MainActor.run { self.tourManagerName = "Not Assigned" }
             }
+        } catch {
+            print("Error fetching tour manager: \(error.localizedDescription)")
+            await MainActor.run { self.tourManagerName = "Not Assigned" }
+        }
+        
+        do {
+            let showsSnapshot = try await showsTask
+            await MainActor.run { self.totalShows = showsSnapshot.count }
+        } catch {
+            print("Error fetching show count: \(error.localizedDescription)")
+            await MainActor.run { self.totalShows = 0 }
+        }
     }
     
-    private func loadTodayItems(tourID: String, completion: @escaping ([ItineraryItem]) -> Void) {
+    private func loadTodayItems(tourID: String) async {
         let db = Firestore.firestore()
         
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: Date())
         let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday)!
         
-        db.collection("itineraryItems")
-            .whereField("tourId", isEqualTo: tourID)
-            .whereField("timeUTC", isGreaterThanOrEqualTo: Timestamp(date: startOfToday))
-            .whereField("timeUTC", isLessThan: Timestamp(date: startOfTomorrow))
-            .getDocuments { snapshot, error in
-                guard let documents = snapshot?.documents else {
-                    print("Error fetching today's items: \(error?.localizedDescription ?? "Unknown")")
-                    completion([])
-                    return
-                }
-                let items = documents.compactMap { try? $0.data(as: ItineraryItem.self) }
-                completion(items)
-            }
-    }
-    
-    private func loadSharedTours(userID: String, completion: @escaping ([Tour]) -> Void) {
-        let db = Firestore.firestore()
-        let sharedToursRef = db.collection("users").document(userID).collection("sharedTours")
-        
-        sharedToursRef.getDocuments { snapshot, error in
-            guard let documents = snapshot?.documents, !documents.isEmpty else {
-                completion([])
-                return
-            }
+        do {
+            let snapshot = try await db.collection("itineraryItems")
+                .whereField("tourId", isEqualTo: tourID)
+                .whereField("timeUTC", isGreaterThanOrEqualTo: Timestamp(date: startOfToday))
+                .whereField("timeUTC", isLessThan: Timestamp(date: startOfTomorrow))
+                .getDocuments()
             
-            let tourIDs = documents.map { $0.documentID }
-            
-            db.collection("tours").whereField(FieldPath.documentID(), in: tourIDs)
-                .getDocuments { tourSnapshot, error in
-                    guard let tourDocuments = tourSnapshot?.documents else {
-                        completion([])
-                        return
-                    }
-                    let tours = tourDocuments.compactMap { try? $0.data(as: Tour.self) }
-                    completion(tours)
-                }
+            let items = snapshot.documents.compactMap { try? $0.data(as: ItineraryItem.self) }
+            await MainActor.run {
+                self.todayItems = items.sorted(by: { $0.timeUTC.dateValue() < $1.timeUTC.dateValue() })
+            }
+        } catch {
+            print("Error fetching today's items: \(error.localizedDescription)")
+            await MainActor.run { self.todayItems = [] }
         }
-    }
-
-    private func loadTourDetails(tourID: String) {
-        let db = Firestore.firestore()
-        
-        db.collection("tourCrew")
-            .whereField("tourId", isEqualTo: tourID)
-            .whereField("roles", arrayContains: "Tour Manager")
-            .limit(to: 1)
-            .getDocuments { snapshot, _ in
-                if let doc = snapshot?.documents.first, let crewMember = try? doc.data(as: TourCrew.self) {
-                    self.tourManagerName = crewMember.name
-                } else {
-                    self.tourManagerName = "Not Assigned"
-                }
-            }
-
-        db.collection("shows")
-            .whereField("tourId", isEqualTo: tourID)
-            .getDocuments { snapshot, _ in
-                self.totalShows = snapshot?.documents.count ?? 0
-            }
     }
 }
