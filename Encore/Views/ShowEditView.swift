@@ -15,18 +15,39 @@ struct ShowEditView: View {
     @State private var doorsOpen: Date
     @State private var headlinerSetTime: Date
     @State private var packOut: Date
+    
+    // State for the delete confirmation alert
+    @State private var isShowingDeleteAlert = false
 
     init(tour: Tour, show: Binding<Show>) {
         self.tour = tour
         self._show = show
         
-        self._date = State(initialValue: show.wrappedValue.date.dateValue())
-        self._venueAccess = State(initialValue: show.wrappedValue.venueAccess?.dateValue() ?? ShowEditView.defaultTime(hour: 12))
-        self._loadIn = State(initialValue: show.wrappedValue.loadIn?.dateValue() ?? ShowEditView.defaultTime(hour: 15))
-        self._soundCheck = State(initialValue: show.wrappedValue.soundCheck?.dateValue() ?? ShowEditView.defaultTime(hour: 17))
-        self._doorsOpen = State(initialValue: show.wrappedValue.doorsOpen?.dateValue() ?? ShowEditView.defaultTime(hour: 19))
-        self._headlinerSetTime = State(initialValue: show.wrappedValue.headlinerSetTime?.dateValue() ?? ShowEditView.defaultTime(hour: 20))
-        self._packOut = State(initialValue: show.wrappedValue.packOut?.dateValue() ?? ShowEditView.defaultTime(hour: 23))
+        // Helper function to translate a date from the event's timezone to the user's local timezone for display
+        func dateInUserLocale(from eventTimestamp: Timestamp?) -> Date? {
+            guard let eventTimestamp = eventTimestamp else { return nil }
+            let eventDate = eventTimestamp.dateValue()
+
+            // Get components from the date in its local timezone
+            var eventCalendar = Calendar.current
+            eventCalendar.timeZone = TimeZone(identifier: show.wrappedValue.timezone ?? "UTC") ?? .current
+            let components = eventCalendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: eventDate)
+
+            // Create a new date from those same components, but in the user's local calendar
+            var userCalendar = Calendar.current // This uses the device's timezone
+            return userCalendar.date(from: components)
+        }
+        
+        let showDateForPicker = dateInUserLocale(from: show.wrappedValue.date) ?? Date()
+
+        // Initialize local state from the binding, adjusted for display
+        self._date = State(initialValue: showDateForPicker)
+        self._venueAccess = State(initialValue: dateInUserLocale(from: show.wrappedValue.venueAccess) ?? ShowEditView.defaultTime(for: showDateForPicker, hour: 12))
+        self._loadIn = State(initialValue: dateInUserLocale(from: show.wrappedValue.loadIn) ?? ShowEditView.defaultTime(for: showDateForPicker, hour: 15))
+        self._soundCheck = State(initialValue: dateInUserLocale(from: show.wrappedValue.soundCheck) ?? ShowEditView.defaultTime(for: showDateForPicker, hour: 17))
+        self._doorsOpen = State(initialValue: dateInUserLocale(from: show.wrappedValue.doorsOpen) ?? ShowEditView.defaultTime(for: showDateForPicker, hour: 19))
+        self._headlinerSetTime = State(initialValue: dateInUserLocale(from: show.wrappedValue.headlinerSetTime) ?? ShowEditView.defaultTime(for: showDateForPicker, hour: 20))
+        self._packOut = State(initialValue: dateInUserLocale(from: show.wrappedValue.packOut) ?? ShowEditView.defaultTime(for: showDateForPicker, hour: 23))
     }
 
     var body: some View {
@@ -37,11 +58,21 @@ struct ShowEditView: View {
                 timingSection
                 headlinerSection
                 packOutSection
-                saveButton
+                actionButtons
             }
             .padding()
         }
         .frame(minWidth: 600, maxWidth: .infinity)
+        .alert("Delete Show?", isPresented: $isShowingDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteShow()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to permanently delete this show and its associated itinerary items? This action cannot be undone.")
+        }
     }
 
     private var headerSection: some View {
@@ -120,13 +151,30 @@ struct ShowEditView: View {
                 Toggle(isOn: optionalBoolBinding(for: $show.packOutNextDay)) {
                     Text("Next Day")
                 }
+                #if os(macOS)
                 .toggleStyle(.checkbox)
+                #else
+                .toggleStyle(.switch)
+                #endif
             }
         }
     }
 
-    private var saveButton: some View {
-        StyledButtonV2(title: "Save Changes", action: saveChanges, fullWidth: true, showArrow: true)
+    private var actionButtons: some View {
+        VStack(spacing: 12) {
+            StyledButtonV2(title: "Save Changes", action: saveChanges, fullWidth: true, showArrow: true)
+            
+            Button(action: {
+                isShowingDeleteAlert = true
+            }) {
+                Text("Delete Show")
+                    .foregroundColor(.red)
+                    .font(.subheadline)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 8)
+        }
     }
     
     private func optionalStringBinding(for binding: Binding<String?>) -> Binding<String> {
@@ -140,38 +188,43 @@ struct ShowEditView: View {
     private func optionalBoolBinding(for binding: Binding<Bool?>) -> Binding<Bool> {
         Binding<Bool>(get: { binding.wrappedValue ?? false }, set: { binding.wrappedValue = $0 })
     }
-
-    // This helper function correctly combines the selected show date with a specific time.
-    private func createFullDate(for time: Date) -> Date {
-        let calendar = Calendar.current
-        let dateComponents = calendar.dateComponents([.year, .month, .day], from: self.date)
-        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
-        
-        var combinedComponents = DateComponents()
-        combinedComponents.year = dateComponents.year
-        combinedComponents.month = dateComponents.month
-        combinedComponents.day = dateComponents.day
-        combinedComponents.hour = timeComponents.hour
-        combinedComponents.minute = timeComponents.minute
-        
-        return calendar.date(from: combinedComponents) ?? Date()
-    }
-
+    
     private func saveChanges() {
         guard let showID = show.id else {
             print("Error: Show ID is missing, cannot save.")
             return
         }
+
+        let eventTimeZone = TimeZone(identifier: show.timezone ?? "UTC") ?? .current
         
-        // 1. Update the main 'show' binding with the corrected timestamps
-        show.date = Timestamp(date: date)
-        show.venueAccess = Timestamp(date: createFullDate(for: venueAccess))
-        show.loadIn = Timestamp(date: createFullDate(for: loadIn))
-        show.soundCheck = Timestamp(date: createFullDate(for: soundCheck))
-        show.doorsOpen = Timestamp(date: createFullDate(for: doorsOpen))
-        show.headlinerSetTime = Timestamp(date: createFullDate(for: headlinerSetTime))
+        func createTimestampInEventZone(for time: Date, on day: Date, in timezone: TimeZone) -> Timestamp {
+            let localCalendar = Calendar.current
+            let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: day)
+            let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
+            
+            var eventCalendar = Calendar(identifier: .gregorian)
+            eventCalendar.timeZone = timezone
+
+            var finalComponents = DateComponents()
+            finalComponents.year = dateComponents.year
+            finalComponents.month = dateComponents.month
+            finalComponents.day = dateComponents.day
+            finalComponents.hour = timeComponents.hour
+            finalComponents.minute = timeComponents.minute
+            finalComponents.timeZone = timezone
+            
+            let finalDate = eventCalendar.date(from: finalComponents) ?? Date()
+            return Timestamp(date: finalDate)
+        }
         
-        var finalPackOutDate = createFullDate(for: packOut)
+        show.date = createTimestampInEventZone(for: date, on: date, in: eventTimeZone)
+        show.venueAccess = createTimestampInEventZone(for: venueAccess, on: date, in: eventTimeZone)
+        show.loadIn = createTimestampInEventZone(for: loadIn, on: date, in: eventTimeZone)
+        show.soundCheck = createTimestampInEventZone(for: soundCheck, on: date, in: eventTimeZone)
+        show.doorsOpen = createTimestampInEventZone(for: doorsOpen, on: date, in: eventTimeZone)
+        show.headlinerSetTime = createTimestampInEventZone(for: headlinerSetTime, on: date, in: eventTimeZone)
+        
+        var finalPackOutDate = createTimestampInEventZone(for: packOut, on: date, in: eventTimeZone).dateValue()
         if show.packOutNextDay == true {
             finalPackOutDate = Calendar.current.date(byAdding: .day, value: 1, to: finalPackOutDate) ?? finalPackOutDate
         }
@@ -181,16 +234,13 @@ struct ShowEditView: View {
         let showRef = db.collection("shows").document(showID)
         let itineraryQuery = db.collection("itineraryItems").whereField("showId", isEqualTo: showID)
 
-        // 2. Fetch the itinerary documents that need to be updated first.
         itineraryQuery.getDocuments { (itinerarySnapshot, error) in
             if let error = error {
                 print("Error fetching itinerary items to update: \(error.localizedDescription)")
                 return
             }
             
-            // 3. Now that we have the documents, run the transaction.
             db.runTransaction({ (transaction, errorPointer) -> Any? in
-                // A. Update the main Show document within the transaction.
                 do {
                     try transaction.setData(from: self.show, forDocument: showRef, merge: true)
                 } catch let fetchError as NSError {
@@ -198,7 +248,6 @@ struct ShowEditView: View {
                     return nil
                 }
                 
-                // B. Loop through the itinerary documents we fetched and update their times.
                 itinerarySnapshot?.documents.forEach { doc in
                     guard let itemType = ItineraryItemType(rawValue: doc["type"] as? String ?? "") else { return }
                     
@@ -209,7 +258,7 @@ struct ShowEditView: View {
                     case .doors:            newTime = self.show.doorsOpen
                     case .headline:         newTime = self.show.headlinerSetTime
                     case .packOut:          newTime = self.show.packOut
-                    default:                return
+                    default:                 return
                     }
                     
                     if let newTime = newTime {
@@ -229,10 +278,44 @@ struct ShowEditView: View {
         }
     }
     
-    private static func defaultTime(hour: Int) -> Date {
-        var components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+    private func deleteShow() async {
+        guard let showID = show.id else {
+            print("Error: Show ID is missing, cannot delete.")
+            return
+        }
+
+        let db = Firestore.firestore()
+        let batch = db.batch()
+
+        // 1. Delete the Show document itself
+        let showRef = db.collection("shows").document(showID)
+        batch.deleteDocument(showRef)
+
+        // 2. Find and delete all itinerary items associated with this show
+        do {
+            let itinerarySnapshot = try await db.collection("itineraryItems").whereField("showId", isEqualTo: showID).getDocuments()
+            for document in itinerarySnapshot.documents {
+                batch.deleteDocument(document.reference)
+            }
+            
+            // NOTE: A full production implementation should use a Cloud Function
+            // to delete other related data like setlists, guest lists, and ticketed events
+            // to ensure data integrity. This client-side delete is limited in scope.
+
+            // 3. Commit the batch
+            try await batch.commit()
+            print("✅ Show and associated itinerary items deleted successfully.")
+            dismiss()
+        } catch {
+            print("❌ Error deleting show: \(error.localizedDescription)")
+            // Optionally, show an error alert to the user
+        }
+    }
+    
+    private static func defaultTime(for date: Date, hour: Int) -> Date {
+        var components = Calendar.current.dateComponents([.year, .month, .day], from: date)
         components.hour = hour
         components.minute = 0
-        return Calendar.current.date(from: components) ?? Date()
+        return Calendar.current.date(from: components) ?? date
     }
 }

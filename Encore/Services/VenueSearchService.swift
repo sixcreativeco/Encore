@@ -7,7 +7,7 @@ class VenueSearchService: ObservableObject {
     private var currentSearch: MKLocalSearch?
 
     func searchVenues(query: String) {
-        currentSearch?.cancel()  // cancel previous search to avoid stacking
+        currentSearch?.cancel()
 
         guard !query.isEmpty else {
             self.results = []
@@ -25,11 +25,13 @@ class VenueSearchService: ObservableObject {
             DispatchQueue.main.async {
                 if let mapItems = response?.mapItems {
                     self?.results = mapItems.map {
+                        // The result now includes the placemark's timezone object
                         VenueResult(
                             name: $0.name ?? "",
                             address: $0.placemark.title ?? "",
                             city: $0.placemark.locality ?? "",
-                            country: $0.placemark.country ?? ""
+                            country: $0.placemark.country ?? "",
+                            timeZone: $0.placemark.timeZone
                         )
                     }
                 } else {
@@ -46,4 +48,5 @@ struct VenueResult: Identifiable {
     let address: String
     let city: String
     let country: String
+    let timeZone: TimeZone? // Added timezone property
 }

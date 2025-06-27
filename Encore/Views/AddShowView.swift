@@ -1,39 +1,50 @@
 import SwiftUI
 import FirebaseFirestore
+import CoreLocation
 
 struct AddShowView: View {
     @Environment(\.dismiss) var dismiss
     
     var tourID: String
-    var userID: String // This is the ownerId
+    var userID: String
     var artistName: String
     var onSave: () -> Void
 
+    // Venue state
+    @StateObject private var venueSearch = VenueSearchService()
+    @State private var venueQuery = ""
+    @State private var showVenueSuggestions = false
+    @State private var selectedVenue: VenueResult?
+    
+    // Show details state
     @State private var city = ""
     @State private var country = ""
-    @State private var venue = ""
+    @State private var venueName = ""
     @State private var address = ""
     @State private var contactName = ""
     @State private var contactEmail = ""
     @State private var contactPhone = ""
-    @State private var date = Date()
+    
+    // Date and time state
+    @State private var showDate = Date()
     @State private var venueAccess = defaultTime(hour: 12)
     @State private var loadIn = defaultTime(hour: 15)
     @State private var soundCheck = defaultTime(hour: 17)
     @State private var doorsOpen = defaultTime(hour: 19)
-
-    @State private var supportActs: [SupportActInput] = [SupportActInput()]
-    @State private var allSupportActs: [String] = []
-
     @State private var headlinerSetTime = defaultTime(hour: 20)
-    @State private var headlinerSetDurationMinutes = 60
-
     @State private var packOut = defaultTime(hour: 23)
     @State private var packOutNextDay = false
+    
+    // Support Act State
+    @State private var supportActs: [SupportActInput] = [SupportActInput()]
+    @State private var allSupportActs: [String] = []
+    
+    @State private var headlinerSetDurationMinutes = 60
 
-    @StateObject private var venueSearch = VenueSearchService()
-    @State private var venueQuery = ""
-    @State private var showVenueSuggestions = false
+    // View State
+    @State private var isSaving = false
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
 
     struct SupportActInput: Identifiable {
         var id = UUID().uuidString
@@ -48,7 +59,17 @@ struct AddShowView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
-                headerSection
+                HStack {
+                    Text("Add Show").font(.largeTitle.bold())
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 24, weight: .medium))
+                            .padding(10)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
                 showDetailsSection
                 timingSection
                 supportActSection
@@ -61,47 +82,43 @@ struct AddShowView: View {
                 loadSupportActs()
                 loadDefaultShowDate()
             }
+            .alert("Save Error", isPresented: $showingAlert) {
+                Button("OK") { }
+            } message: {
+                Text(alertMessage)
+            }
         }
         .frame(minWidth: 600, maxWidth: .infinity)
-    }
-
-    private var headerSection: some View {
-        HStack {
-            Text("Add Show").font(.largeTitle.bold())
-            Spacer()
-            Button(action: { dismiss() }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 24, weight: .medium))
-                    .padding(10)
-            }
-            .buttonStyle(.plain)
-        }
     }
 
     private var showDetailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Date").font(.headline)
-            HStack {
-                StyledDateField(date: $date)
-                    .frame(width: 200)
-                    .padding(.leading, -40)
-                Spacer()
-            }
-            .padding(.bottom, -8)
+            StyledDateField(date: $showDate)
+                 .frame(maxWidth: .infinity, alignment: .leading)
+            
             Text("Venue").font(.headline)
             VStack(alignment: .leading, spacing: 8) {
-                StyledInputField(placeholder: "Venue", text: $venueQuery)
+                StyledInputField(placeholder: "Search for Venue...", text: $venueQuery)
                     .onChange(of: venueQuery) { _, newValue in
-                        showVenueSuggestions = !newValue.isEmpty
-                        venueSearch.searchVenues(query: newValue)
+                        if newValue != selectedVenue?.name {
+                            self.selectedVenue = nil
+                            showVenueSuggestions = !newValue.isEmpty
+                            venueSearch.searchVenues(query: newValue)
+                        }
                     }
+                
                 if showVenueSuggestions && !venueSearch.results.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        ForEach(venueSearch.results.prefix(5)) { result in
+                        ForEach(venueSearch.results) { result in
                             Button(action: {
-                                venue = result.name; address = result.address; city = result.city
-                                country = result.country; venueQuery = result.name; showVenueSuggestions = false
-                                venueSearch.results = []
+                                self.selectedVenue = result
+                                self.venueName = result.name
+                                self.address = result.address
+                                self.city = result.city
+                                self.country = result.country
+                                self.venueQuery = result.name
+                                self.showVenueSuggestions = false
                             }) {
                                 VStack(alignment: .leading) {
                                     Text(result.name).font(.body)
@@ -138,7 +155,7 @@ struct AddShowView: View {
             }
         }
     }
-
+    
     private var supportActSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Support Acts").font(.headline)
@@ -201,9 +218,7 @@ struct AddShowView: View {
             Text("Pack Out").font(.headline)
             HStack(spacing: 16) {
                 StyledTimePicker(label: "Time", time: $packOut)
-                Toggle(isOn: $packOutNextDay) {
-                    Text("Next Day")
-                }
+                Toggle(isOn: $packOutNextDay) { Text("Next Day") }
                 #if os(macOS)
                 .toggleStyle(.checkbox)
                 #else
@@ -214,7 +229,168 @@ struct AddShowView: View {
     }
 
     private var saveButton: some View {
-        StyledButtonV2(title: "Save Show", action: saveShow, fullWidth: true, showArrow: true)
+        Button(action: { Task { await saveShow() } }) {
+            HStack {
+                Spacer()
+                if isSaving {
+                    ProgressView().colorInvert()
+                } else {
+                    Text("Save Show").fontWeight(.semibold)
+                }
+                Spacer()
+            }
+            .padding()
+            .background(isSaving ? Color.gray : Color.accentColor)
+            .foregroundColor(.white)
+            .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
+        .disabled(isSaving)
+    }
+
+    private func getEventTimezone() async throws -> TimeZone {
+        if let timeZone = selectedVenue?.timeZone { return timeZone }
+        
+        guard !address.isEmpty else {
+            throw NSError(domain: "AppError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Please select a venue from the search results or enter a full address to determine the timezone."])
+        }
+        
+        let geocoder = CLGeocoder()
+        let placemarks = try? await geocoder.geocodeAddressString(address)
+        
+        if let timeZone = placemarks?.first?.timeZone {
+            return timeZone
+        } else {
+            throw NSError(domain: "AppError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not determine a timezone for the address entered. Please check the address is complete."])
+        }
+    }
+    
+    // --- THIS FUNCTION CONTAINS THE CORE FIX ---
+    private func saveShow() async {
+        isSaving = true
+        do {
+            let eventTimeZone = try await getEventTimezone()
+            
+            // This helper function now correctly creates a Timestamp based on the venue's timezone.
+            func createTimestampInEventZone(for time: Date, on day: Date, in timezone: TimeZone) -> Timestamp {
+                let localCalendar = Calendar.current
+                let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: day)
+                let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
+                
+                var eventCalendar = Calendar(identifier: .gregorian)
+                eventCalendar.timeZone = timezone
+
+                var finalComponents = DateComponents()
+                finalComponents.year = dateComponents.year
+                finalComponents.month = dateComponents.month
+                finalComponents.day = dateComponents.day
+                finalComponents.hour = timeComponents.hour
+                finalComponents.minute = timeComponents.minute
+                finalComponents.timeZone = timezone
+                
+                let finalDate = eventCalendar.date(from: finalComponents) ?? Date()
+                return Timestamp(date: finalDate)
+            }
+            
+            let db = Firestore.firestore()
+            let batch = db.batch()
+            var supportActIDsToSave: [String] = []
+
+            for sa in supportActs.filter({ !$0.name.isEmpty }) {
+                let actRef = db.collection("supportActs").document()
+                let newSupportAct = SupportAct(tourId: self.tourID, name: sa.name.trimmingCharacters(in: .whitespacesAndNewlines), type: SupportAct.ActType(rawValue: sa.type) ?? .Touring, contactEmail: nil)
+                try batch.setData(from: newSupportAct, forDocument: actRef)
+                supportActIDsToSave.append(actRef.documentID)
+            }
+            
+            var packOutDate = createTimestampInEventZone(for: packOut, on: showDate, in: eventTimeZone).dateValue()
+            if packOutNextDay {
+                packOutDate = Calendar.current.date(byAdding: .day, value: 1, to: packOutDate) ?? packOutDate
+            }
+
+            var newShow = Show(
+                tourId: self.tourID,
+                date: createTimestampInEventZone(for: showDate, on: showDate, in: eventTimeZone),
+                city: city, country: country.isEmpty ? nil : country,
+                venueName: venueName, venueAddress: address,
+                timezone: eventTimeZone.identifier,
+                contactName: contactName.isEmpty ? nil : contactName,
+                contactEmail: contactEmail.isEmpty ? nil : contactEmail,
+                contactPhone: contactPhone.isEmpty ? nil : contactPhone,
+                venueAccess: createTimestampInEventZone(for: venueAccess, on: showDate, in: eventTimeZone),
+                loadIn: createTimestampInEventZone(for: loadIn, on: showDate, in: eventTimeZone),
+                soundCheck: createTimestampInEventZone(for: soundCheck, on: showDate, in: eventTimeZone),
+                doorsOpen: createTimestampInEventZone(for: doorsOpen, on: showDate, in: eventTimeZone),
+                headlinerSetTime: createTimestampInEventZone(for: headlinerSetTime, on: showDate, in: eventTimeZone),
+                headlinerSetDurationMinutes: headlinerSetDurationMinutes,
+                packOut: Timestamp(date: packOutDate),
+                packOutNextDay: packOutNextDay,
+                supportActIds: supportActIDsToSave.isEmpty ? nil : supportActIDsToSave
+            )
+            
+            let showRef = db.collection("shows").document()
+            try batch.setData(from: newShow, forDocument: showRef)
+            newShow.id = showRef.documentID
+            
+            createItineraryItems(for: newShow, batch: batch, eventTimeZone: eventTimeZone)
+            
+            try await batch.commit()
+            
+            await MainActor.run {
+                self.onSave()
+                self.dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                self.alertMessage = error.localizedDescription
+                self.showingAlert = true
+                self.isSaving = false
+            }
+        }
+    }
+
+    private func createItineraryItems(for show: Show, batch: WriteBatch, eventTimeZone: TimeZone) {
+        guard let showId = show.id else { return }
+        
+        func createItineraryItem(forDate date: Timestamp?, type: ItineraryItemType, title: String) {
+            guard let date = date else { return }
+            let item = ItineraryItem(
+                tourId: self.tourID, showId: showId, title: title, type: type.rawValue, timeUTC: date,
+                subtitle: nil, notes: nil, timezone: eventTimeZone.identifier,
+                visibility: "Everyone", visibleTo: nil
+            )
+            let itemRef = Firestore.firestore().collection("itineraryItems").document()
+            try? batch.setData(from: item, forDocument: itemRef)
+        }
+        
+        createItineraryItem(forDate: show.venueAccess, type: .custom, title: "Venue Access")
+        createItineraryItem(forDate: show.loadIn, type: .loadIn, title: "Load In")
+        createItineraryItem(forDate: show.soundCheck, type: .soundcheck, title: "Soundcheck")
+        createItineraryItem(forDate: show.doorsOpen, type: .doors, title: "Doors Open")
+        createItineraryItem(forDate: show.headlinerSetTime, type: .headline, title: "\(self.artistName) Set")
+        createItineraryItem(forDate: show.packOut, type: .packOut, title: "Pack Out")
+
+        for sa in supportActs.filter({ !$0.name.isEmpty }) {
+            // This logic needs to be timezone-aware as well
+            var calendar = Calendar.current
+            calendar.timeZone = eventTimeZone
+            let showDayComponents = calendar.dateComponents([.year, .month, .day], from: show.date.dateValue())
+
+            var soundcheckComponents = calendar.dateComponents([.hour, .minute], from: sa.soundCheck)
+            soundcheckComponents.year = showDayComponents.year
+            soundcheckComponents.month = showDayComponents.month
+            soundcheckComponents.day = showDayComponents.day
+            let soundcheckDate = calendar.date(from: soundcheckComponents) ?? Date()
+
+            var setTimeComponents = calendar.dateComponents([.hour, .minute], from: sa.setTime)
+            setTimeComponents.year = showDayComponents.year
+            setTimeComponents.month = showDayComponents.month
+            setTimeComponents.day = showDayComponents.day
+            let setTimeDate = calendar.date(from: setTimeComponents) ?? Date()
+
+            createItineraryItem(forDate: Timestamp(date: soundcheckDate), type: .soundcheck, title: "\(sa.name) Soundcheck")
+            createItineraryItem(forDate: Timestamp(date: setTimeDate), type: .custom, title: "\(sa.name) Set")
+        }
     }
 
     private func loadSupportActs() {
@@ -224,118 +400,13 @@ struct AddShowView: View {
                 self.allSupportActs = snapshot?.documents.compactMap { try? $0.data(as: SupportAct.self).name } ?? []
             }
     }
-
+    
     private func loadDefaultShowDate() {
         let db = Firestore.firestore()
         db.collection("tours").document(tourID).getDocument { snapshot, _ in
             if let tour = try? snapshot?.data(as: Tour.self) {
-                self.date = tour.startDate.dateValue()
+                self.showDate = tour.startDate.dateValue()
             }
-        }
-    }
-    
-    private func createFullDate(for time: Date) -> Date {
-        let calendar = Calendar.current
-        let dateComponents = calendar.dateComponents([.year, .month, .day], from: self.date)
-        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
-        
-        var combinedComponents = DateComponents()
-        combinedComponents.year = dateComponents.year
-        combinedComponents.month = dateComponents.month
-        combinedComponents.day = dateComponents.day
-        combinedComponents.hour = timeComponents.hour
-        combinedComponents.minute = timeComponents.minute
-        
-        return calendar.date(from: combinedComponents) ?? Date()
-    }
-    
-    private func saveShow() {
-        let finalVenueAccess = Timestamp(date: createFullDate(for: venueAccess))
-        let finalLoadIn = Timestamp(date: createFullDate(for: loadIn))
-        let finalSoundCheck = Timestamp(date: createFullDate(for: soundCheck))
-        let finalDoorsOpen = Timestamp(date: createFullDate(for: doorsOpen))
-        let finalHeadlinerSetTime = Timestamp(date: createFullDate(for: headlinerSetTime))
-        
-        var finalPackOutDate = createFullDate(for: packOut)
-        if packOutNextDay {
-            finalPackOutDate = Calendar.current.date(byAdding: .day, value: 1, to: finalPackOutDate) ?? finalPackOutDate
-        }
-        let finalPackOut = Timestamp(date: finalPackOutDate)
-        
-        let db = Firestore.firestore()
-        var supportActIDsToSave: [String] = []
-        let batch = db.batch()
-
-        for sa in supportActs.filter({ !$0.name.isEmpty }) {
-            let trimmedName = sa.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            let newSupportAct = SupportAct(
-                tourId: self.tourID,
-                name: trimmedName,
-                type: SupportAct.ActType(rawValue: sa.type) ?? .Touring,
-                contactEmail: nil
-            )
-            let actRef = db.collection("supportActs").document()
-            _ = try? batch.setData(from: newSupportAct, forDocument: actRef)
-            supportActIDsToSave.append(actRef.documentID)
-        }
-
-        var newShow = Show(
-            tourId: self.tourID,
-            date: Timestamp(date: date),
-            city: city,
-            country: country.isEmpty ? nil : country,
-            venueName: venueQuery,
-            venueAddress: address,
-            contactName: contactName.isEmpty ? nil : contactName,
-            contactEmail: contactEmail.isEmpty ? nil : contactEmail,
-            contactPhone: contactPhone.isEmpty ? nil : contactPhone,
-            venueAccess: finalVenueAccess,
-            loadIn: finalLoadIn,
-            soundCheck: finalSoundCheck,
-            doorsOpen: finalDoorsOpen,
-            headlinerSetTime: finalHeadlinerSetTime,
-            headlinerSetDurationMinutes: headlinerSetDurationMinutes,
-            packOut: finalPackOut,
-            packOutNextDay: packOutNextDay,
-            supportActIds: supportActIDsToSave.isEmpty ? nil : supportActIDsToSave
-        )
-
-        let showRef = db.collection("shows").document()
-        _ = try? batch.setData(from: newShow, forDocument: showRef)
-        newShow.id = showRef.documentID
-        
-        createItineraryItems(for: newShow, batch: batch)
-        
-        batch.commit { error in
-            if let error = error {
-                print("❌ Error saving show: \(error.localizedDescription)")
-            } else {
-                print("✅ Show, Support Acts, and Itinerary Items saved successfully.")
-                self.onSave()
-                self.dismiss()
-            }
-        }
-    }
-    
-    private func createItineraryItems(for show: Show, batch: WriteBatch) {
-        guard let showId = show.id else { return }
-        let db = Firestore.firestore()
-
-        func createItineraryItem(forDate date: Timestamp?, type: ItineraryItemType, title: String) {
-            guard let date = date else { return }
-            let item = ItineraryItem(tourId: self.tourID, showId: showId, title: title, type: type.rawValue, timeUTC: date)
-            let itemRef = db.collection("itineraryItems").document()
-            _ = try? batch.setData(from: item, forDocument: itemRef)
-        }
-        
-        createItineraryItem(forDate: show.loadIn, type: .loadIn, title: "Load In")
-        createItineraryItem(forDate: show.soundCheck, type: .soundcheck, title: "Soundcheck")
-        createItineraryItem(forDate: show.doorsOpen, type: .doors, title: "Doors Open")
-        createItineraryItem(forDate: show.headlinerSetTime, type: .headline, title: "\(self.artistName) Set")
-        
-        for sa in supportActs.filter({ !$0.name.isEmpty }) {
-            createItineraryItem(forDate: Timestamp(date: createFullDate(for: sa.soundCheck)), type: .soundcheck, title: "\(sa.name) Soundcheck")
-            createItineraryItem(forDate: Timestamp(date: createFullDate(for: sa.setTime)), type: .custom, title: "\(sa.name) Set")
         }
     }
 

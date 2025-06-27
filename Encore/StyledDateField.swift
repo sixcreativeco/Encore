@@ -10,6 +10,6 @@ struct StyledDateField: View {
             .background(Color.gray.opacity(0.06))
             .cornerRadius(10)
             .datePickerStyle(.compact)
-            .frame(maxWidth: 200)
+            // The fixed-width frame has been removed to allow the view to expand.
     }
 }

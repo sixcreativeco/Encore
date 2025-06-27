@@ -16,6 +16,7 @@ enum ItineraryItemType: String, Codable, CaseIterable {
     case travel
     case content
     case merch
+    case lounge // NEW
     
     var displayName: String {
         switch self {
@@ -34,6 +35,7 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         case .travel: return "Travel"
         case .content: return "Content"
         case .merch: return "Merchandise"
+        case .lounge: return "Lounge" // NEW
         }
     }
     
@@ -54,10 +56,10 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         case .travel: return "car.fill"
         case .content: return "camera.fill"
         case .merch: return "tshirt.fill"
+        case .lounge: return "sofa" // NEW
         }
     }
 
-    // FIX: This logic now lives inside the enum where it belongs.
     var isShowTiming: Bool {
         switch self {
         case .loadIn, .soundcheck, .doors, .headline, .packOut:
@@ -67,7 +69,6 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         }
     }
 
-    // FIX: This now correctly maps the enum case to the Firestore field name.
     var firestoreShowKey: String? {
         switch self {
         case .loadIn: return "loadIn"

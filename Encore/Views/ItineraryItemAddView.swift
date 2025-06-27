@@ -3,16 +3,44 @@ import FirebaseFirestore
 
 struct ItineraryItemAddView: View {
     var tourID: String
-    var userID: String // This is the ownerID
-    var presetDate: Date
+    var userID: String
     var onSave: () -> Void
+    var showForTimezone: Show?
 
     @Environment(\.dismiss) var dismiss
 
+    // Form State
     @State private var type: ItineraryItemType = .custom
     @State private var title = ""
-    @State private var time: Date = Date()
     @State private var note = ""
+    @State private var eventDate: Date
+    @State private var time: Date
+    
+    // Visibility State
+    @State private var visibility: String = "Everyone"
+    @State private var showCrewSelector = false
+    @State private var tourCrew: [TourCrew] = []
+    @State private var selectedCrewIDs: Set<String> = []
+
+    // Grid Layout
+    private let columns = [GridItem(.adaptive(minimum: 120))]
+
+    init(tourID: String, userID: String, onSave: @escaping () -> Void, showForTimezone: Show?) {
+        self.tourID = tourID
+        self.userID = userID
+        self.onSave = onSave
+        self.showForTimezone = showForTimezone
+        
+        let baseDate = showForTimezone?.date.dateValue() ?? Date()
+        self._eventDate = State(initialValue: baseDate)
+
+        // Set default time to 12:00 PM on the base date
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: baseDate)
+        components.hour = 12
+        components.minute = 0
+        self._time = State(initialValue: calendar.date(from: components) ?? baseDate)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -34,88 +62,140 @@ struct ItineraryItemAddView: View {
                         .foregroundColor(.accentColor)
                         .frame(width: 30)
                     
-                    StyledInputField(placeholder: "Event (e.g. 'Dinner reservation', 'Drive to venue')", text: $title)
-                        .onChange(of: title) { _, newValue in
-                            updateType(from: newValue)
-                        }
+                    StyledInputField(placeholder: "Event (e.g. 'Dinner reservation')", text: $title)
+                        .onChange(of: title) { _, newValue in updateType(from: newValue) }
+                }
+
+                HStack {
+                    StyledDateField(date: $eventDate)
+                    StyledTimePicker(label: "", time: $time)
                 }
                 
-                StyledTimePicker(label: "Time", time: $time)
-                
                 CustomTextEditor(placeholder: "Notes (optional)", text: $note)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Visibility").font(.headline)
+                    HStack {
+                        Button("Everyone") {
+                            visibility = "Everyone"
+                            showCrewSelector = false
+                        }
+                        .buttonStyle(PrimaryButtonStyle(color: visibility == "Everyone" ? .accentColor : .gray.opacity(0.3)))
+                        
+                        Button("Choose Crew") {
+                            visibility = "Custom"
+                            showCrewSelector = true
+                        }
+                        .buttonStyle(PrimaryButtonStyle(color: visibility == "Custom" ? .accentColor : .gray.opacity(0.3)))
+                    }
+                    
+                    if showCrewSelector {
+                        crewGrid
+                            .padding(.top, 8)
+                    }
+                }
             }
 
             Spacer()
-
-            Button("Save Item") {
-                saveItem()
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(title.isEmpty ? Color.gray.opacity(0.5) : Color.accentColor)
-            .foregroundColor(.white)
-            .cornerRadius(10)
-            .disabled(title.isEmpty)
+            
+            Button("Save Item", action: saveItem)
+                .frame(maxWidth: .infinity).padding().background(title.isEmpty ? Color.gray.opacity(0.5) : Color.accentColor)
+                .foregroundColor(.white).cornerRadius(10)
+                .disabled(title.isEmpty)
         }
         .padding(32)
-        .frame(width: 500, height: 420)
-        .onAppear {
-            initializeTime()
+        .frame(width: 550, height: 650)
+        .onAppear(perform: fetchCrew)
+    }
+    
+    private var crewGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(tourCrew) { crew in
+                    Button(action: {
+                        toggleCrewSelection(crew.id!)
+                    }) {
+                        Text(crew.name)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .padding(8)
+                            .frame(maxWidth: .infinity)
+                            .background(selectedCrewIDs.contains(crew.id!) ? Color.blue.opacity(0.4) : Color.gray.opacity(0.2))
+                            .cornerRadius(8)
+                            .foregroundColor(.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(maxHeight: 150)
+    }
+    
+    private func toggleCrewSelection(_ crewID: String) {
+        if selectedCrewIDs.contains(crewID) {
+            selectedCrewIDs.remove(crewID)
+        } else {
+            selectedCrewIDs.insert(crewID)
+        }
+    }
+
+    private func fetchCrew() {
+        Task {
+            do {
+                self.tourCrew = try await FirebaseTourService.loadCrew(forTour: tourID)
+                self.selectedCrewIDs = Set(self.tourCrew.compactMap { $0.id })
+            } catch {
+                print("Error fetching crew: \(error.localizedDescription)")
+            }
         }
     }
 
     private func updateType(from eventTitle: String) {
         let lowercasedTitle = eventTitle.lowercased()
+        var newType: ItineraryItemType = .custom
         
-        if ["hotel", "motel", "airbnb", "lobby", "accommodation", "check in", "check out"].contains(where: lowercasedTitle.contains) {
-            self.type = .hotel
-        } else if ["drive", "transport", "pickup", "pick up", "drop off", "bus", "van", "car", "taxi", "uber", "lyft", "shuttle", "transfer", "transportation", "travel"].contains(where: lowercasedTitle.contains) {
-            self.type = .travel
-        } else if ["photoshoot", "shoot", "film", "content", "tiktok", "promo", "photo", "photo shoot" , "video", "video shoot", "social media"].contains(where: lowercasedTitle.contains) {
-            self.type = .content
-        } else if ["breakfast", "lunch", "dinner", "food", "catering", "buffet", "meal", "brunch", "lunchtime"].contains(where: lowercasedTitle.contains) {
-            self.type = .catering
-        } else if ["merch", "merchandise"].contains(where: lowercasedTitle.contains) {
-            self.type = .merch
-        } else if ["flight", "fly to", "airport", "take off", "land", "lands", "landing"].contains(where: lowercasedTitle.contains) {
-            self.type = .flight
-        } else if ["soundcheck", "sound check", "line check"].contains(where: lowercasedTitle.contains) {
-            self.type = .soundcheck
-        } else if ["load in", "load-in", "frieght"].contains(where: lowercasedTitle.contains) {
-            self.type = .loadIn
-        } else if ["doors"].contains(where: lowercasedTitle.contains) {
-            self.type = .doors
-        } else {
-            self.type = .custom
-        }
+        if ["hotel", "check in", "check out", "lobby", "acommodation", "resort", "hotel room", "apartment", "airbnb", "acom", "accom"].contains(where: lowercasedTitle.contains) { newType = .hotel }
+        else if ["drive", "transport", "bus", "van", "pick up", "drop off", "car", "taxi", "shuttle", "rideshare", "pickup", "dropoff", "uber", "lyft"].contains(where: lowercasedTitle.contains) { newType = .travel }
+        else if ["flight", "airport", "takeoff", "landing", "fly", "airplane", "plane", "departures", "arrivals", "terminal", "gate"].contains(where: lowercasedTitle.contains) { newType = .flight }
+        else if ["shoot", "film", "content", "tiktok", "reel", "reels", "video", "photo", "photoshoot", "press", "vlog"].contains(where: lowercasedTitle.contains) { newType = .content }
+        else if ["food", "lunch", "breakfast", "dinner", "tea", "kai", "restaurant", "eat", "catering", "snack"].contains(where: lowercasedTitle.contains) { newType = .catering }
+        else if ["lounge", "airport lounge"].contains(where: lowercasedTitle.contains) { newType = .lounge }
+        
+        self.type = newType
     }
-
-    private func initializeTime() {
-        let calendar = Calendar.current
-        let now = Date()
-        let merged = calendar.date(
-            bySettingHour: calendar.component(.hour, from: now),
-            minute: calendar.component(.minute, from: now),
-            second: 0,
-            of: presetDate
-        ) ?? presetDate
-
-        self.time = merged
-    }
-
+    
     private func saveItem() {
-        // FIX: Create an instance of our new 'ItineraryItem' model
+        let eventTimeZone = TimeZone.knownTimeZoneIdentifiers.first { $0.contains(showForTimezone?.city ?? "") } ?? TimeZone.current.identifier
+        
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone(identifier: eventTimeZone) ?? .current
+
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: eventDate)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+        
+        var combinedComponents = DateComponents()
+        combinedComponents.year = dateComponents.year
+        combinedComponents.month = dateComponents.month
+        combinedComponents.day = dateComponents.day
+        combinedComponents.hour = timeComponents.hour
+        combinedComponents.minute = timeComponents.minute
+        
+        let finalDate = calendar.date(from: combinedComponents) ?? Date()
+
         let newItem = ItineraryItem(
             tourId: self.tourID,
-            showId: nil, // This view doesn't specify a show, which is fine
+            showId: showForTimezone?.id,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             type: self.type.rawValue,
-            timeUTC: Timestamp(date: time),
-            notes: note.trimmingCharacters(in: .whitespacesAndNewlines)
+            timeUTC: Timestamp(date: finalDate),
+            subtitle: nil,
+            notes: note.isEmpty ? nil : note,
+            timezone: eventTimeZone,
+            visibility: visibility,
+            visibleTo: visibility == "Custom" ? Array(selectedCrewIDs) : nil
         )
         
         do {
-            // FIX: Save the new object directly to the top-level /itineraryItems collection
             _ = try Firestore.firestore().collection("itineraryItems").addDocument(from: newItem)
             onSave()
             dismiss()

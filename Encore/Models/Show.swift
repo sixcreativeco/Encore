@@ -10,6 +10,9 @@ struct Show: Codable, Identifiable {
     var venueName: String
     var venueAddress: String
     
+    // --- NEW ---
+    var timezone: String? // IANA timezone identifier (e.g., "America/Los_Angeles")
+    
     var contactName: String?
     var contactEmail: String?
     var contactPhone: String?
@@ -24,7 +27,6 @@ struct Show: Codable, Identifiable {
     var packOut: Timestamp?
     var packOutNextDay: Bool?
     
-    // FIX: Added a property to store the IDs of linked support acts.
     var supportActIds: [String]?
     
     @ServerTimestamp var createdAt: Timestamp?

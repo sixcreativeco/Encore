@@ -126,6 +126,7 @@
 				Models/Venue.swift,
 				OfflineSyncManager.swift,
 				SectionHeader.swift,
+				Services/FirebaseTourService.swift,
 				Services/InvitationService.swift,
 				Services/NotificationService.swift,
 				Services/VenueSearchService.swift,
@@ -637,6 +638,7 @@
 		EF2B3F4B2E06F9F20055B8D3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
@@ -659,7 +661,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.9.4;
+				MARKETING_VERSION = 1.9.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sixcreative.encoreviewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -672,6 +674,7 @@
 		EF2B3F4C2E06F9F20055B8D3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
@@ -694,7 +697,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.9.4;
+				MARKETING_VERSION = 1.9.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sixcreative.encoreviewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -906,6 +909,7 @@
 		EFA43B7F2DEC967F004781D4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Encore/Encore.entitlements;
@@ -934,7 +938,7 @@
 					"$(PROJECT_DIR)/Encore/encore-ticketing-web/node_modules/@unrs/resolver-binding-darwin-arm64",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.9.4;
+				MARKETING_VERSION = 1.9.5;
 				PRODUCT_BUNDLE_IDENTIFIER = SixCreative.Encore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -946,6 +950,7 @@
 		EFA43B802DEC967F004781D4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Encore/Encore.entitlements;
@@ -974,7 +979,7 @@
 					"$(PROJECT_DIR)/Encore/encore-ticketing-web/node_modules/@unrs/resolver-binding-darwin-arm64",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.9.4;
+				MARKETING_VERSION = 1.9.5;
 				PRODUCT_BUNDLE_IDENTIFIER = SixCreative.Encore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

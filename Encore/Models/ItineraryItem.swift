@@ -9,9 +9,12 @@ struct ItineraryItem: Codable, Identifiable, Equatable {
     var type: String
     var timeUTC: Timestamp
     
-    // FIX: Added the missing 'subtitle' property.
     var subtitle: String?
     
     var notes: String?
     var timezone: String?
+
+    // --- NEW FIELDS ---
+    var visibility: String? // "everyone" or "custom"
+    var visibleTo: [String]? // Array of crew member document IDs
 }

@@ -10,14 +10,15 @@ struct TourDetailView: View {
         ScrollView {
             VStack(spacing: 32) {
                 TourHeaderView(tour: tour)
+                    .padding(.horizontal, 24)
                 
                 TourSummaryCardsView(tourID: tour.id ?? "", ownerUserID: tour.ownerId)
                     .environmentObject(appState)
+                    .padding(.horizontal, 24)
                 
-                HStack(alignment: .firstTextBaseline, spacing: 24) {
+                HStack(alignment: .top, spacing: 24) {
                     
                     TourItineraryView(tour: tour)
-                    .frame(height: 500)
 
                     ScrollView {
                         VStack(spacing: 24) {
@@ -25,17 +26,14 @@ struct TourDetailView: View {
                                 tourID: tour.id ?? "",
                                 ownerUserID: tour.ownerId
                             )
-                            
-                            // FIX: This call is now corrected.
-                            // It only passes the tourID, matching the new TourFlightsView.
                             TourFlightsView(
                                 tourID: tour.id ?? ""
                             )
                         }
-                        .padding()
                     }
-                    .frame(height: 500)
+                    .frame(height: 500) //  Give the right column a fixed height
                 }
+                .padding(.horizontal, 24)
 
                 if let tourID = tour.id {
                     ShowGridView(
@@ -46,9 +44,9 @@ struct TourDetailView: View {
                             appState.selectedShow = selectedShow
                         }
                     )
+                    .padding(.horizontal, 24)
                 }
             }
-            .padding(.horizontal, 24)
             .padding(.vertical)
         }
         .ignoresSafeArea(edges: .bottom)
