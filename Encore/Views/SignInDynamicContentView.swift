@@ -218,7 +218,7 @@ fileprivate struct TypingEffectTextView: View {
 
     var body: some View {
         Text(String(words[currentWordIndex].prefix(visibleCharacters)))
-            .frame(width: 250, alignment: .leading)
+             .frame(width: 250, alignment: .leading)
             .onReceive(timer) { _ in
                 animateText()
             }
@@ -241,7 +241,7 @@ fileprivate struct TypingEffectTextView: View {
             }
         case .deleting:
             if visibleCharacters > 0 {
-                visibleCharacters -= 1
+                 visibleCharacters -= 1
             } else {
                 state = .typing
                 currentWordIndex = (currentWordIndex + 1) % words.count
@@ -256,7 +256,7 @@ fileprivate struct TypingEffectTextView: View {
 fileprivate enum DummySignInData {
     private static func time(hour: Int, minute: Int) -> Date { Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: Date()) ?? Date() }
     
-    // FIX: Updated to create instances of the new 'Flight' model.
+    // FIX: Updated to create instances of the new 'Flight' model with the correct passenger type.
     static let nzFlight = Flight(tourId: "d1", airline: "Air New Zealand", flightNumber: "NZ102", departureTimeUTC: Timestamp(date: time(hour: 8, minute: 0)), arrivalTimeUTC: Timestamp(date: time(hour: 11, minute: 30)), origin: "AKL", destination: "SYD", passengers: [])
     static let aaFlight = Flight(tourId: "d2", airline: "American Airlines", flightNumber: "AA118", departureTimeUTC: Timestamp(date: time(hour: 18, minute: 30)), arrivalTimeUTC: Timestamp(date: time(hour: 23, minute: 50)), origin: "LAX", destination: "JFK", passengers: [])
     static let qfFlight = Flight(tourId: "d3", airline: "Qantas", flightNumber: "QF44", departureTimeUTC: Timestamp(date: time(hour: 10, minute: 0)), arrivalTimeUTC: Timestamp(date: time(hour: 14, minute: 0)), origin: "SYD", destination: "LAX", passengers: [])
@@ -305,7 +305,7 @@ fileprivate struct PlaceholderFlightCard: View {
     var body: some View {
         HStack(spacing: 16) {
             Image(logoName).resizable().aspectRatio(contentMode: .fit).frame(width: 44, height: 44)
-            VStack(alignment: .leading, spacing: 2) {
+             VStack(alignment: .leading, spacing: 2) {
                 Text("\(flight.origin) → \(flight.destination)").font(.system(size: 20, weight: .bold))
                 Text("\(flight.airline ?? "") \(flight.flightNumber ?? "")").font(.caption).opacity(0.8)
             }
@@ -333,7 +333,7 @@ fileprivate struct PlaceholderContactCard: View {
     let contact: DummyContactItem
     var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: "person.text.rectangle.fill").font(.title2.weight(.medium)).foregroundColor(.accentColor).frame(width: 30)
+             Image(systemName: "person.text.rectangle.fill").font(.title2.weight(.medium)).foregroundColor(.accentColor).frame(width: 30)
             VStack(alignment: .leading) {
                 Text(contact.name).fontWeight(.bold)
                 Text(contact.role).font(.subheadline).foregroundColor(.secondary)

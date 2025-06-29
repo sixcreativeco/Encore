@@ -41,12 +41,35 @@ struct TourItineraryView: View {
     }
     
     var body: some View {
+        #if os(iOS)
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(colors: [Color(red: 0/255, green: 58/255, blue: 83/255), Color(red: 23/255, green: 17/255, blue: 17/255)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
+            mainContent
+                .background(.clear)
+        }
+        #else
+        mainContent
+            .frame(height: 500) // Fixed height only for macOS
+        #endif
+    }
+    
+    // Extracted main content to a helper view to avoid code duplication
+    @ViewBuilder
+    private var mainContent: some View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
                 SectionHeader(title: "Itinerary", onAdd: { isAddingItem = true })
                     .padding(.horizontal)
-                    .padding(.top, 16)
                     .padding(.bottom, 8)
+                    #if os(iOS)
+                    .padding(.top, 8)
+                    #endif
 
                 if !sortedDates.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -77,10 +100,10 @@ struct TourItineraryView: View {
                         ForEach(itemsForSelectedDate) { item in
                             let locationHint = shows.first { $0.id == item.showId }?.city
                             ItineraryItemCard(
-                                item: item,
+                                 item: item,
                                 locationHint: locationHint,
                                 isExpanded: expandedItemID == item.id,
-                                onExpandToggle: { toggleExpanded(item) },
+                                 onExpandToggle: { toggleExpanded(item) },
                                 onEdit: { self.itemToEdit = item },
                                 onDelete: { deleteItem(item) }
                             )
@@ -91,7 +114,6 @@ struct TourItineraryView: View {
                 .padding(.bottom)
             }
         }
-        .frame(height: 500)
         .onAppear {
             setupListeners()
             fetchShowsForTour()
@@ -118,7 +140,6 @@ struct TourItineraryView: View {
         let dateComponents: DateComponents
         let city: String
         @Binding var selectedDate: DateComponents?
-
         private var isSelected: Bool {
             selectedDate == dateComponents
         }

@@ -17,8 +17,10 @@ typealias AirportDictionary = [String: Airport]
 
 struct AirportEntry: Identifiable {
     let id = UUID()
-    let name: String  // e.g. "Auckland International Airport (AKL)"
+    let name: String
     let iata: String
     let city: String
     let country: String
+    // ADDED: The timezone identifier property that was missing.
+    let tz: String
 }

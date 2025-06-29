@@ -13,18 +13,16 @@ struct ItineraryItemEditView: View {
     
     // Visibility State
     @State private var visibility: String
-    @State private var showCrewSelector: Bool
     @State private var tourCrew: [TourCrew] = []
     @State private var selectedCrewIDs: Set<String>
 
-    // Grid Layout
+    // Grid Layout (macOS)
     private let columns = [GridItem(.adaptive(minimum: 120))]
     
     init(item: Binding<ItineraryItem>, onSave: @escaping () -> Void) {
         self._item = item
         self.onSave = onSave
         
-        // Initialize local state from the binding
         let initialDate = item.wrappedValue.timeUTC.dateValue()
         self._eventDate = State(initialValue: initialDate)
         self._time = State(initialValue: initialDate)
@@ -32,11 +30,20 @@ struct ItineraryItemEditView: View {
         
         let initialVisibility = item.wrappedValue.visibility ?? "Everyone"
         self._visibility = State(initialValue: initialVisibility)
-        self._showCrewSelector = State(initialValue: initialVisibility == "Custom")
         self._selectedCrewIDs = State(initialValue: Set(item.wrappedValue.visibleTo ?? []))
     }
 
     var body: some View {
+        #if os(macOS)
+        macOSBody
+        #else
+        iOSBody
+        #endif
+    }
+
+    // MARK: - macOS Body
+    @ViewBuilder
+    private var macOSBody: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
                 Text("Edit Itinerary Item").font(.largeTitle.bold())
@@ -69,18 +76,16 @@ struct ItineraryItemEditView: View {
                     HStack {
                         Button("Everyone") {
                             visibility = "Everyone"
-                            showCrewSelector = false
                         }
                         .buttonStyle(PrimaryButtonStyle(color: visibility == "Everyone" ? .accentColor : .gray.opacity(0.3)))
                         
                         Button("Choose Crew") {
                             visibility = "Custom"
-                            showCrewSelector = true
                         }
                         .buttonStyle(PrimaryButtonStyle(color: visibility == "Custom" ? .accentColor : .gray.opacity(0.3)))
                     }
-                    
-                    if showCrewSelector {
+                
+                    if visibility == "Custom" {
                         crewGrid
                             .padding(.top, 8)
                     }
@@ -97,7 +102,66 @@ struct ItineraryItemEditView: View {
         .frame(minWidth: 550, minHeight: 650)
         .onAppear(perform: fetchCrew)
     }
-    
+
+    // MARK: - iOS Body
+    @ViewBuilder
+    private var iOSBody: some View {
+        NavigationView {
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [Color(red: 0/255, green: 58/255, blue: 83/255), Color(red: 23/255, green: 17/255, blue: 17/255)]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                Form {
+                    Section(header: Text("Event Details")) {
+                        HStack {
+                             Image(systemName: ItineraryItemType(rawValue: item.type)?.iconName ?? "calendar")
+                                .foregroundColor(.accentColor)
+                            TextField("Event Title", text: $item.title)
+                                .onChange(of: item.title) { _, newValue in updateType(from: newValue) }
+                        }
+                        DatePicker("Date", selection: $eventDate, displayedComponents: .date)
+                        DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+                    }
+                    
+                    Section(header: Text("Notes")) {
+                        TextEditor(text: $notes)
+                            .frame(minHeight: 100)
+                    }
+                    
+                    Section(header: Text("Visibility")) {
+                        Picker("Visible To", selection: $visibility) {
+                            Text("Everyone").tag("Everyone")
+                            Text("Custom").tag("Custom")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        
+                        if visibility == "Custom" {
+                            crewList
+                        }
+                    }
+                }
+                // These modifiers are now correctly wrapped for iOS only
+                #if os(iOS)
+                .navigationTitle("Edit Itinerary Item")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Save", action: saveChanges)
+                    }
+                }
+                #endif
+            }
+        }
+        .onAppear(perform: fetchCrew)
+    }
+
     private var crewGrid: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 12) {
@@ -119,6 +183,20 @@ struct ItineraryItemEditView: View {
             }
         }
         .frame(maxHeight: 150)
+    }
+    
+    private var crewList: some View {
+        List(tourCrew) { crew in
+            Button(action: { toggleCrewSelection(crew.id!) }) {
+                HStack {
+                    Text(crew.name)
+                    Spacer()
+                    if selectedCrewIDs.contains(crew.id!) {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+        }
     }
     
     private func toggleCrewSelection(_ crewID: String) {

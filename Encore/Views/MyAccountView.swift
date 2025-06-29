@@ -21,20 +21,38 @@ struct MyAccountView: View {
     @State private var isLoading = true
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 30) {
-                Text("Account")
-                    .font(.largeTitle.bold())
+        ZStack {
+            // Background Gradient for iOS
+            #if os(iOS)
+            LinearGradient(
+                gradient: Gradient(colors: [Color(red: 0/255, green: 58/255, blue: 83/255), Color(red: 23/255, green: 17/255, blue: 17/255)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            #endif
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 30) {
+                    #if os(macOS)
+                    Text("Account")
+                        .font(.largeTitle.bold())
+                    #endif
 
-                accountCard
-                
-                statsSection
-                
-                supportSection
+                    accountCard
+                    
+                    statsSection
+                    
+                    supportSection
 
-                Spacer()
+                    Spacer()
+                }
+                .padding()
             }
-            .padding(30)
+            .navigationTitle("Account")
+            #if os(iOS)
+            .background(Color.clear)
+            #endif
         }
         .onAppear {
             Task {
@@ -46,63 +64,58 @@ struct MyAccountView: View {
     // MARK: - Main UI Sections
 
     private var accountCard: some View {
-        ZStack {
-            HStack(alignment: .top) {
-                // Left side: User Info
-                HStack(spacing: 16) {
-                    KFImage(userProfileImageURL)
-                        .placeholder {
-                            Image(systemName: "person.crop.circle.fill")
-                                .resizable()
-                                .foregroundColor(.gray)
-                        }
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 60, height: 60)
-                        .clipShape(Circle())
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(userName)
-                                .font(.title2.bold())
-                            Text("userid: \(appState.userID ?? "N/A")")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Label(userEmail, systemImage: "envelope.fill")
-                            .font(.subheadline)
-                        
-                        Label(userPhone, systemImage: "phone.fill")
-                            .font(.subheadline)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 16) {
+                KFImage(userProfileImageURL)
+                    .placeholder {
+                        Image(systemName: "person.crop.circle.fill")
+                            .resizable()
+                            .foregroundColor(.gray)
                     }
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 60, height: 60)
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(userName)
+                        .font(.title2.bold())
+                    Text("userid: \(appState.userID ?? "N/A")")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
-
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Label(userEmail, systemImage: "envelope.fill")
+                Label(userPhone.isEmpty ? "No phone number" : userPhone, systemImage: "phone.fill")
+            }
+            .font(.subheadline)
+            
+            Divider()
+            
+            HStack {
+                VStack(alignment: .leading) {
+                   Text("encore indie")
+                       .font(.headline.bold())
+                   Button("Upgrade") {}
+                        .font(.caption.bold())
+                        .foregroundColor(.accentColor)
+                }
                 Spacer()
-
-                // Right side: Status and Plan
-                VStack(alignment: .trailing, spacing: 8) {
-                    HStack {
-                        Circle()
-                            .fill(syncManager.isOnline ? Color.green : Color.gray)
-                            .frame(width: 8, height: 8)
-                        Text("Online")
-                            .font(.caption)
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing) {
-                        Text("encore indie")
-                            .font(.headline.bold())
-                        Button("Upgrade") {}
-                            .buttonStyle(PrimaryButtonStyle(color: .white, textColor: .black))
-                    }
+                HStack {
+                    Circle()
+                        .fill(syncManager.isOnline ? Color.green : Color.gray)
+                        .frame(width: 8, height: 8)
+                    Text("Online")
+                        .font(.caption)
                 }
             }
         }
-        .padding(24)
-        .background(Color.black.opacity(0.15))
+        .padding()
+        .background(.thinMaterial)
         .cornerRadius(16)
     }
 
@@ -111,7 +124,8 @@ struct MyAccountView: View {
             Text("Stats")
                 .font(.title2.bold())
             
-            HStack(spacing: 16) {
+            // Use a vertical layout for stats on iOS
+            VStack(spacing: 12) {
                 statBlock(count: totalTours, label: "Tours", icon: "airplane")
                 statBlock(count: totalShows, label: "Shows", icon: "music.mic")
                 statBlock(count: totalTicketsSold, label: "Tickets Sold", icon: "ticket.fill")
@@ -123,7 +137,7 @@ struct MyAccountView: View {
         HStack {
             VStack(alignment: .leading) {
                 Text("\(count)")
-                    .font(.system(size: 36, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
                 Text(label)
                     .font(.headline)
                     .foregroundColor(.secondary)
@@ -134,7 +148,7 @@ struct MyAccountView: View {
                 .foregroundColor(.secondary)
         }
         .padding()
-        .background(Color.black.opacity(0.15))
+        .background(.thinMaterial)
         .cornerRadius(12)
     }
 
@@ -143,30 +157,31 @@ struct MyAccountView: View {
             Text("Support")
                 .font(.title2.bold())
             
-            HStack {
+            VStack(spacing: 12) {
                 supportButton(title: "Contact Support") {}
                 supportButton(title: "Terms of Service") {}
                 supportButton(title: "Privacy Policy") {}
             }
             
-            supportButton(title: "Clear Local Cache", width: 180) {}
+            supportButton(title: "Clear Local Cache") {}
+                .padding(.top)
             
             Button("Sign Out", role: .destructive) {
                 AuthManager.shared.signOut()
             }
             .buttonStyle(PrimaryButtonStyle(color: .red.opacity(0.7)))
+            .frame(maxWidth: .infinity)
             .padding(.top, 20)
         }
     }
 
-    private func supportButton(title: String, width: CGFloat? = nil, action: @escaping () -> Void) -> some View {
+    private func supportButton(title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 10)
-                .frame(width: width)
-                .background(Color.black.opacity(0.15))
+                .background(.thinMaterial)
                 .cornerRadius(8)
         }
         .buttonStyle(.plain)
@@ -183,10 +198,7 @@ struct MyAccountView: View {
         isLoading = true
         let db = Firestore.firestore()
 
-        // Fetch User Profile
         async let userProfileTask = db.collection("users").document(userID).getDocument()
-        
-        // Fetch Tours to get IDs
         async let toursTask = db.collection("tours").whereField("ownerId", isEqualTo: userID).getDocuments()
 
         do {
@@ -207,7 +219,6 @@ struct MyAccountView: View {
             await MainActor.run { self.totalTours = tourIDs.count }
 
             if !tourIDs.isEmpty {
-                // Fetch stats based on tour IDs
                 await fetchStats(for: tourIDs, db: db)
             } else {
                 await MainActor.run { isLoading = false }
@@ -220,10 +231,7 @@ struct MyAccountView: View {
     }
     
     private func fetchStats(for tourIDs: [String], db: Firestore) async {
-        // Fetch Show Count
         async let showsTask = db.collection("shows").whereField("tourId", in: tourIDs).getDocuments()
-        
-        // Fetch Ticketed Events to then get Ticket Sales
         async let ticketedEventsTask = db.collection("ticketedEvents").whereField("tourId", in: tourIDs).getDocuments()
 
         do {

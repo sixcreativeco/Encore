@@ -7,6 +7,8 @@ import FirebaseMessaging // Import FirebaseMessaging
 
 #if os(macOS)
 import AppKit
+#else
+import UIKit
 #endif
 
 class AuthManager: ObservableObject {
@@ -117,6 +119,56 @@ class AuthManager: ObservableObject {
             
         } catch {
             print("LOG: ❌ ERROR in AuthManager.handleGoogleSignIn: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    #endif
+    
+    #if os(iOS)
+    func handleGoogleSignIn() async -> User? {
+        print("LOG: 1. AuthManager.handleGoogleSignIn (iOS) called.")
+
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            print("LOG: ❌ Firebase client ID not found.")
+            return nil
+        }
+        
+        let config = GIDConfiguration(clientID: clientID)
+        GIDSignIn.sharedInstance.configuration = config
+        
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
+            print("LOG: ❌ Could not find root view controller.")
+            return nil
+        }
+
+        do {
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
+            
+            print("LOG: 2. GIDSignIn successful. User: \(result.user.profile?.name ?? "N/A")")
+            
+            guard let idToken = result.user.idToken?.tokenString else {
+                print("LOG: ❌ Could not get idToken from Google result.")
+                return nil
+            }
+            
+            let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: result.user.accessToken.tokenString)
+            
+            let authResult = try await Auth.auth().signIn(with: credential)
+            self.user = authResult.user
+            
+            print("LOG: 3. Firebase signIn successful. UID: \(authResult.user.uid)")
+            
+            await self.createUserDocumentIfNeeded(userID: authResult.user.uid)
+            
+            return authResult.user
+            
+        } catch {
+            if (error as NSError).code == GIDSignInError.canceled.rawValue {
+                print("LOG: ℹ️ Google Sign-In was cancelled by the user.")
+            } else {
+                print("LOG: ❌ ERROR in AuthManager.handleGoogleSignIn (iOS): \(error.localizedDescription)")
+            }
             return nil
         }
     }

@@ -21,7 +21,8 @@ class AirportService {
                 name: "\($0.name) (\($0.iata))",
                 iata: $0.iata,
                 city: $0.city,
-                country: $0.country
+                country: $0.country,
+                tz: $0.tz // Ensure the timezone identifier is loaded
             )
         }.sorted { $0.name < $1.name }
     }

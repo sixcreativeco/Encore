@@ -1,6 +1,13 @@
 import Foundation
 import FirebaseFirestore
 
+// NEW: A struct to hold passenger info, including baggage.
+struct Passenger: Codable, Identifiable, Hashable {
+    var id: String { crewId } // Use crewId for Identifiable conformance
+    let crewId: String
+    var baggage: String?
+}
+
 struct Flight: Codable, Identifiable {
     @DocumentID var id: String?
     let tourId: String
@@ -11,5 +18,6 @@ struct Flight: Codable, Identifiable {
     var origin: String // Airport code, e.g., "JFK"
     var destination: String // Airport code, e.g., "LHR"
     var notes: String?
-    var passengers: [String] // Array of TourCrew IDs
+    // UPDATED: The passengers property now uses the new Passenger struct.
+    var passengers: [Passenger]
 }

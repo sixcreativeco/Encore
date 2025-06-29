@@ -6,7 +6,6 @@ struct ItineraryItemAddView: View {
     var userID: String
     var onSave: () -> Void
     var showForTimezone: Show?
-
     @Environment(\.dismiss) var dismiss
 
     // Form State
@@ -22,7 +21,7 @@ struct ItineraryItemAddView: View {
     @State private var tourCrew: [TourCrew] = []
     @State private var selectedCrewIDs: Set<String> = []
 
-    // Grid Layout
+    // Grid Layout (for macOS)
     private let columns = [GridItem(.adaptive(minimum: 120))]
 
     init(tourID: String, userID: String, onSave: @escaping () -> Void, showForTimezone: Show?) {
@@ -34,7 +33,6 @@ struct ItineraryItemAddView: View {
         let baseDate = showForTimezone?.date.dateValue() ?? Date()
         self._eventDate = State(initialValue: baseDate)
 
-        // Set default time to 12:00 PM on the base date
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day], from: baseDate)
         components.hour = 12
@@ -43,6 +41,16 @@ struct ItineraryItemAddView: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        macOSBody
+        #else
+        iOSBody
+        #endif
+    }
+    
+    // MARK: - macOS Body
+    @ViewBuilder
+    private var macOSBody: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
                 Text("Add Itinerary Item").font(.largeTitle.bold())
@@ -108,6 +116,70 @@ struct ItineraryItemAddView: View {
         .onAppear(perform: fetchCrew)
     }
     
+    // MARK: - iOS Body
+    @ViewBuilder
+    private var iOSBody: some View {
+        NavigationView {
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [Color(red: 0/255, green: 58/255, blue: 83/255), Color(red: 23/255, green: 17/255, blue: 17/255)]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                Form {
+                    Section(header: Text("Event Details")) {
+                        HStack {
+                             Image(systemName: type.iconName)
+                                .foregroundColor(.accentColor)
+                            TextField("Event Title", text: $title)
+                                .onChange(of: title) { _, newValue in updateType(from: newValue) }
+                        }
+                        DatePicker("Date", selection: $eventDate, displayedComponents: .date)
+                        DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+                    }
+                    
+                    Section(header: Text("Notes")) {
+                        TextEditor(text: $note)
+                            .frame(minHeight: 100)
+                    }
+                    
+                    Section(header: Text("Visibility")) {
+                        Picker("Visible To", selection: $visibility) {
+                            Text("Everyone").tag("Everyone")
+                            Text("Custom").tag("Custom")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        
+                        if visibility == "Custom" {
+                            crewList
+                        }
+                    }
+                    
+                    Section {
+                         Button(action: saveItem) {
+                            Text("Save Item")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .disabled(title.isEmpty)
+                    }
+                }
+                // These modifiers are now correctly wrapped for iOS only
+                #if os(iOS)
+                .navigationTitle("Add Itinerary Item")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") { dismiss() }
+                    }
+                }
+                #endif
+            }
+        }
+        .onAppear(perform: fetchCrew)
+    }
+
     private var crewGrid: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 12) {
@@ -131,6 +203,20 @@ struct ItineraryItemAddView: View {
         .frame(maxHeight: 150)
     }
     
+    private var crewList: some View {
+        List(tourCrew) { crew in
+            Button(action: { toggleCrewSelection(crew.id!) }) {
+                HStack {
+                    Text(crew.name)
+                    Spacer()
+                    if selectedCrewIDs.contains(crew.id!) {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+        }
+    }
+    
     private func toggleCrewSelection(_ crewID: String) {
         if selectedCrewIDs.contains(crewID) {
             selectedCrewIDs.remove(crewID)
@@ -149,7 +235,7 @@ struct ItineraryItemAddView: View {
             }
         }
     }
-
+    
     private func updateType(from eventTitle: String) {
         let lowercasedTitle = eventTitle.lowercased()
         var newType: ItineraryItemType = .custom
@@ -165,10 +251,10 @@ struct ItineraryItemAddView: View {
     }
     
     private func saveItem() {
-        let eventTimeZone = TimeZone.knownTimeZoneIdentifiers.first { $0.contains(showForTimezone?.city ?? "") } ?? TimeZone.current.identifier
+        let eventTimeZone = TimeZone(identifier: showForTimezone?.timezone ?? "UTC") ?? .current
         
         var calendar = Calendar.current
-        calendar.timeZone = TimeZone(identifier: eventTimeZone) ?? .current
+        calendar.timeZone = eventTimeZone
 
         let dateComponents = calendar.dateComponents([.year, .month, .day], from: eventDate)
         let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
@@ -190,7 +276,7 @@ struct ItineraryItemAddView: View {
             timeUTC: Timestamp(date: finalDate),
             subtitle: nil,
             notes: note.isEmpty ? nil : note,
-            timezone: eventTimeZone,
+            timezone: eventTimeZone.identifier,
             visibility: visibility,
             visibleTo: visibility == "Custom" ? Array(selectedCrewIDs) : nil
         )

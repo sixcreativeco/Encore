@@ -2,15 +2,16 @@ import SwiftUI
 import FirebaseFirestore
 
 struct TourFlightsView: View {
-    // FIX: The view now ONLY needs the tourID to fetch its data.
-    // The unnecessary userID and ownerUserID have been removed.
     var tourID: String
 
     @State private var flights: [Flight] = []
+    @State private var tourCrew: [TourCrew] = []
     @State private var showAddFlight = false
     @State private var expandedFlightID: String? = nil
     @State private var flightListener: ListenerRegistration? = nil
     @EnvironmentObject var appState: AppState
+    
+    private let airports = AirportService.shared.airports
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -19,13 +20,12 @@ struct TourFlightsView: View {
             if flights.isEmpty {
                 placeholderView
             } else {
-                flightList
+                 flightList
             }
         }
-        .onAppear { setupListener() }
+        .onAppear(perform: loadData)
         .onDisappear { flightListener?.remove() }
         .sheet(isPresented: $showAddFlight) {
-            // To present the AddFlightView, we find the full Tour object from appState.
             if let tour = appState.tours.first(where: { $0.id == tourID }) {
                 AddFlightView(tour: tour, onFlightAdded: {})
             }
@@ -36,7 +36,7 @@ struct TourFlightsView: View {
         Text("No flights yet.")
             .frame(maxWidth: .infinity, minHeight: 50)
             .padding()
-            .background(Color.gray.opacity(0.1))
+             .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
     }
 
@@ -45,7 +45,9 @@ struct TourFlightsView: View {
             ForEach(flights) { flight in
                 FlightItemCard(
                     flight: flight,
-                    isExpanded: expandedFlightID == flight.id,
+                    crew: tourCrew,
+                    airports: airports,
+                     isExpanded: expandedFlightID == flight.id,
                     onExpandToggle: { toggleExpanded(flight) },
                     onEdit: { /* Placeholder */ },
                     onDelete: { deleteFlight(flight) }
@@ -53,6 +55,14 @@ struct TourFlightsView: View {
                 .animation(.easeInOut, value: expandedFlightID)
             }
         }
+    }
+    
+    private func loadData() {
+        flightListener?.remove()
+        flightListener = FirebaseFlightService.addFlightsListener(forTour: tourID) { loadedFlights in
+            self.flights = loadedFlights.sorted(by: { $0.departureTimeUTC.dateValue() < $1.departureTimeUTC.dateValue() })
+        }
+        fetchCrew()
     }
 
     private func toggleExpanded(_ flight: Flight) {
@@ -64,11 +74,14 @@ struct TourFlightsView: View {
             }
         }
     }
-
-    private func setupListener() {
-        flightListener?.remove()
-        flightListener = FirebaseFlightService.addFlightsListener(forTour: tourID) { loadedFlights in
-            self.flights = loadedFlights.sorted(by: { $0.departureTimeUTC.dateValue() < $1.departureTimeUTC.dateValue() })
+    
+    private func fetchCrew() {
+        Task {
+            do {
+                self.tourCrew = try await FirebaseTourService.loadCrew(forTour: tourID)
+            } catch {
+                print("Error fetching crew for flights view: \(error.localizedDescription)")
+            }
         }
     }
 

@@ -21,9 +21,17 @@ struct EncoreApp: App {
 
     init() {
         #if os(iOS)
+        // This custom factory will now provide the correct App Check provider
+        // for both simulator and physical device builds.
         class MyAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
           func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
+            #if targetEnvironment(simulator)
+            // Use the debug provider on the simulator
+            return AppCheckDebugProvider(app: app)
+            #else
+            // Use the Device Check provider on real devices
             return DeviceCheckProvider(app: app)
+            #endif
           }
         }
         AppCheck.setAppCheckProviderFactory(MyAppCheckProviderFactory())
@@ -44,6 +52,7 @@ struct EncoreApp: App {
         FirebaseApp.configure(options: options)
     }
 
+    
     var body: some Scene {
         WindowGroup {
             ZStack {

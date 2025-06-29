@@ -15,6 +15,29 @@ struct SignInView: View {
     @State private var invitationDetails: InvitationService.InvitationDetails?
     
     var body: some View {
+        #if os(iOS)
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(colors: [Color(red: 0/255, green: 58/255, blue: 83/255), Color(red: 23/255, green: 17/255, blue: 17/255)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .preferredColorScheme(.dark)
+            
+            signInForm
+        }
+        .alert("Error", isPresented: .constant(errorMessage != nil), actions: {
+            Button("OK") { errorMessage = nil }
+        }, message: {
+            Text(errorMessage ?? "An unknown error occurred.")
+        })
+        .sheet(isPresented: $showJoinView) {
+            if let details = invitationDetails {
+                JoinTourView(invitationDetails: details)
+            }
+        }
+        #else
         HStack(spacing: 0) {
             signInForm
                 .frame(width: 450)
@@ -33,64 +56,75 @@ struct SignInView: View {
                 JoinTourView(invitationDetails: details)
             }
         }
+        #endif
     }
     
     private var signInForm: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 24) {
+                Spacer()
 
-            Image("EncoreLogo")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 180)
-                .foregroundColor(.primary)
-                .padding(.bottom, 24)
+                Image("EncoreLogo")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 180)
+                    .foregroundColor(.primary)
+                    .padding(.bottom, 24)
 
-            VStack(spacing: 16) {
-                CustomTextField(placeholder: "Join with Code", text: $inviteCode)
-                    .onSubmit {
-                        if !inviteCode.isEmpty {
-                            handleJoinWithCode()
+                VStack(spacing: 16) {
+                    CustomTextField(placeholder: "Join with Code", text: $inviteCode)
+                        .onSubmit {
+                            if !inviteCode.isEmpty {
+                                handleJoinWithCode()
+                            }
+                        }
+                        .disabled(isLoading)
+                    
+                    HStack(spacing: 12) {
+                        VStack { Divider() }; Text("OR").font(.caption).foregroundColor(.secondary); VStack { Divider() }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    #if os(macOS)
+                    GoogleSignInButton { Task { await handleGoogleSignIn() } }
+                        .frame(width: 280, height: 44)
+                        .cornerRadius(8)
+                    #else
+                    GoogleSignInButton(viewModel: GoogleSignInButtonViewModel(scheme: .dark, style: .wide, state: .normal)) {
+                        Task {
+                            await handleGoogleSignIn()
                         }
                     }
-                    .disabled(isLoading)
-                
-                HStack(spacing: 12) {
-                    VStack { Divider() }; Text("OR").font(.caption).foregroundColor(.secondary); VStack { Divider() }
-                }
-                .padding(.vertical, 8)
-
-                #if os(macOS)
-                GoogleSignInButton { Task { await handleGoogleSignIn() } }
-                    .frame(width: 280, height: 44)
+                    .frame(width: 280, height: 48)
                     .cornerRadius(8)
-                #endif
-                
-                CustomTextField(placeholder: "Email", text: $email)
-                CustomSecureField(placeholder: "Password", text: $password)
-                
-                Button(action: handleEmailSignIn) {
-                    HStack {
-                        Spacer()
-                        if isLoading && inviteCode.isEmpty { ProgressView().colorInvert() }
-                        else { Text("Sign In") }
-                        Spacer()
-                    }
-                    .fontWeight(.semibold).frame(maxWidth: .infinity).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
-                }
-                .buttonStyle(.plain).disabled(isLoading || email.isEmpty || password.isEmpty)
-            }
-            .frame(width: 280)
+                    #endif
 
-            VStack(spacing: 6) {
-                Text("Don't have an account?").font(.footnote)
-                Button("Sign Up") { showSignUp = true }.font(.footnote.bold())
-                    .sheet(isPresented: $showSignUp) { SignUpView() }
+                    CustomTextField(placeholder: "Email", text: $email)
+                    CustomSecureField(placeholder: "Password", text: $password)
+                    
+                    Button(action: handleEmailSignIn) {
+                        HStack {
+                            Spacer()
+                            if isLoading && inviteCode.isEmpty { ProgressView().colorInvert() }
+                            else { Text("Sign In") }
+                            Spacer()
+                        }
+                        .fontWeight(.semibold).frame(maxWidth: .infinity).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
+                    }
+                    .buttonStyle(.plain).disabled(isLoading || email.isEmpty || password.isEmpty)
+                }
+                .frame(width: 280)
+
+                VStack(spacing: 6) {
+                    Text("Don't have an account?").font(.footnote)
+                    Button("Sign Up") { showSignUp = true }.font(.footnote.bold())
+                        .sheet(isPresented: $showSignUp) { SignUpView() }
+                }
+                Spacer()
             }
-            Spacer()
+            .padding(32)
         }
-        .padding(32)
     }
     
     private func handleJoinWithCode() {
@@ -124,8 +158,11 @@ struct SignInView: View {
         guard let presentingWindow = NSApplication.shared.keyWindow else {
             return
         }
-        
         _ = await AuthManager.shared.handleGoogleSignIn(presentingWindow: presentingWindow)
+    }
+    #else
+    private func handleGoogleSignIn() async {
+        _ = await AuthManager.shared.handleGoogleSignIn()
     }
     #endif
     
