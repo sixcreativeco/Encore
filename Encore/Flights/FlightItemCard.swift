@@ -161,10 +161,15 @@ struct FlightItemCard: View {
         .transition(.opacity)
     }
 
+    // --- FIX IS HERE ---
     private func extractAirlineCode(from flightNumber: String) -> String {
-        let prefix = flightNumber.prefix { $0.isLetter }
-         return String(prefix)
+        let prefix = String(flightNumber.prefix { $0.isLetter }).uppercased()
+        if prefix == "3K" {
+            return "JQ"
+        }
+        return prefix
     }
+    // -------------------
 
     private func formattedDateTimeString(for timestamp: FirebaseFirestore.Timestamp, airportCode: String) -> String {
         let date = timestamp.dateValue()

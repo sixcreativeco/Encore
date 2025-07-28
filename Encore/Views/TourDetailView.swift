@@ -29,9 +29,14 @@ struct TourDetailView: View {
                             TourFlightsView(
                                 tourID: tour.id ?? ""
                             )
+                            // --- ADDITION IS HERE ---
+                            TourHotelsView(
+                                tourID: tour.id ?? ""
+                            )
+                            // ------------------------
                         }
                     }
-                    .frame(height: 500) //  Give the right column a fixed height
+                    .frame(height: 700) //  Give the right column a fixed height
                 }
                 .padding(.horizontal, 24)
 

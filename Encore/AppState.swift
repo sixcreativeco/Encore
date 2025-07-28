@@ -13,8 +13,6 @@ class AppState: ObservableObject {
     
     @Published var notifications: [TourInvitationNotification] = []
     private var notificationListener: ListenerRegistration?
-
-
     private var authStateHandle: AuthStateDidChangeListenerHandle?
 
     init() {
@@ -30,6 +28,7 @@ class AppState: ObservableObject {
 
     private func registerAuthStateHandler() {
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] (_, user) in
+          
             self?.objectWillChange.send()
           
             DispatchQueue.main.async {
@@ -73,9 +72,10 @@ class AppState: ObservableObject {
     func loadTours() {
         guard let userID = userID else { return }
         let db = Firestore.firestore()
-        var allTours: [Tour] = []
+        
+        // --- FIX IS HERE: Using a Set guarantees uniqueness ---
+        var allToursSet = Set<Tour>()
         let group = DispatchGroup()
-        var fetchedTourIDs = Set<String>()
 
         // 1. Fetch tours the user owns
         group.enter()
@@ -83,10 +83,7 @@ class AppState: ObservableObject {
             .whereField("ownerId", isEqualTo: userID)
             .getDocuments { snapshot, _ in
                 let ownedTours = snapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []
-                for tour in ownedTours {
-                    if let id = tour.id { fetchedTourIDs.insert(id) }
-                }
-                allTours.append(contentsOf: ownedTours)
+                allToursSet.formUnion(ownedTours)
                 group.leave()
             }
 
@@ -101,7 +98,7 @@ class AppState: ObservableObject {
                 return
             }
             
-            let crewTourIDs = documents.compactMap { $0["tourId"] as? String }.filter { !fetchedTourIDs.contains($0) }
+            let crewTourIDs = documents.compactMap { $0["tourId"] as? String }
 
             guard !crewTourIDs.isEmpty else {
                 group.leave()
@@ -111,13 +108,14 @@ class AppState: ObservableObject {
             db.collection("tours").whereField(FieldPath.documentID(), in: crewTourIDs)
                 .getDocuments { tourSnapshot, _ in
                     let crewTours = tourSnapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []
-                    allTours.append(contentsOf: crewTours)
+                    allToursSet.formUnion(crewTours)
                     group.leave()
                 }
         }
 
         group.notify(queue: .main) {
-            self.tours = allTours.sorted(by: { $0.startDate.dateValue() < $1.startDate.dateValue() })
+            // Convert the Set back to a sorted Array
+            self.tours = Array(allToursSet).sorted(by: { $0.startDate.dateValue() < $1.startDate.dateValue() })
         }
     }
 }

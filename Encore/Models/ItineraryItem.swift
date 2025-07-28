@@ -18,3 +18,4 @@ struct ItineraryItem: Codable, Identifiable, Equatable {
     var visibility: String? // "everyone" or "custom"
     var visibleTo: [String]? // Array of crew member document IDs
 }
+

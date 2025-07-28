@@ -9,15 +9,16 @@ struct Show: Codable, Identifiable {
     var country: String?
     var venueName: String
     var venueAddress: String
+    var timezone: String?
     
-    // --- NEW ---
-    var timezone: String? // IANA timezone identifier (e.g., "America/Los_Angeles")
-    
+    // --- ADD THIS LINE ---
+    var scanCode: String?
+    // --------------------
+
     var contactName: String?
     var contactEmail: String?
     var contactPhone: String?
     
-    // All nullable timestamps for flexibility
     var venueAccess: Timestamp?
     var loadIn: Timestamp?
     var soundCheck: Timestamp?
@@ -26,7 +27,6 @@ struct Show: Codable, Identifiable {
     var headlinerSetDurationMinutes: Int?
     var packOut: Timestamp?
     var packOutNextDay: Bool?
-    
     var supportActIds: [String]?
     
     @ServerTimestamp var createdAt: Timestamp?

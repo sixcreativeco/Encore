@@ -1,28 +1,18 @@
 import SwiftUI
-import FirebaseFirestore
-import FirebaseAuth
 import Kingfisher
+import FirebaseAuth
 
 struct MyAccountView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var syncManager = OfflineSyncManager.shared
+    @StateObject private var viewModel = MyAccountViewModel()
 
     // User Profile State
-    @State private var userName: String = "Loading..."
-    @State private var userEmail: String = ""
-    @State private var userPhone: String = ""
-    @State private var userProfileImageURL: URL?
-
-    // Stats State
-    @State private var totalTours: Int = 0
-    @State private var totalShows: Int = 0
-    @State private var totalTicketsSold: Int = 0
-    
-    @State private var isLoading = true
+    @State private var userName: String = Auth.auth().currentUser?.displayName ?? "Loading..."
+    @State private var userEmail: String = Auth.auth().currentUser?.email ?? ""
 
     var body: some View {
         ZStack {
-            // Background Gradient for iOS
             #if os(iOS)
             LinearGradient(
                 gradient: Gradient(colors: [Color(red: 0/255, green: 58/255, blue: 83/255), Color(red: 23/255, green: 17/255, blue: 17/255)]),
@@ -40,9 +30,7 @@ struct MyAccountView: View {
                     #endif
 
                     accountCard
-                    
-                    statsSection
-                    
+                    stripeSection
                     supportSection
 
                     Spacer()
@@ -54,11 +42,13 @@ struct MyAccountView: View {
             .background(Color.clear)
             #endif
         }
-        .onAppear {
-            Task {
-                await loadAllUserData()
-            }
+        // --- Add this alert modifier ---
+        .alert(viewModel.alertTitle, isPresented: $viewModel.showingAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.alertMessage)
         }
+        // ------------------------------
     }
 
     // MARK: - Main UI Sections
@@ -66,7 +56,7 @@ struct MyAccountView: View {
     private var accountCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 16) {
-                KFImage(userProfileImageURL)
+                KFImage(Auth.auth().currentUser?.photoURL)
                     .placeholder {
                         Image(systemName: "person.crop.circle.fill")
                             .resizable()
@@ -88,28 +78,20 @@ struct MyAccountView: View {
                 }
             }
             
-            VStack(alignment: .leading, spacing: 8) {
-                Label(userEmail, systemImage: "envelope.fill")
-                Label(userPhone.isEmpty ? "No phone number" : userPhone, systemImage: "phone.fill")
-            }
-            .font(.subheadline)
+            Label(userEmail, systemImage: "envelope.fill")
+                .font(.subheadline)
             
             Divider()
             
             HStack {
-                VStack(alignment: .leading) {
-                   Text("encore indie")
-                       .font(.headline.bold())
-                   Button("Upgrade") {}
-                        .font(.caption.bold())
-                        .foregroundColor(.accentColor)
-                }
+                Text("Encore Indie Plan")
+                    .font(.headline.bold())
                 Spacer()
                 HStack {
                     Circle()
                         .fill(syncManager.isOnline ? Color.green : Color.gray)
                         .frame(width: 8, height: 8)
-                    Text("Online")
+                    Text(syncManager.isOnline ? "Online" : "Offline")
                         .font(.caption)
                 }
             }
@@ -118,38 +100,83 @@ struct MyAccountView: View {
         .background(.thinMaterial)
         .cornerRadius(16)
     }
-
-    private var statsSection: some View {
+    
+    @ViewBuilder
+    private var stripeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Stats")
+            Text("Payments")
                 .font(.title2.bold())
             
-            // Use a vertical layout for stats on iOS
-            VStack(spacing: 12) {
-                statBlock(count: totalTours, label: "Tours", icon: "airplane")
-                statBlock(count: totalShows, label: "Shows", icon: "music.mic")
-                statBlock(count: totalTicketsSold, label: "Tickets Sold", icon: "ticket.fill")
+            VStack(alignment: .leading) {
+                if viewModel.isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 150)
+                } else if viewModel.hasStripeAccount, let status = viewModel.stripeAccountStatus {
+                    connectedStripeView(status: status)
+                } else {
+                    disconnectedStripeView
+                }
             }
+            .padding()
+            .background(.thinMaterial)
+            .cornerRadius(16)
         }
     }
-
-    private func statBlock(count: Int, label: String, icon: String) -> some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("\(count)")
-                    .font(.system(size: 28, weight: .bold))
-                Text(label)
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            Image(systemName: icon)
-                .font(.title)
+    
+    private var disconnectedStripeView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Stripe Account Not Connected", systemImage: "xmark.circle.fill")
+                .font(.headline)
+                .foregroundColor(.orange)
+            
+            Text("Connect a Stripe account to start selling tickets and receive payouts directly to your bank account.")
+                .font(.subheadline)
                 .foregroundColor(.secondary)
+            
+            Button(action: {
+                viewModel.connectStripeAccount()
+            }) {
+                Text("Connect Stripe Account")
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PrimaryButtonStyle(color: .blue))
         }
-        .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
+    }
+    
+    private func connectedStripeView(status: MyAccountViewModel.StripeAccountStatus) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Stripe Account Connected", systemImage: "checkmark.circle.fill")
+                .font(.headline)
+                .foregroundColor(.green)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Account ID: \(status.accountId)")
+                    .font(.caption.monospaced())
+                    .foregroundColor(.secondary)
+                
+                statusRow(label: "Onboarding Complete", condition: status.detailsSubmitted)
+                statusRow(label: "Payments Enabled", condition: status.chargesEnabled)
+                statusRow(label: "Payouts Enabled", condition: status.payoutsEnabled)
+            }
+            
+            Button("Disconnect Stripe Account", role: .destructive) {
+                Task {
+                    await viewModel.disconnectStripeAccount()
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle(color: .red.opacity(0.8)))
+        }
+    }
+    
+    private func statusRow(label: String, condition: Bool) -> some View {
+        HStack {
+            Image(systemName: condition ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundColor(condition ? .green : .orange)
+            Text(label)
+            Spacer()
+        }
+        .font(.subheadline)
     }
 
     private var supportSection: some View {
@@ -162,9 +189,6 @@ struct MyAccountView: View {
                 supportButton(title: "Terms of Service") {}
                 supportButton(title: "Privacy Policy") {}
             }
-            
-            supportButton(title: "Clear Local Cache") {}
-                .padding(.top)
             
             Button("Sign Out", role: .destructive) {
                 AuthManager.shared.signOut()
@@ -185,71 +209,5 @@ struct MyAccountView: View {
                 .cornerRadius(8)
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - Data Loading Logic
-
-    private func loadAllUserData() async {
-        guard let userID = appState.userID else {
-            isLoading = false
-            return
-        }
-
-        isLoading = true
-        let db = Firestore.firestore()
-
-        async let userProfileTask = db.collection("users").document(userID).getDocument()
-        async let toursTask = db.collection("tours").whereField("ownerId", isEqualTo: userID).getDocuments()
-
-        do {
-            let userDocument = try await userProfileTask
-            if let userData = userDocument.data() {
-                await MainActor.run {
-                    self.userName = userData["displayName"] as? String ?? "No Name"
-                    self.userEmail = userData["email"] as? String ?? ""
-                    self.userPhone = userData["phone"] as? String ?? ""
-                    if let urlString = userData["profileImageURL"] as? String {
-                        self.userProfileImageURL = URL(string: urlString)
-                    }
-                }
-            }
-
-            let toursSnapshot = try await toursTask
-            let tourIDs = toursSnapshot.documents.compactMap { $0.documentID }
-            await MainActor.run { self.totalTours = tourIDs.count }
-
-            if !tourIDs.isEmpty {
-                await fetchStats(for: tourIDs, db: db)
-            } else {
-                await MainActor.run { isLoading = false }
-            }
-
-        } catch {
-            print("Error loading user data: \(error.localizedDescription)")
-            await MainActor.run { isLoading = false }
-        }
-    }
-    
-    private func fetchStats(for tourIDs: [String], db: Firestore) async {
-        async let showsTask = db.collection("shows").whereField("tourId", in: tourIDs).getDocuments()
-        async let ticketedEventsTask = db.collection("ticketedEvents").whereField("tourId", in: tourIDs).getDocuments()
-
-        do {
-            let showsSnapshot = try await showsTask
-            await MainActor.run { self.totalShows = showsSnapshot.count }
-            
-            let ticketedEventsSnapshot = try await ticketedEventsTask
-            let eventIDs = ticketedEventsSnapshot.documents.compactMap { $0.documentID }
-
-            if !eventIDs.isEmpty {
-                let salesSnapshot = try await db.collection("ticketSales").whereField("ticketedEventId", in: eventIDs).getDocuments()
-                let totalSold = salesSnapshot.documents.reduce(0) { $0 + ($1.data()["quantity"] as? Int ?? 0) }
-                await MainActor.run { self.totalTicketsSold = totalSold }
-            }
-        } catch {
-            print("Error fetching stats: \(error.localizedDescription)")
-        }
-        
-        await MainActor.run { isLoading = false }
     }
 }

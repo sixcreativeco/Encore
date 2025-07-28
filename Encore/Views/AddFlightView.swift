@@ -1,375 +1,310 @@
 import SwiftUI
 import FirebaseFirestore
+import Combine
 
 struct AddFlightView: View {
     var tour: Tour
     var onFlightAdded: () -> Void
 
     @Environment(\.dismiss) var dismiss
-    @Environment(\.colorScheme) var colorScheme
-
-    // Form State
-    @State private var flightNumber = ""
-    @State private var flightDate = Date()
-    @State private var selectedAirport: AirportEntry? = nil
-    @State private var airportSearchText = ""
-    @State private var notes = ""
-
-    // View State
-    @State private var isLoading = false
-    @State private var fetchedFlight: Flight? = nil
-    @State private var errorMessage: String? = nil
-
-    // Passenger State
-    @State private var tourCrew: [TourCrew] = []
-    @State private var crewSearchText = ""
-    @State private var baggageInput = ""
-    @State private var passengerEntries: [Passenger] = []
     
-    // Computed property to calculate total baggage
+    enum EntryMode: String, CaseIterable, Identifiable {
+        case autoSearch = "Auto Search"
+        case manual = "Manual Entry"
+        var id: String { self.rawValue }
+    }
+    @State private var entryMode: EntryMode = .autoSearch
+
+    // Auto Search State
+    @State private var autoFlightNumber = ""
+    @State private var autoFlightDate = Date()
+    @State private var autoSelectedAirport: AirportEntry? = nil
+    @State private var autoAirportSearchText = ""
+    @FocusState private var isAirportSearchFocused: Bool
+    @State private var fetchedFlight: Flight? = nil
+
+    // Manual Entry State
+    @State private var manualAirlineName = ""
+    @State private var manualAirlineCode = ""
+    @State private var manualFlightNumber = ""
+    @State private var manualDepartureDate = Date()
+    @State private var manualArrivalDate = Date()
+    @State private var manualDepartureAirport = ""
+    @State private var manualArrivalAirport = ""
+    @State private var manualDepartureTime = Date()
+    @State private var manualArrivalTime = Date()
+    
+    // Shared State
+    @State private var notes = ""
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var tourCrew: [TourCrew] = []
+    @State private var passengerEntries: [Passenger] = []
+
     private var totalBaggage: Int {
         passengerEntries.reduce(0) { total, passenger in
             total + (Int(passenger.baggage ?? "0") ?? 0)
         }
     }
     
-    private let airports = AirportService.shared.airports
-
-    private var filteredAirports: [AirportEntry] {
-        if airportSearchText.isEmpty { return [] }
-        return airports.filter {
-            $0.name.lowercased().contains(airportSearchText.lowercased()) ||
-            $0.city.lowercased().contains(airportSearchText.lowercased()) ||
-            $0.iata.lowercased().contains(airportSearchText.lowercased())
-        }
-    }
+    private let allAirports = AirportService.shared.airports
     
-    private var filteredCrew: [TourCrew] {
-        if crewSearchText.isEmpty { return [] }
-        let selectedIDs = Set(passengerEntries.map { $0.crewId })
-        return tourCrew.filter { crew in
-            guard let id = crew.id else { return false }
-            return crew.name.lowercased().contains(crewSearchText.lowercased()) && !selectedIDs.contains(id)
+    private var filteredAirports: [AirportEntry] {
+        if autoAirportSearchText.isEmpty { return [] }
+        return allAirports.filter {
+            $0.name.lowercased().contains(autoAirportSearchText.lowercased()) ||
+            $0.city.lowercased().contains(autoAirportSearchText.lowercased()) ||
+            $0.iata.lowercased().contains(autoAirportSearchText.lowercased())
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            HStack {
-                Text("Add Flight").font(.title.bold())
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                header
+                Picker("Entry Mode", selection: $entryMode) {
+                    ForEach(EntryMode.allCases) { mode in Text(mode.rawValue).tag(mode) }
+                }
+                .pickerStyle(SegmentedPickerStyle()).padding(.bottom, 16)
+                
+                if entryMode == .autoSearch { autoSearchView }
+                else { manualEntryView }
                 Spacer()
-                Button(action: { dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                         .font(.title2)
-                        .foregroundColor(.gray)
-                }
-                .buttonStyle(.plain)
             }
-
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading) {
-                        Text("Flight Number").font(.subheadline)
-                        TextField("e.g. QF140", text: $flightNumber)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                    }
-
-                    VStack(alignment: .leading) {
-                        Text("Flight Date").font(.subheadline)
-                         DatePicker("", selection: $flightDate, displayedComponents: .date)
-                            .labelsHidden()
-                    }
-                }
-
-                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Departure Airport").font(.subheadline)
-                    TextField("Start typing airport...", text: $airportSearchText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-
-                    if !filteredAirports.isEmpty {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 0) {
-                                ForEach(filteredAirports) { airport in
-                                     Button {
-                                        selectAirport(airport)
-                                     } label: {
-                                        HStack {
-                                            Text("\(airport.name) (\(airport.iata))")
-                                             Spacer()
-                                        }
-                                         .padding(8)
-                                    }
-                                    .buttonStyle(.plain)
-                                 }
-                            }
-                        }
-                        .background(Color.gray.opacity(0.1))
-                         .cornerRadius(8)
-                        .frame(maxHeight: 200)
-                    }
-
-                    if let selected = selectedAirport {
-                         Text("Selected: \(selected.name)").font(.caption).foregroundColor(.gray)
-                    }
-                }
-            }
-            
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Who's on this flight?").font(.headline)
-                HStack(alignment: .bottom) {
-                    VStack(alignment: .leading) {
-                        Text("Name").font(.subheadline)
-                        TextField("Search Crew", text: $crewSearchText)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-
-                        if !filteredCrew.isEmpty {
-                            ScrollView {
-                                 VStack(alignment: .leading, spacing: 0) {
-                                    ForEach(filteredCrew) { crew in
-                                        Button {
-                                            crewSearchText = crew.name
-                                        } label: {
-                                             HStack {
-                                                Text(crew.name)
-                                                 Spacer()
-                                            }
-                                             .padding(8)
-                                        }
-                                        .buttonStyle(.plain)
-                                     }
-                                }
-                            }
-                             .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
-                            .frame(maxHeight: 150)
-                        }
-                    }
-
-                    VStack(alignment: .leading) {
-                        Text("Baggage (kg)").font(.subheadline)
-                        TextField("e.g. 23", text: $baggageInput)
-                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                    }
-                    
-                    Button(action: { addPassenger() }) {
-                        Text("Add")
-                    }
-                    .disabled(crewSearchText.isEmpty)
-                }
-
-                if !passengerEntries.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(passengerEntries) { entry in
-                            HStack {
-                                Text(tourCrew.first { $0.id == entry.crewId }?.name ?? "Unknown")
-                                Spacer()
-                                Text(entry.baggage ?? "N/A")
-                                    .foregroundColor(.secondary)
-                                Button(action: {
-                                    passengerEntries.removeAll { $0.id == entry.id }
-                                }) {
-                                    Image(systemName: "xmark.circle")
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        Divider()
-                        HStack {
-                            Text("Total Baggage").fontWeight(.bold)
-                            Spacer()
-                            Text("\(totalBaggage) kg").fontWeight(.bold)
-                        }
-                    }
-                }
-            }
-
-            if isLoading { ProgressView() }
-
-            if let fetched = fetchedFlight {
-                flightPreview(fetched)
-                Button("Confirm & Add") {
-                    saveFlight(fetched)
-                }
-                .buttonStyle(.borderedProminent)
-            } else {
-                Button(action: { fetchFlightData() }) {
-                    Text("Search Flight")
-                        .frame(maxWidth: .infinity).padding().background(Color.blue).foregroundColor(.white).cornerRadius(10)
-                }
-                .buttonStyle(.plain)
-                .disabled(flightNumber.isEmpty || selectedAirport == nil)
-            }
-
-            if let error = errorMessage {
-                Text(error).foregroundColor(.red)
-            }
-
-            Spacer()
+            .padding()
         }
-        .padding()
         .onAppear(perform: loadCrew)
     }
     
-    private func selectAirport(_ airport: AirportEntry) {
-        selectedAirport = airport
-        airportSearchText = "\(airport.name) (\(airport.iata))"
-    }
-
-    private func addPassenger() {
-        guard let crewMember = tourCrew.first(where: { $0.name == crewSearchText }), let crewID = crewMember.id else { return }
-        
-        let newEntry = Passenger(crewId: crewID, baggage: baggageInput.isEmpty ? nil : baggageInput)
-        
-        if !passengerEntries.contains(where: { $0.crewId == crewID }) {
-            passengerEntries.append(newEntry)
+    private var header: some View {
+         HStack {
+            Text("Add Flight").font(.title.bold()); Spacer()
+            Button(action: { dismiss() }) { Image(systemName: "xmark.circle.fill").font(.title2).foregroundColor(.gray) }.buttonStyle(.plain)
         }
-        crewSearchText = ""
-        baggageInput = ""
     }
 
+    // --- REBUILT AUTO SEARCH VIEW ---
+    private var autoSearchView: some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading) { Text("Flight Number").font(.subheadline); TextField("e.g. QF140", text: $autoFlightNumber).textFieldStyle(RoundedBorderTextFieldStyle()) }
+                VStack(alignment: .leading) { Text("Flight Date").font(.subheadline); DatePicker("", selection: $autoFlightDate, displayedComponents: .date).labelsHidden() }
+            }
+
+            VStack(alignment: .leading) {
+                Text("Departure Airport").font(.subheadline)
+                
+                // --- DEFINITIVE FIX: Swaps between a display "pill" and the text field ---
+                if let selectedAirport = autoSelectedAirport {
+                    HStack {
+                        Text(selectedAirport.name)
+                            .padding(.vertical, 8)
+                            .padding(.leading, 12)
+                        Spacer()
+                        Button(action: {
+                            self.autoSelectedAirport = nil
+                            self.autoAirportSearchText = ""
+                            self.isAirportSearchFocused = true
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 8)
+                    }
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(8)
+                } else {
+                    TextField("Start typing airport or city...", text: $autoAirportSearchText)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .focused($isAirportSearchFocused)
+                }
+
+                if isAirportSearchFocused && !filteredAirports.isEmpty {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(filteredAirports) { airport in
+                                HStack { Text(airport.name).padding(8); Spacer() }
+                                .contentShape(Rectangle())
+                                .onTapGesture { selectAirport(airport) }
+                                Divider()
+                            }
+                        }
+                    }.background(Color.gray.opacity(0.1)).cornerRadius(8).frame(maxHeight: 200)
+                }
+            }
+            // --- END OF FIX ---
+
+            if fetchedFlight == nil {
+                Button(action: findFlight) {
+                    HStack { Spacer(); if isLoading { ProgressView().colorInvert() } else { Text("Search Flight") }; Spacer() }
+                }
+                .buttonStyle(PlainButtonStyle()).padding().background(Color.blue).foregroundColor(.white).cornerRadius(10)
+                .disabled(autoFlightNumber.isEmpty || autoSelectedAirport == nil || isLoading)
+            } else {
+                flightPreview(fetchedFlight!)
+                passengersSection
+                Button(action: { saveFlight(fetchedFlight!) }) {
+                    HStack { Spacer(); Text("Confirm & Add Flight"); Spacer() }
+                }
+                .buttonStyle(PlainButtonStyle()).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
+            }
+            if let error = errorMessage { Text(error).foregroundColor(.red).font(.caption).padding(.top) }
+        }
+    }
+
+    private var manualEntryView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 16) {
+                StyledInputField(placeholder: "Airline Name", text: $manualAirlineName)
+                StyledInputField(placeholder: "Code", text: $manualAirlineCode).onChange(of: manualAirlineCode) { _, v in manualAirlineCode = String(v.uppercased().filter { "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".contains($0) }.prefix(2)) }
+                StyledInputField(placeholder: "Flight No.", text: $manualFlightNumber).onChange(of: manualFlightNumber) { _, v in manualFlightNumber = v.filter { "0123456789".contains($0) } }
+            }
+            HStack(spacing: 16) {
+                VStack(alignment: .leading) { Text("Departure").font(.subheadline); StyledDateField(date: $manualDepartureDate); StyledTimePicker(label: "", time: $manualDepartureTime) }
+                VStack(alignment: .leading) { Text("Arrival").font(.subheadline); StyledDateField(date: $manualArrivalDate); StyledTimePicker(label: "", time: $manualArrivalTime) }
+            }
+            HStack(spacing: 16) {
+                StyledInputField(placeholder: "From (IATA)", text: $manualDepartureAirport).onChange(of: manualDepartureAirport) { _, v in manualDepartureAirport = String(v.uppercased().prefix(3)) }
+                StyledInputField(placeholder: "To (IATA)", text: $manualArrivalAirport).onChange(of: manualArrivalAirport) { _, v in manualArrivalAirport = String(v.uppercased().prefix(3)) }
+            }
+            passengersSection
+            Button(action: saveManualFlight) { HStack { Spacer(); Text("Save Manual Flight"); Spacer() } }.buttonStyle(PlainButtonStyle()).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
+        }
+    }
+    
+    private var passengersSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Who's on this flight?").font(.headline)
+            GuestInputView(tourCrew: $tourCrew, passengerEntries: $passengerEntries)
+            if !passengerEntries.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(passengerEntries) { entry in
+                        HStack {
+                            Text(tourCrew.first { $0.id == entry.crewId }?.name ?? "Unknown"); Spacer()
+                            Text("\(entry.baggage ?? "0") kg").foregroundColor(.secondary)
+                            Button(action: { passengerEntries.removeAll { $0.id == entry.id } }) { Image(systemName: "xmark.circle") }.buttonStyle(.plain)
+                        }
+                    }
+                    Divider(); HStack { Text("Total Baggage").fontWeight(.bold); Spacer(); Text("\(totalBaggage) kg").fontWeight(.bold) }
+                }
+            }
+        }
+    }
+    
     private func flightPreview(_ flight: Flight) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                 Text("\(flight.airline ?? "N/A") \(flight.flightNumber ?? "N/A")").font(.headline)
-                Spacer()
-            }
-            Text("\(flight.origin) → \(flight.destination)").font(.subheadline)
-            Text("Departs: \(flight.departureTimeUTC.dateValue().formatted(date: .long, time: .shortened))").font(.caption)
-        }
-        .padding()
-        .background(Color(nsColor: .controlBackgroundColor))
-        .cornerRadius(12)
+            Text("Flight Found").font(.headline)
+            HStack { Text("\(flight.airline ?? "N/A") \(flight.flightNumber ?? "N/A")").font(.subheadline); Spacer() }
+            Text("\(flight.origin) → \(flight.destination)")
+            Text("Departs: \(flight.departureTimeUTC.dateValue().formatted(date: .abbreviated, time: .shortened))")
+            Text("Arrives: \(flight.arrivalTimeUTC.dateValue().formatted(date: .abbreviated, time: .shortened))")
+        }.font(.caption).padding().frame(maxWidth: .infinity, alignment: .leading).background(Color(nsColor: .controlBackgroundColor)).cornerRadius(12)
+    }
+    
+    private func selectAirport(_ airport: AirportEntry) {
+        self.autoSelectedAirport = airport
+        self.autoAirportSearchText = "" // Clear the search text
+        self.isAirportSearchFocused = false
     }
     
     private func loadCrew() {
         Task {
-            do {
-                self.tourCrew = try await FirebaseTourService.loadCrew(forTour: tour.id ?? "")
-            } catch {
-                print("Error loading crew: \(error.localizedDescription)")
-            }
+            do { self.tourCrew = try await FirebaseTourService.loadCrew(forTour: tour.id ?? "") }
+            catch { print("❌ DEBUG: Error loading crew: \(error.localizedDescription)") }
         }
     }
     
-    private func fetchFlightData() {
-        guard let departureAirport = selectedAirport, let tourID = tour.id else {
-            self.errorMessage = "Please select a departure airport."
-            return
-        }
-
-        isLoading = true
-        errorMessage = nil
-
-        let apiDateFormatter = DateFormatter()
-        apiDateFormatter.dateFormat = "yyyy-MM-dd"
-        let formattedDate = apiDateFormatter.string(from: flightDate)
-
+    private func findFlight() {
+        guard let departureAirport = autoSelectedAirport else { self.errorMessage = "Please select a departure airport."; return }
+        isLoading = true; errorMessage = nil; fetchedFlight = nil
+        let apiDateFormatter = DateFormatter(); apiDateFormatter.dateFormat = "yyyy-MM-dd"; let formattedDate = apiDateFormatter.string(from: autoFlightDate)
         FlightLabsAPI.fetchFutureFlights(depIATA: departureAirport.iata, date: formattedDate) { result in
             DispatchQueue.main.async {
                 self.isLoading = false
                 switch result {
                 case .success(let flights):
-                    let airlineCode = String(self.flightNumber.prefix { $0.isLetter })
-                    let number = String(self.flightNumber.drop { $0.isLetter })
-
+                    let airlineCode = String(self.autoFlightNumber.prefix { $0.isLetter }); let number = String(self.autoFlightNumber.drop { $0.isLetter })
                     if let match = flights.first(where: { $0.carrier.fs.uppercased() == airlineCode.uppercased() && $0.carrier.flightNumber == number }) {
-                        
-                        // Find full airport data for both departure and arrival to get timezones
-                        guard let depAirportData = AirportService.shared.airports.first(where: { $0.iata == departureAirport.iata }),
-                              let arrAirportData = AirportService.shared.airports.first(where: { $0.iata == match.airport.fs }),
-                              let depTimeZone = TimeZone(identifier: depAirportData.tz),
-                              let arrTimeZone = TimeZone(identifier: arrAirportData.tz) else {
-                            self.errorMessage = "Could not determine timezone for airports."
-                            return
+                        guard let dep = self.allAirports.first(where: { $0.iata == departureAirport.iata }), let arr = self.allAirports.first(where: { $0.iata == match.airport.fs }), let depTZ = TimeZone(identifier: dep.tz), let arrTZ = TimeZone(identifier: arr.tz) else {
+                            self.errorMessage = "Could not determine timezone for airports."; return
                         }
-                        
-                        func createDateInTimezone(date: Date, timeString: String, timezone: TimeZone) -> Date {
-                            var calendar = Calendar.current
-                            calendar.timeZone = timezone
-                            let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
-                            let timeComponents = timeString.split(separator: ":")
-                            let hour = Int(timeComponents.first ?? "0") ?? 0
-                            let minute = Int(timeComponents.last ?? "0") ?? 0
-                            
-                            var finalComponents = DateComponents()
-                            finalComponents.year = dateComponents.year
-                            finalComponents.month = dateComponents.month
-                            finalComponents.day = dateComponents.day
-                            finalComponents.hour = hour
-                            finalComponents.minute = minute
-                            
-                            return calendar.date(from: finalComponents) ?? date
-                        }
-
-                        // Create departure and arrival dates in their respective local timezones
-                        let departureDateLocal = createDateInTimezone(date: self.flightDate, timeString: match.departureTime?.time24 ?? "00:00", timezone: depTimeZone)
-                        var arrivalDateLocal = createDateInTimezone(date: self.flightDate, timeString: match.arrivalTime?.time24 ?? "00:00", timezone: arrTimeZone)
-
-                        // If local arrival time is before local departure time, it's an overnight or date line-crossing flight.
-                        if arrivalDateLocal < departureDateLocal {
-                             arrivalDateLocal = Calendar.current.date(byAdding: .day, value: 1, to: arrivalDateLocal) ?? arrivalDateLocal
-                        }
-                        
-                        let flight = Flight(
-                            tourId: tourID,
-                            airline: match.carrier.name,
-                            flightNumber: "\(match.carrier.fs)\(match.carrier.flightNumber)",
-                            departureTimeUTC: Timestamp(date: departureDateLocal),
-                            arrivalTimeUTC: Timestamp(date: arrivalDateLocal),
-                            origin: departureAirport.iata,
-                            destination: match.airport.fs,
-                            notes: self.notes,
-                            passengers: self.passengerEntries
-                        )
-                        self.fetchedFlight = flight
-                    } else {
-                        self.errorMessage = "No matching flight found for this date."
-                    }
-                case .failure(let error):
-                    self.errorMessage = error.localizedDescription
+                        var arrDate = self.createDateInTimezone(date: self.autoFlightDate, timeString: match.arrivalTime?.time24 ?? "00:00", timezone: arrTZ)
+                        let depDate = self.createDateInTimezone(date: self.autoFlightDate, timeString: match.departureTime?.time24 ?? "00:00", timezone: depTZ)
+                        if arrDate < depDate { arrDate = Calendar.current.date(byAdding: .day, value: 1, to: arrDate) ?? arrDate }
+                        self.fetchedFlight = Flight(tourId: self.tour.id ?? "", airline: match.carrier.name, flightNumber: "\(match.carrier.fs)\(match.carrier.flightNumber)", departureTimeUTC: Timestamp(date: depDate), arrivalTimeUTC: Timestamp(date: arrDate), origin: dep.iata, destination: arr.iata, notes: self.notes, passengers: [])
+                    } else { self.errorMessage = "No matching flight found for this date." }
+                case .failure(let error): self.errorMessage = error.localizedDescription
                 }
             }
         }
     }
+    
+    private func saveManualFlight() {
+        guard let tourID = tour.id, !manualAirlineName.isEmpty, !manualAirlineCode.isEmpty, !manualFlightNumber.isEmpty, !manualDepartureAirport.isEmpty, !manualArrivalAirport.isEmpty else { errorMessage = "Please fill all manual flight fields."; return }
+        let fullFlightNumber = manualAirlineCode.uppercased() + manualFlightNumber
+        let depTimestamp = combineDateAndTime(date: manualDepartureDate, time: manualDepartureTime)
+        let arrTimestamp = combineDateAndTime(date: manualArrivalDate, time: manualArrivalTime)
+        let flightToSave = Flight(tourId: tourID, airline: manualAirlineName, flightNumber: fullFlightNumber, departureTimeUTC: depTimestamp, arrivalTimeUTC: arrTimestamp, origin: manualDepartureAirport.uppercased(), destination: manualArrivalAirport.uppercased(), notes: notes, passengers: passengerEntries)
+        saveFlight(flightToSave)
+    }
 
     private func saveFlight(_ flight: Flight) {
-        let db = Firestore.firestore()
-        var finalFlight = flight
-        finalFlight.passengers = self.passengerEntries
-        
-        FirebaseFlightService.saveFlight(finalFlight) { error, newFlightID  in
-            if let error = error {
-                print("❌ Error saving flight: \(error.localizedDescription)")
-                self.errorMessage = "Failed to save flight. Please try again."
-                return
+        isLoading = true; var flightToSave = flight; flightToSave.passengers = self.passengerEntries
+        FirebaseFlightService.saveFlight(flightToSave) { error, newFlightID  in
+            self.isLoading = false
+            if let error = error { self.errorMessage = "Failed to save flight. Please try again: \(error.localizedDescription)"; return }
+            self.onFlightAdded(); self.dismiss()
+        }
+    }
+    
+    private func createDateInTimezone(date: Date, timeString: String, timezone: TimeZone) -> Date {
+        var calendar = Calendar.current; calendar.timeZone = timezone
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
+        let timeComponents = timeString.split(separator: ":"); let hour = Int(timeComponents.first ?? "0") ?? 0; let minute = Int(timeComponents.last ?? "0") ?? 0
+        var finalComponents = DateComponents(); finalComponents.year = dateComponents.year; finalComponents.month = dateComponents.month; finalComponents.day = dateComponents.day; finalComponents.hour = hour; finalComponents.minute = minute
+        return calendar.date(from: finalComponents) ?? date
+    }
+    
+    private func combineDateAndTime(date: Date, time: Date) -> Timestamp {
+        let calendar = Calendar.current
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+        var combined = DateComponents(); combined.year = dateComponents.year; combined.month = dateComponents.month; combined.day = dateComponents.day; combined.hour = timeComponents.hour; combined.minute = timeComponents.minute
+        return Timestamp(date: calendar.date(from: combined) ?? Date())
+    }
+    
+    struct GuestInputView: View {
+        @Binding var tourCrew: [TourCrew]; @Binding var passengerEntries: [Passenger]
+        @State private var guestSearchText: String = ""; @State private var guestBaggage: String = ""
+        private var filteredCrewSuggestions: [TourCrew] {
+            if guestSearchText.isEmpty { return [] }
+            let assignedGuestIDs = Set(passengerEntries.map { $0.crewId })
+            return tourCrew.filter { crew in let isAssigned = assignedGuestIDs.contains(crew.id ?? ""); let matchesSearch = crew.name.lowercased().contains(guestSearchText.lowercased()); return !isAssigned && matchesSearch }
+        }
+        var body: some View {
+            VStack {
+                 HStack(alignment: .bottom) {
+                    VStack(alignment: .leading) { Text("Name").font(.subheadline); TextField("Search Crew", text: $guestSearchText).textFieldStyle(RoundedBorderTextFieldStyle()) }
+                    VStack(alignment: .leading) { Text("Baggage (kg)").font(.subheadline); TextField("e.g. 23", text: $guestBaggage).textFieldStyle(RoundedBorderTextFieldStyle()) }
+                    Button("Add") { addPassenger() }.disabled(guestSearchText.isEmpty)
+                }
+                if !filteredCrewSuggestions.isEmpty {
+                    ScrollView {
+                         VStack(alignment: .leading, spacing: 0) {
+                            ForEach(filteredCrewSuggestions) { crew in
+                                Button(action: { guestSearchText = crew.name }) { HStack { Text(crew.name); Spacer() }.padding(8) }.buttonStyle(.plain)
+                             }
+                        }
+                    }.background(Color.gray.opacity(0.1)).cornerRadius(8).frame(maxHeight: 150)
+                }
             }
-            
-            guard let flightID = newFlightID else {
-                self.errorMessage = "Failed to get new flight ID."
-                return
-            }
-            
-            let itineraryItem = ItineraryItem(
-                 id: "flight-\(flightID)",
-                tourId: flight.tourId,
-                showId: nil,
-                title: "\(flight.airline ?? "") \(flight.flightNumber ?? ""): \(flight.origin) → \(flight.destination)",
-                type: ItineraryItemType.flight.rawValue,
-                 timeUTC: flight.departureTimeUTC, // Itinerary item is based on departure
-                notes: flight.notes,
-                timezone: AirportService.shared.airports.first { $0.iata == flight.origin }?.tz,
-                visibility: "Everyone",
-                visibleTo: nil
-            )
-            
-            do {
-                try db.collection("itineraryItems").document(itineraryItem.id!).setData(from: itineraryItem)
-                self.onFlightAdded()
-                self.dismiss()
-            } catch {
-                print("❌ Error saving itinerary item: \(error.localizedDescription)")
-                self.errorMessage = "Failed to save itinerary item for flight."
-            }
+        }
+        private func addPassenger() {
+            guard let crewMember = tourCrew.first(where: { $0.name == guestSearchText }), let crewID = crewMember.id else { return }
+            let newEntry = Passenger(crewId: crewID, baggage: guestBaggage.isEmpty ? nil : guestBaggage)
+            if !passengerEntries.contains(where: { $0.crewId == crewID }) { passengerEntries.append(newEntry) }
+            guestSearchText = ""; guestBaggage = ""
         }
     }
 }

@@ -7,7 +7,7 @@ enum ItineraryItemType: String, Codable, CaseIterable {
     case packOut
     case flight
     case arrival
-    case hotel
+    case hotel // MODIFIED: This was previously in the codebase but is now being explicitly re-confirmed and used.
     case meeting
     case freeTime
     case catering
@@ -16,8 +16,8 @@ enum ItineraryItemType: String, Codable, CaseIterable {
     case travel
     case content
     case merch
-    case lounge // NEW
-    
+    case lounge
+
     var displayName: String {
         switch self {
         case .loadIn: return "Load In"
@@ -35,10 +35,10 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         case .travel: return "Travel"
         case .content: return "Content"
         case .merch: return "Merchandise"
-        case .lounge: return "Lounge" // NEW
+        case .lounge: return "Lounge"
         }
     }
-    
+
     var iconName: String {
         switch self {
         case .loadIn: return "truck.box"
@@ -47,7 +47,7 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         case .packOut: return "shippingbox"
         case .flight: return "airplane"
         case .arrival: return "airplane.arrival"
-        case .hotel: return "bed.double.fill"
+        case .hotel: return "bed.double.fill" // MODIFIED: This was previously in the codebase but is now being explicitly re-confirmed and used.
         case .meeting: return "person.2.fill"
         case .freeTime: return "clock.fill"
         case .catering: return "fork.knife"
@@ -56,7 +56,7 @@ enum ItineraryItemType: String, Codable, CaseIterable {
         case .travel: return "car.fill"
         case .content: return "camera.fill"
         case .merch: return "tshirt.fill"
-        case .lounge: return "sofa" // NEW
+        case .lounge: return "sofa"
         }
     }
 

@@ -142,6 +142,50 @@ class TicketingAPI {
         }.resume()
     }
     
+    // Add these new functions to the TicketingAPI class:
+
+    func fetchWalletBalance(userId: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        guard let url = URL(string: "\(possibleBaseURLs[0])/api/get-wallet") else {
+            completion(.failure(APIError.invalidURL))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = ["userId": userId]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            guard let data = data else {
+                completion(.failure(APIError.noData))
+                return
+            }
+            
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    completion(.success(json))
+                } else {
+                    completion(.failure(APIError.invalidResponse))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+    
     // MARK: - Utility Methods
     
     func openURL(_ urlString: String) {

@@ -21,7 +21,6 @@ struct ItineraryItemAddView: View {
     @State private var tourCrew: [TourCrew] = []
     @State private var selectedCrewIDs: Set<String> = []
 
-    // Grid Layout (for macOS)
     private let columns = [GridItem(.adaptive(minimum: 120))]
 
     init(tourID: String, userID: String, onSave: @escaping () -> Void, showForTimezone: Show?) {
@@ -48,7 +47,6 @@ struct ItineraryItemAddView: View {
         #endif
     }
     
-    // MARK: - macOS Body
     @ViewBuilder
     private var macOSBody: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -62,25 +60,21 @@ struct ItineraryItemAddView: View {
                 }
                 .buttonStyle(.plain)
             }
-
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 12) {
                     Image(systemName: type.iconName)
                         .font(.title2)
                         .foregroundColor(.accentColor)
                         .frame(width: 30)
-                    
+
                     StyledInputField(placeholder: "Event (e.g. 'Dinner reservation')", text: $title)
                         .onChange(of: title) { _, newValue in updateType(from: newValue) }
                 }
-
                 HStack {
                     StyledDateField(date: $eventDate)
                     StyledTimePicker(label: "", time: $time)
                 }
-                
                 CustomTextEditor(placeholder: "Notes (optional)", text: $note)
-
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Visibility").font(.headline)
                     HStack {
@@ -96,7 +90,7 @@ struct ItineraryItemAddView: View {
                         }
                         .buttonStyle(PrimaryButtonStyle(color: visibility == "Custom" ? .accentColor : .gray.opacity(0.3)))
                     }
-                    
+                
                     if showCrewSelector {
                         crewGrid
                             .padding(.top, 8)
@@ -107,16 +101,18 @@ struct ItineraryItemAddView: View {
             Spacer()
             
             Button("Save Item", action: saveItem)
-                .frame(maxWidth: .infinity).padding().background(title.isEmpty ? Color.gray.opacity(0.5) : Color.accentColor)
-                .foregroundColor(.white).cornerRadius(10)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(title.isEmpty ? Color.gray.opacity(0.5) : Color.accentColor)
+                .foregroundColor(.white)
+                .cornerRadius(10)
                 .disabled(title.isEmpty)
         }
         .padding(32)
         .frame(width: 550, height: 650)
         .onAppear(perform: fetchCrew)
     }
-    
-    // MARK: - iOS Body
+     
     @ViewBuilder
     private var iOSBody: some View {
         NavigationView {
@@ -165,7 +161,6 @@ struct ItineraryItemAddView: View {
                         .disabled(title.isEmpty)
                     }
                 }
-                // These modifiers are now correctly wrapped for iOS only
                 #if os(iOS)
                 .navigationTitle("Add Itinerary Item")
                 .navigationBarTitleDisplayMode(.inline)
@@ -253,20 +248,30 @@ struct ItineraryItemAddView: View {
     private func saveItem() {
         let eventTimeZone = TimeZone(identifier: showForTimezone?.timezone ?? "UTC") ?? .current
         
-        var calendar = Calendar.current
-        calendar.timeZone = eventTimeZone
+        // Use the user's current calendar to decompose the date picker values into raw numbers.
+        let localCalendar = Calendar.current
+        let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: eventDate)
+        let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
+        
+        // Create a new calendar that is configured to the EVENT's local timezone.
+        var eventCalendar = Calendar.current
+        eventCalendar.timeZone = eventTimeZone
 
-        let dateComponents = calendar.dateComponents([.year, .month, .day], from: eventDate)
-        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+        // Combine the raw numbers into a new set of components for the EVENT's timezone.
+        var finalComponents = DateComponents()
+        finalComponents.year = dateComponents.year
+        finalComponents.month = dateComponents.month
+        finalComponents.day = dateComponents.day
+        finalComponents.hour = timeComponents.hour
+        finalComponents.minute = timeComponents.minute
+        finalComponents.timeZone = eventTimeZone
         
-        var combinedComponents = DateComponents()
-        combinedComponents.year = dateComponents.year
-        combinedComponents.month = dateComponents.month
-        combinedComponents.day = dateComponents.day
-        combinedComponents.hour = timeComponents.hour
-        combinedComponents.minute = timeComponents.minute
-        
-        let finalDate = calendar.date(from: combinedComponents) ?? Date()
+        // Create the final Date object. Because the calendar's timezone is correct,
+        // this date will represent the correct moment in time (UTC).
+        guard let finalDate = eventCalendar.date(from: finalComponents) else {
+            print("Error: Could not construct final date from components.")
+            return
+        }
 
         let newItem = ItineraryItem(
             tourId: self.tourID,

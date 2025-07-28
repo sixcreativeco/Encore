@@ -1,8 +1,8 @@
 import Foundation
 import FirebaseFirestore
 
-// FIX: Added Equatable conformance
-struct Tour: Codable, Identifiable, Equatable {
+// FIX: Added Hashable conformance
+struct Tour: Codable, Identifiable, Equatable, Hashable {
     @DocumentID var id: String?
     let ownerId: String
     var tourName: String
@@ -11,4 +11,14 @@ struct Tour: Codable, Identifiable, Equatable {
     var endDate: Timestamp
     var posterURL: String?
     @ServerTimestamp var createdAt: Timestamp?
+
+    // Conformance to Equatable (already present)
+    static func == (lhs: Tour, rhs: Tour) -> Bool {
+        return lhs.id == rhs.id
+    }
+
+    // Conformance to Hashable
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
