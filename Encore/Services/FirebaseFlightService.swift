@@ -79,7 +79,7 @@ struct FirebaseFlightService {
     static func addFlightsListener(forTour tourID: String, completion: @escaping ([Flight]) -> Void) -> ListenerRegistration {
         return db.collection("flights")
              .whereField("tourId", isEqualTo: tourID)
-            .addSnapshotListener { snapshot, error in
+             .addSnapshotListener { snapshot, error in
                 let flights = snapshot?.documents.compactMap { try? $0.data(as: Flight.self) } ?? []
                 completion(flights)
             }

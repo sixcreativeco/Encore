@@ -8,22 +8,26 @@ struct TourEditView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var appState: AppState
 
-    // The view now uses a local state copy of the new 'Tour' model for editing.
     @State private var editableTour: Tour
+    
+    // State for UI controls
+    @State private var startDate: Date
+    @State private var endDate: Date
 
+    // State for poster image handling
     @State private var posterImage: NSImage? = nil
     @State private var posterFileURL: URL? = nil
     @State private var isSaving = false
     @State private var isLoadingImage = false
 
-    // The initializer now takes the new 'Tour' model.
     init(tour: Tour) {
-        // We initialize our local state with the tour passed into the view.
         _editableTour = State(initialValue: tour)
+        // Initialize local Date state from the tour's Timestamps
+        _startDate = State(initialValue: tour.startDate.dateValue())
+        _endDate = State(initialValue: tour.endDate.dateValue())
     }
 
     var body: some View {
-        // NOTE: The UI layout of this view remains unchanged.
         VStack(alignment: .leading, spacing: 24) {
             HStack {
                 Spacer()
@@ -39,23 +43,21 @@ struct TourEditView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Edit Tour").font(.system(size: 28, weight: .bold))
                     
-                    // FIX: Form fields now bind directly to the 'editableTour' state object.
                     CustomTextField(placeholder: "Tour Name", text: $editableTour.tourName)
                     CustomTextField(placeholder: "Artist Name", text: $editableTour.artist)
                     
                     HStack(spacing: 12) {
-                        // FIX: These require a binding to a Date, not a Timestamp. We'll use a helper.
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Start Date").font(.subheadline).foregroundColor(.gray)
-                            CustomDateField(date: dateBinding(for: $editableTour.startDate))
+                            // Bind directly to the local Date state
+                            CustomDateField(date: $startDate)
                         }
                         VStack(alignment: .leading, spacing: 4) {
                             Text("End Date").font(.subheadline).foregroundColor(.gray)
-                            CustomDateField(date: dateBinding(for: $editableTour.endDate))
+                            // Bind directly to the local Date state
+                            CustomDateField(date: $endDate)
                         }
                     }
-                    // This UI component for tour scope was not in your model, so it is removed for now.
-                    // We can add it back to the 'Tour' model if needed.
                 }
 
                 VStack {
@@ -102,14 +104,6 @@ struct TourEditView: View {
         }
     }
 
-    // This helper function safely converts a Binding<Timestamp> to a Binding<Date> for the DatePicker.
-    private func dateBinding(for timestampBinding: Binding<Timestamp>) -> Binding<Date> {
-        Binding<Date>(
-            get: { timestampBinding.wrappedValue.dateValue() },
-            set: { timestampBinding.wrappedValue = Timestamp(date: $0) }
-        )
-    }
-
     private func loadPosterAsync() async {
         guard let urlStr = editableTour.posterURL, let url = URL(string: urlStr) else { return }
         isLoadingImage = true
@@ -120,10 +114,23 @@ struct TourEditView: View {
         isLoadingImage = false
     }
 
-    private func selectPoster() { /* This function remains unchanged */ }
+    private func selectPoster() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg]
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url, let img = NSImage(contentsOf: url) {
+            posterImage = img
+            posterFileURL = url
+        }
+    }
 
     private func saveEdits() async {
         isSaving = true
+        
+        // Update the tour object's timestamps from our local Date state before saving
+        editableTour.startDate = Timestamp(date: startDate)
+        editableTour.endDate = Timestamp(date: endDate)
         
         if let fileURL = posterFileURL {
             do {
@@ -134,7 +141,6 @@ struct TourEditView: View {
             } catch { print("❌ Error uploading poster: \(error.localizedDescription)") }
         }
         
-        // FIX: Save the updated 'Codable' object directly to the top-level /tours collection.
         do {
             guard let tourID = editableTour.id else { throw URLError(.badServerResponse) }
             try Firestore.firestore().collection("tours").document(tourID).setData(from: editableTour, merge: true)
@@ -147,9 +153,8 @@ struct TourEditView: View {
     }
 
     private func deleteTour() async {
-        guard let userID = appState.userID, let tourID = editableTour.id else { return }
+        guard let tourID = editableTour.id else { return }
         
-        // FIX: Delete from the top-level /tours collection.
         do {
             try await Firestore.firestore().collection("tours").document(tourID).delete()
             DispatchQueue.main.async {

@@ -8,14 +8,26 @@ struct ItineraryItem: Codable, Identifiable, Equatable {
     var title: String
     var type: String
     var timeUTC: Timestamp
-    
+        
     var subtitle: String?
-    
+        
     var notes: String?
     var timezone: String?
-
+    
     // --- NEW FIELDS ---
     var visibility: String? // "everyone" or "custom"
     var visibleTo: [String]? // Array of crew member document IDs
+    
+    // Custom equality to help SwiftUI detect changes
+    static func == (lhs: ItineraryItem, rhs: ItineraryItem) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.title == rhs.title &&
+               lhs.type == rhs.type &&
+               lhs.timeUTC == rhs.timeUTC &&
+               lhs.subtitle == rhs.subtitle &&
+               lhs.notes == rhs.notes &&
+               lhs.timezone == rhs.timezone &&
+               lhs.visibility == rhs.visibility &&
+               lhs.visibleTo == rhs.visibleTo
+    }
 }
-

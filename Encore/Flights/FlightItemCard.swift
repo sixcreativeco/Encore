@@ -135,7 +135,7 @@ struct FlightItemCard: View {
                 Button(action: { onEdit() }) {
                     Text("Edit")
                              .fontWeight(.semibold)
-                        .padding(.vertical, 10)
+                             .padding(.vertical, 10)
                         .frame(maxWidth: .infinity)
                              .foregroundColor(.white)
                         .background(editColor)
@@ -145,7 +145,7 @@ struct FlightItemCard: View {
 
                 Button(action: { onDelete() }) {
                     Text("Delete")
-                             .fontWeight(.semibold)
+                        .fontWeight(.semibold)
                         .padding(.vertical, 10)
                         .frame(maxWidth: .infinity)
                              .foregroundColor(.white)
@@ -156,7 +156,7 @@ struct FlightItemCard: View {
             }
             .padding(.horizontal)
         }
-         .padding(.top, 16)
+        .padding(.top, 16)
         .padding(.bottom, 12)
         .transition(.opacity)
     }
