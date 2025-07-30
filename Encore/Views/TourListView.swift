@@ -1,6 +1,7 @@
 import SwiftUI
-import FirebaseFirestore
 import Kingfisher
+import FirebaseAuth
+import FirebaseFirestore
 
 struct TourListView: View {
     @EnvironmentObject var appState: AppState
@@ -33,76 +34,133 @@ struct TourListView: View {
             .ignoresSafeArea()
             #endif
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 40) {
-
-                    if !currentTours.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Current Tour")
-                                .font(.title.bold())
-                                .padding(.horizontal)
-                        
-                            ForEach(currentTours) { tour in
-                                CurrentTourCard(tour: tour, onTourSelected: onTourSelected)
-                                    .padding(.horizontal)
-                            }
-                        }
-                    }
-
-                    if !upcomingTours.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Upcoming")
-                                .font(.title2.bold())
-                                .padding(.horizontal)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(upcomingTours) { tour in
-                                        Button(action: {
-                                            onTourSelected?(tour)
-                                        }) {
-                                            TourCard(tour: tour)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                    }
-
-                    if !pastTours.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Past Tours")
-                                .font(.title2.bold())
-                                .padding(.horizontal)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(pastTours) { tour in
-                                        Button(action: {
-                                            onTourSelected?(tour)
-                                        }) {
-                                            TourCard(tour: tour)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical)
+            // --- NEW: Conditional view ---
+            if appState.tours.isEmpty {
+                emptyStateView
+            } else {
+                tourScrollView
             }
-            #if os(iOS)
-            .background(Color.clear)
-            #endif
         }
         .onAppear {
             appState.loadTours()
             preloadPosterImages(for: appState.tours)
         }
+    }
+    
+    // --- NEW: View for when no tours exist ---
+    private var emptyStateView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            Image(systemName: "music.mic.circle.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            
+            VStack(spacing: 8) {
+                Text("No tours yet")
+                    .font(.title2.bold())
+                Text("Get started by creating your first tour.")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+            }
+            
+            Button(action: {
+                appState.selectedTab = "NewTour"
+            }) {
+                Text("Create a tour")
+                    .fontWeight(.semibold)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 24)
+                    .background(Color.accentColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+            }
+            .buttonStyle(.plain)
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // --- EXISTING: The main list of tours ---
+    private var tourScrollView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 40) {
+                // Top right "Add Tour" button for macOS
+                #if os(macOS)
+                HStack {
+                    Text("Tours")
+                        .font(.largeTitle.bold())
+                    Spacer()
+                    Button(action: {
+                        appState.selectedTab = "NewTour"
+                    }) {
+                        Image(systemName: "plus")
+                            .fontWeight(.semibold).foregroundColor(.primary)
+                            .frame(width: 36, height: 36)
+                            .background(Color.black.opacity(0.15)).clipShape(Circle())
+                    }.buttonStyle(.plain)
+                }
+                .padding(.horizontal)
+                #endif
+
+                if !currentTours.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Current Tour")
+                            .font(.title.bold())
+                            .padding(.horizontal)
+                    
+                        ForEach(currentTours) { tour in
+                            CurrentTourCard(tour: tour, onTourSelected: onTourSelected)
+                                .padding(.horizontal)
+                        }
+                    }
+                }
+
+                if !upcomingTours.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Upcoming")
+                            .font(.title2.bold())
+                            .padding(.horizontal)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(upcomingTours) { tour in
+                                    Button(action: { onTourSelected?(tour) }) {
+                                        TourCard(tour: tour)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                }
+
+                if !pastTours.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Past Tours")
+                            .font(.title2.bold())
+                            .padding(.horizontal)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(pastTours) { tour in
+                                    Button(action: { onTourSelected?(tour) }) {
+                                        TourCard(tour: tour)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical)
+        }
+        #if os(iOS)
+        .background(Color.clear)
+        #endif
     }
 
     private func preloadPosterImages(for tours: [Tour]) {
@@ -111,10 +169,12 @@ struct TourListView: View {
     }
 }
 
+
+// Subviews like CurrentTourCard and TourCard remain unchanged and are not shown for brevity.
+// Make sure they are still present in your file.
 fileprivate struct CurrentTourCard: View {
     let tour: Tour
     var onTourSelected: ((Tour) -> Void)?
-    
     @State private var tourManagerName: String?
     @State private var showCount: Int = 0
     @State private var crewCount: Int = 0
@@ -200,18 +260,15 @@ fileprivate struct CurrentTourCard: View {
         guard let tourID = tour.id else { return }
         let db = Firestore.firestore()
         
-        // Fetch Tour Manager
         async let managerTask = db.collection("tourCrew")
             .whereField("tourId", isEqualTo: tourID)
             .whereField("roles", arrayContains: "Tour Manager")
             .limit(to: 1).getDocuments()
 
-        // Fetch Show Count
         async let showCountTask = db.collection("shows")
             .whereField("tourId", isEqualTo: tourID)
             .count.getAggregation(source: .server)
 
-        // Fetch Crew Count
         async let crewCountTask = db.collection("tourCrew")
             .whereField("tourId", isEqualTo: tourID)
             .count.getAggregation(source: .server)

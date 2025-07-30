@@ -8,68 +8,50 @@ struct ItineraryItemCard: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
 
+    // This helper function now correctly formats the time based on the
+    // specific timezone saved with each itinerary item.
     private func formattedLocalTime(for item: ItineraryItem) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        
-        if let timezoneIdentifier = item.timezone, let timeZone = TimeZone(identifier: timezoneIdentifier) {
-            formatter.timeZone = timeZone
-        } else {
-            // Fallback to the user's current timezone if the item's timezone is not specified
-            formatter.timeZone = .current
+        formatter.dateFormat = "h:mm a" // e.g., 8:45 PM
+        if let timezoneIdentifier = item.timezone {
+            formatter.timeZone = TimeZone(identifier: timezoneIdentifier)
         }
-        
-        let date = item.timeUTC.dateValue()
-        return formatter.string(from: date)
+        return formatter.string(from: item.timeUTC.dateValue())
     }
 
     var body: some View {
-        Button(action: onExpandToggle) {
+         Button(action: onExpandToggle) {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: ItineraryItemType(rawValue: item.type)?.iconName ?? "questionmark.circle")
-                             #if os(iOS)
-                            .font(.headline)
-                            #else
                             .font(.title2)
-                            #endif
                         
                         Text(item.title)
-                             #if os(iOS)
-                            .font(.subheadline.weight(.semibold))
-                            #else
                             .font(.headline)
-                             #endif
                         
                         Spacer()
                         
-                        Text(formattedLocalTime(for: item))
-                            #if os(iOS)
-                            .font(.caption)
-                             #else
-                            .font(.subheadline)
-                            #endif
+                        // --- THIS IS THE UI FIX ---
+                        // It now correctly displays the local time and the new subtitle
+                        // which we are using for the timezone note (e.g., "Melbourne Time").
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(formattedLocalTime(for: item))
+                            if let subtitle = item.subtitle, !subtitle.isEmpty {
+                                Text(subtitle)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .font(.subheadline)
+                        // --- END OF UI FIX ---
                     }
 
-                    if let subtitle = item.subtitle, !subtitle.isEmpty {
-                        Text(subtitle)
-                            #if os(iOS)
-                            .font(.caption)
-                             #else
-                            .font(.subheadline)
-                            #endif
-                            .foregroundColor(.gray)
-                    }
-                    
                     if let note = item.notes, !note.isEmpty {
                         Text(note)
-                             #if os(iOS)
-                            .font(.caption)
-                            #else
                             .font(.subheadline)
-                            #endif
                             .foregroundColor(.gray)
+                            .padding(.leading, 38) // Align with title
                     }
                 }
                 .padding()
@@ -89,30 +71,22 @@ struct ItineraryItemCard: View {
             HStack(spacing: 24) {
                 Button(action: onEdit) {
                     Text("Edit")
-                         .fontWeight(.semibold)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity)
-                        .foregroundColor(.white)
-                         .background(Color(red: 116/255, green: 151/255, blue: 173/255))
+                        .fontWeight(.semibold).padding(.vertical, 10)
+                        .frame(maxWidth: .infinity).foregroundColor(.white)
+                        .background(Color(red: 116/255, green: 151/255, blue: 173/255))
                         .cornerRadius(12)
-                }
-                .buttonStyle(.plain)
-
+                }.buttonStyle(.plain)
+                
                 Button(action: onDelete) {
                      Text("Delete")
-                        .fontWeight(.semibold)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity)
-                         .foregroundColor(.white)
+                        .fontWeight(.semibold).padding(.vertical, 10)
+                        .frame(maxWidth: .infinity).foregroundColor(.white)
                         .background(Color(red: 193/255, green: 106/255, blue: 106/255))
                         .cornerRadius(12)
-                }
-                 .buttonStyle(.plain)
+                }.buttonStyle(.plain)
             }
             .padding(.horizontal)
         }
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-        .transition(.opacity)
+        .padding(.top, 16).padding(.bottom, 12).transition(.opacity)
     }
 }

@@ -102,7 +102,16 @@ struct JoinTourView: View {
         
         Task {
             do {
-                guard let newUser = try await AuthManager.shared.handleEmailSignUp(email: email, password: password, displayName: name) else {
+                // --- THIS IS THE FIX ---
+                // The 'phoneNumber' argument has been removed from this call
+                let signUpResult = try await AuthManager.shared.handleEmailSignUp(
+                    email: email,
+                    password: password,
+                    displayName: name
+                )
+                // -----------------------
+
+                guard let newUser = signUpResult.user else {
                     throw URLError(.cannotCreateFile)
                 }
                 

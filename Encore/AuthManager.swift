@@ -1,9 +1,9 @@
 import Foundation
-@preconcurrency import FirebaseCore
-@preconcurrency import FirebaseAuth
+import FirebaseCore
+import FirebaseAuth
 import FirebaseFirestore
 import GoogleSignIn
-import FirebaseMessaging // Import FirebaseMessaging
+import FirebaseMessaging
 
 #if os(macOS)
 import AppKit
@@ -18,42 +18,48 @@ class AuthManager: ObservableObject {
         if FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }
-        
         self.user = Auth.auth().currentUser
     }
 
     @Published var user: User?
     
+    // --- UPDATED SIGN UP FUNCTION (phoneNumber removed) ---
+    func handleEmailSignUp(email: String, password: String, displayName: String) async throws -> (user: User?, needsVerification: Bool) {
+        do {
+            let authResult = try await Auth.auth().createUser(withEmail: email, password: password)
+            
+            let changeRequest = authResult.user.createProfileChangeRequest()
+            changeRequest.displayName = displayName
+            try await changeRequest.commitChanges()
+
+            self.user = Auth.auth().currentUser
+            
+            // Call createUserDocumentIfNeeded without a phone number
+            await self.createUserDocumentIfNeeded(userID: authResult.user.uid, phoneNumber: nil)
+            
+            // Send the verification email
+            try await authResult.user.sendEmailVerification()
+            
+            // Sign the user out until they verify
+            signOut()
+            
+            return (authResult.user, true)
+            
+        } catch {
+            print("LOG: ❌ ERROR in AuthManager.handleEmailSignUp: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    // --- Other functions remain the same ---
+
     func updateFCMToken() {
         guard let userID = user?.uid else { return }
-        
         Messaging.messaging().token { token, error in
-            if let error = error {
-                print("❌ Error fetching FCM registration token: \(error)")
-                return
-            }
-            
-            guard let fcmToken = token else {
-                print("❌ FCM token was nil.")
-                return
-            }
-            
-            print("✅ FCM Registration Token: \(fcmToken)")
-            
-            let db = Firestore.firestore()
-            let ref = db.collection("users").document(userID)
-            
-            // Using arrayUnion prevents duplicate tokens from being added.
-            // We will store FCM tokens in a new field to avoid confusion.
-            ref.updateData([
-                "fcmTokens": FieldValue.arrayUnion([fcmToken])
-            ]) { error in
-                if let error = error {
-                    print("❌ Error saving FCM token: \(error.localizedDescription)")
-                } else {
-                    print("✅ FCM token saved for user: \(userID)")
-                }
-            }
+            if let error = error { print("❌ Error fetching FCM token: \(error)"); return }
+            guard let fcmToken = token else { print("❌ FCM token was nil."); return }
+            let ref = Firestore.firestore().collection("users").document(userID)
+            ref.updateData(["fcmTokens": FieldValue.arrayUnion([fcmToken])])
         }
     }
 
@@ -63,62 +69,23 @@ class AuthManager: ObservableObject {
             self.user = authResult.user
             return authResult.user
         } catch {
-            print("LOG: ❌ ERROR in AuthManager.handleEmailSignIn: \(error.localizedDescription)")
-            throw error
-        }
-    }
-
-    func handleEmailSignUp(email: String, password: String, displayName: String) async throws -> User? {
-        do {
-            let authResult = try await Auth.auth().createUser(withEmail: email, password: password)
-            
-            let changeRequest = authResult.user.createProfileChangeRequest()
-            changeRequest.displayName = displayName
-            try await changeRequest.commitChanges()
-
-            self.user = Auth.auth().currentUser
-            await self.createUserDocumentIfNeeded(userID: authResult.user.uid)
-            
-            return authResult.user
-        } catch {
-            print("LOG: ❌ ERROR in AuthManager.handleEmailSignUp: \(error.localizedDescription)")
             throw error
         }
     }
 
     #if os(macOS)
     func handleGoogleSignIn(presentingWindow: NSWindow) async -> User? {
-        print("LOG: 1. AuthManager.handleGoogleSignIn called.")
-        
         let config = GIDConfiguration(clientID: FirebaseApp.app()?.options.clientID ?? "")
         GIDSignIn.sharedInstance.configuration = config
-
         do {
-            guard let result = try? await GIDSignIn.sharedInstance.signIn(withPresenting: presentingWindow) else {
-                print("LOG: ❌ GIDSignIn returned nil. User may have cancelled.")
-                return nil
-            }
-            
-            print("LOG: 2. GIDSignIn successful. User: \(result.user.profile?.name ?? "N/A")")
-            
-            guard let idToken = result.user.idToken?.tokenString else {
-                print("LOG: ❌ Could not get idToken from Google result.")
-                return nil
-            }
-            
+            guard let result = try? await GIDSignIn.sharedInstance.signIn(withPresenting: presentingWindow) else { return nil }
+            guard let idToken = result.user.idToken?.tokenString else { return nil }
             let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: result.user.accessToken.tokenString)
-            
             let authResult = try await Auth.auth().signIn(with: credential)
             self.user = authResult.user
-            
-            print("LOG: 3. Firebase signIn successful. UID: \(authResult.user.uid)")
-            
-            await self.createUserDocumentIfNeeded(userID: authResult.user.uid)
-            
+            await self.createUserDocumentIfNeeded(userID: authResult.user.uid, phoneNumber: nil)
             return authResult.user
-            
         } catch {
-            print("LOG: ❌ ERROR in AuthManager.handleGoogleSignIn: \(error.localizedDescription)")
             return nil
         }
     }
@@ -126,69 +93,43 @@ class AuthManager: ObservableObject {
     
     #if os(iOS)
     func handleGoogleSignIn() async -> User? {
-        print("LOG: 1. AuthManager.handleGoogleSignIn (iOS) called.")
-
-        guard let clientID = FirebaseApp.app()?.options.clientID else {
-            print("LOG: ❌ Firebase client ID not found.")
-            return nil
-        }
-        
+        guard let clientID = FirebaseApp.app()?.options.clientID else { return nil }
         let config = GIDConfiguration(clientID: clientID)
         GIDSignIn.sharedInstance.configuration = config
-        
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootViewController = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
-            print("LOG: ❌ Could not find root view controller.")
-            return nil
-        }
-
+              let rootViewController = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return nil }
         do {
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
-            
-            print("LOG: 2. GIDSignIn successful. User: \(result.user.profile?.name ?? "N/A")")
-            
-            guard let idToken = result.user.idToken?.tokenString else {
-                print("LOG: ❌ Could not get idToken from Google result.")
-                return nil
-            }
-            
+            guard let idToken = result.user.idToken?.tokenString else { return nil }
             let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: result.user.accessToken.tokenString)
-            
             let authResult = try await Auth.auth().signIn(with: credential)
             self.user = authResult.user
-            
-            print("LOG: 3. Firebase signIn successful. UID: \(authResult.user.uid)")
-            
-            await self.createUserDocumentIfNeeded(userID: authResult.user.uid)
-            
+            await self.createUserDocumentIfNeeded(userID: authResult.user.uid, phoneNumber: nil)
             return authResult.user
-            
         } catch {
-            if (error as NSError).code == GIDSignInError.canceled.rawValue {
-                print("LOG: ℹ️ Google Sign-In was cancelled by the user.")
-            } else {
-                print("LOG: ❌ ERROR in AuthManager.handleGoogleSignIn (iOS): \(error.localizedDescription)")
-            }
             return nil
         }
     }
     #endif
 
-    private func createUserDocumentIfNeeded(userID: String) async {
+    private func createUserDocumentIfNeeded(userID: String, phoneNumber: String?) async {
         let db = Firestore.firestore()
         let ref = db.collection("users").document(userID)
-
         do {
             let document = try await ref.getDocument()
-            if document.exists {
-                print("LOG: User document already exists for UID: \(userID)")
-                return
+            if document.exists { return }
+            
+            var userData: [String: Any] = [
+                "uid": userID,
+                "email": self.user?.email ?? "",
+                "displayName": self.user?.displayName ?? "",
+                "createdAt": Timestamp(date: Date())
+            ]
+            if let phone = phoneNumber, !phone.isEmpty {
+                userData["phone"] = phone
             }
             
-            let userData: [String: Any] = [ "uid": userID, "email": self.user?.email ?? "", "displayName": self.user?.displayName ?? "", "createdAt": Timestamp(date: Date()) ]
             try await ref.setData(userData)
-            print("✅ User document created for UID: \(userID)")
-
         } catch {
             print("LOG: ❌ Failed creating user document: \(error.localizedDescription)")
         }

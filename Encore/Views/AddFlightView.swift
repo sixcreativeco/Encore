@@ -9,21 +9,18 @@ struct AddFlightView: View {
     @Environment(\.dismiss) var dismiss
     
     enum EntryMode: String, CaseIterable, Identifiable {
-        case autoSearch = "Auto Search"
-        case manual = "Manual Entry"
+        case autoSearch = "Auto Search", manual = "Manual Entry"
         var id: String { self.rawValue }
     }
     @State private var entryMode: EntryMode = .autoSearch
 
-    // Auto Search State
+    // State properties
     @State private var autoFlightNumber = ""
     @State private var autoFlightDate = Date()
     @State private var autoSelectedAirport: AirportEntry? = nil
     @State private var autoAirportSearchText = ""
     @FocusState private var isAirportSearchFocused: Bool
     @State private var fetchedFlight: Flight? = nil
-
-    // Manual Entry State
     @State private var manualAirlineName = ""
     @State private var manualAirlineCode = ""
     @State private var manualFlightNumber = ""
@@ -33,19 +30,11 @@ struct AddFlightView: View {
     @State private var manualArrivalAirport = ""
     @State private var manualDepartureTime = Date()
     @State private var manualArrivalTime = Date()
-    
-    // Shared State
     @State private var notes = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var tourCrew: [TourCrew] = []
     @State private var passengerEntries: [Passenger] = []
-
-    private var totalBaggage: Int {
-        passengerEntries.reduce(0) { total, passenger in
-            total + (Int(passenger.baggage ?? "0") ?? 0)
-        }
-    }
     
     private let allAirports = AirportService.shared.airports
     
@@ -83,58 +72,36 @@ struct AddFlightView: View {
         }
     }
 
-    // --- REBUILT AUTO SEARCH VIEW ---
     private var autoSearchView: some View {
         VStack(spacing: 16) {
             HStack(spacing: 16) {
                 VStack(alignment: .leading) { Text("Flight Number").font(.subheadline); TextField("e.g. QF140", text: $autoFlightNumber).textFieldStyle(RoundedBorderTextFieldStyle()) }
                 VStack(alignment: .leading) { Text("Flight Date").font(.subheadline); DatePicker("", selection: $autoFlightDate, displayedComponents: .date).labelsHidden() }
             }
-
             VStack(alignment: .leading) {
                 Text("Departure Airport").font(.subheadline)
-                
-                // --- DEFINITIVE FIX: Swaps between a display "pill" and the text field ---
                 if let selectedAirport = autoSelectedAirport {
                     HStack {
-                        Text(selectedAirport.name)
-                            .padding(.vertical, 8)
-                            .padding(.leading, 12)
+                        Text(selectedAirport.name).padding(.vertical, 8).padding(.leading, 12)
                         Spacer()
-                        Button(action: {
-                            self.autoSelectedAirport = nil
-                            self.autoAirportSearchText = ""
-                            self.isAirportSearchFocused = true
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.trailing, 8)
+                        Button(action: { self.autoSelectedAirport = nil; self.autoAirportSearchText = ""; self.isAirportSearchFocused = true }) { Image(systemName: "xmark.circle.fill").foregroundColor(.secondary) }
+                        .buttonStyle(.plain).padding(.trailing, 8)
                     }
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(8)
+                    .background(Color.gray.opacity(0.2)).cornerRadius(8)
                 } else {
-                    TextField("Start typing airport or city...", text: $autoAirportSearchText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .focused($isAirportSearchFocused)
+                    TextField("Start typing airport or city...", text: $autoAirportSearchText).textFieldStyle(RoundedBorderTextFieldStyle()).focused($isAirportSearchFocused)
                 }
-
                 if isAirportSearchFocused && !filteredAirports.isEmpty {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(filteredAirports) { airport in
-                                HStack { Text(airport.name).padding(8); Spacer() }
-                                .contentShape(Rectangle())
-                                .onTapGesture { selectAirport(airport) }
+                                HStack { Text(airport.name).padding(8); Spacer() }.contentShape(Rectangle()).onTapGesture { selectAirport(airport) }
                                 Divider()
                             }
                         }
                     }.background(Color.gray.opacity(0.1)).cornerRadius(8).frame(maxHeight: 200)
                 }
             }
-            // --- END OF FIX ---
-
             if fetchedFlight == nil {
                 Button(action: findFlight) {
                     HStack { Spacer(); if isLoading { ProgressView().colorInvert() } else { Text("Search Flight") }; Spacer() }
@@ -142,9 +109,9 @@ struct AddFlightView: View {
                 .buttonStyle(PlainButtonStyle()).padding().background(Color.blue).foregroundColor(.white).cornerRadius(10)
                 .disabled(autoFlightNumber.isEmpty || autoSelectedAirport == nil || isLoading)
             } else {
-                flightPreview(fetchedFlight!)
+                flightPreview(fetchedFlight)
                 passengersSection
-                Button(action: { saveFlight(fetchedFlight!) }) {
+                Button(action: { saveFlight(fetchedFlight) }) {
                     HStack { Spacer(); Text("Confirm & Add Flight"); Spacer() }
                 }
                 .buttonStyle(PlainButtonStyle()).padding().background(Color.accentColor).foregroundColor(.white).cornerRadius(10)
@@ -177,34 +144,26 @@ struct AddFlightView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Who's on this flight?").font(.headline)
             GuestInputView(tourCrew: $tourCrew, passengerEntries: $passengerEntries)
-            if !passengerEntries.isEmpty {
+        }
+    }
+    
+    private func flightPreview(_ flight: Flight?) -> some View {
+        Group {
+            if let flight = flight {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(passengerEntries) { entry in
-                        HStack {
-                            Text(tourCrew.first { $0.id == entry.crewId }?.name ?? "Unknown"); Spacer()
-                            Text("\(entry.baggage ?? "0") kg").foregroundColor(.secondary)
-                            Button(action: { passengerEntries.removeAll { $0.id == entry.id } }) { Image(systemName: "xmark.circle") }.buttonStyle(.plain)
-                        }
-                    }
-                    Divider(); HStack { Text("Total Baggage").fontWeight(.bold); Spacer(); Text("\(totalBaggage) kg").fontWeight(.bold) }
-                }
+                    Text("Flight Found").font(.headline)
+                    HStack { Text("\(flight.airline ?? "N/A") \(flight.flightNumber ?? "N/A")").font(.subheadline); Spacer() }
+                    Text("\(flight.origin) → \(flight.destination)")
+                    Text("Departs: \(flight.departureTimeUTC.dateValue().formatted(date: .abbreviated, time: .shortened))")
+                    Text("Arrives: \(flight.arrivalTimeUTC.dateValue().formatted(date: .abbreviated, time: .shortened))")
+                }.font(.caption).padding().frame(maxWidth: .infinity, alignment: .leading).background(Color(nsColor: .controlBackgroundColor)).cornerRadius(12)
             }
         }
     }
     
-    private func flightPreview(_ flight: Flight) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Flight Found").font(.headline)
-            HStack { Text("\(flight.airline ?? "N/A") \(flight.flightNumber ?? "N/A")").font(.subheadline); Spacer() }
-            Text("\(flight.origin) → \(flight.destination)")
-            Text("Departs: \(flight.departureTimeUTC.dateValue().formatted(date: .abbreviated, time: .shortened))")
-            Text("Arrives: \(flight.arrivalTimeUTC.dateValue().formatted(date: .abbreviated, time: .shortened))")
-        }.font(.caption).padding().frame(maxWidth: .infinity, alignment: .leading).background(Color(nsColor: .controlBackgroundColor)).cornerRadius(12)
-    }
-    
     private func selectAirport(_ airport: AirportEntry) {
         self.autoSelectedAirport = airport
-        self.autoAirportSearchText = "" // Clear the search text
+        self.autoAirportSearchText = ""
         self.isAirportSearchFocused = false
     }
     
@@ -214,7 +173,7 @@ struct AddFlightView: View {
             catch { print("❌ DEBUG: Error loading crew: \(error.localizedDescription)") }
         }
     }
-    
+   
     private func findFlight() {
         guard let departureAirport = autoSelectedAirport else { self.errorMessage = "Please select a departure airport."; return }
         isLoading = true; errorMessage = nil; fetchedFlight = nil
@@ -241,20 +200,49 @@ struct AddFlightView: View {
     }
     
     private func saveManualFlight() {
-        guard let tourID = tour.id, !manualAirlineName.isEmpty, !manualAirlineCode.isEmpty, !manualFlightNumber.isEmpty, !manualDepartureAirport.isEmpty, !manualArrivalAirport.isEmpty else { errorMessage = "Please fill all manual flight fields."; return }
+        guard let tourID = tour.id, !manualAirlineName.isEmpty, !manualAirlineCode.isEmpty, !manualFlightNumber.isEmpty, !manualDepartureAirport.isEmpty, !manualArrivalAirport.isEmpty else { errorMessage = "Please fill all fields."; return }
+        
+        let originAirport = allAirports.first(where: { $0.iata == manualDepartureAirport.uppercased() })
+        let destinationAirport = allAirports.first(where: { $0.iata == manualArrivalAirport.uppercased() })
+        
+        guard let origin = originAirport, let destination = destinationAirport else {
+            errorMessage = "Could not find airport for one of the IATA codes."; return
+        }
+
         let fullFlightNumber = manualAirlineCode.uppercased() + manualFlightNumber
         let depTimestamp = combineDateAndTime(date: manualDepartureDate, time: manualDepartureTime)
         let arrTimestamp = combineDateAndTime(date: manualArrivalDate, time: manualArrivalTime)
-        let flightToSave = Flight(tourId: tourID, airline: manualAirlineName, flightNumber: fullFlightNumber, departureTimeUTC: depTimestamp, arrivalTimeUTC: arrTimestamp, origin: manualDepartureAirport.uppercased(), destination: manualArrivalAirport.uppercased(), notes: notes, passengers: passengerEntries)
-        saveFlight(flightToSave)
+        
+        let flightToSave = Flight(tourId: tourID, airline: manualAirlineName, flightNumber: fullFlightNumber, departureTimeUTC: depTimestamp, arrivalTimeUTC: arrTimestamp, origin: origin.iata, destination: destination.iata, notes: notes, passengers: passengerEntries)
+        
+        saveFlight(flightToSave, originAirport: origin, destinationAirport: destination)
     }
 
-    private func saveFlight(_ flight: Flight) {
-        isLoading = true; var flightToSave = flight; flightToSave.passengers = self.passengerEntries
-        FirebaseFlightService.saveFlight(flightToSave) { error, newFlightID  in
+    private func saveFlight(_ flight: Flight?) {
+        guard let flight = flight else { errorMessage = "No flight data to save."; return }
+        
+        let originAirport = allAirports.first(where: { $0.iata == flight.origin })
+        let destinationAirport = allAirports.first(where: { $0.iata == flight.destination })
+
+        guard let origin = originAirport, let destination = destinationAirport else {
+            errorMessage = "Could not find airport details for this flight."; return
+        }
+        
+        saveFlight(flight, originAirport: origin, destinationAirport: destination)
+    }
+    
+    private func saveFlight(_ flight: Flight, originAirport: AirportEntry, destinationAirport: AirportEntry) {
+        isLoading = true
+        var flightToSave = flight
+        flightToSave.passengers = self.passengerEntries
+        
+        FirebaseFlightService.saveFlight(flightToSave, originAirport: originAirport, destinationAirport: destinationAirport) { error, newFlightID in
             self.isLoading = false
-            if let error = error { self.errorMessage = "Failed to save flight. Please try again: \(error.localizedDescription)"; return }
-            self.onFlightAdded(); self.dismiss()
+            if let error = error {
+                self.errorMessage = "Failed to save flight: \(error.localizedDescription)"; return
+            }
+            self.onFlightAdded()
+            self.dismiss()
         }
     }
     
@@ -277,29 +265,60 @@ struct AddFlightView: View {
     struct GuestInputView: View {
         @Binding var tourCrew: [TourCrew]; @Binding var passengerEntries: [Passenger]
         @State private var guestSearchText: String = ""; @State private var guestBaggage: String = ""
+        
+        private var totalBaggage: Int {
+            passengerEntries.reduce(0) { total, passenger in
+                total + (Int(passenger.baggage ?? "0") ?? 0)
+            }
+        }
+        
         private var filteredCrewSuggestions: [TourCrew] {
             if guestSearchText.isEmpty { return [] }
             let assignedGuestIDs = Set(passengerEntries.map { $0.crewId })
-            return tourCrew.filter { crew in let isAssigned = assignedGuestIDs.contains(crew.id ?? ""); let matchesSearch = crew.name.lowercased().contains(guestSearchText.lowercased()); return !isAssigned && matchesSearch }
-        }
-        var body: some View {
-            VStack {
-                 HStack(alignment: .bottom) {
-                    VStack(alignment: .leading) { Text("Name").font(.subheadline); TextField("Search Crew", text: $guestSearchText).textFieldStyle(RoundedBorderTextFieldStyle()) }
-                    VStack(alignment: .leading) { Text("Baggage (kg)").font(.subheadline); TextField("e.g. 23", text: $guestBaggage).textFieldStyle(RoundedBorderTextFieldStyle()) }
-                    Button("Add") { addPassenger() }.disabled(guestSearchText.isEmpty)
-                }
-                if !filteredCrewSuggestions.isEmpty {
-                    ScrollView {
-                         VStack(alignment: .leading, spacing: 0) {
-                            ForEach(filteredCrewSuggestions) { crew in
-                                Button(action: { guestSearchText = crew.name }) { HStack { Text(crew.name); Spacer() }.padding(8) }.buttonStyle(.plain)
-                             }
-                        }
-                    }.background(Color.gray.opacity(0.1)).cornerRadius(8).frame(maxHeight: 150)
-                }
+            return tourCrew.filter { crew in
+                let isAssigned = assignedGuestIDs.contains(crew.id ?? "")
+                let matchesSearch = crew.name.lowercased().contains(guestSearchText.lowercased())
+                return !isAssigned && matchesSearch
             }
         }
+        
+        var body: some View {
+            VStack {
+                 if !passengerEntries.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(passengerEntries) { entry in
+                            HStack {
+                                Text(tourCrew.first { $0.id == entry.crewId }?.name ?? "Unknown"); Spacer()
+                                Text("\(entry.baggage ?? "0") kg").foregroundColor(.secondary)
+                                Button(action: { passengerEntries.removeAll { $0.id == entry.id } }) { Image(systemName: "xmark.circle") }.buttonStyle(.plain)
+                            }
+                        }
+                        Divider()
+                        HStack {
+                            Text("Total Baggage").fontWeight(.bold)
+                            Spacer()
+                            Text("\(totalBaggage) kg").fontWeight(.bold)
+                        }
+                    }
+                    .padding(.bottom, 16)
+                }
+                HStack(alignment: .bottom) {
+                   VStack(alignment: .leading) { Text("Name").font(.subheadline); TextField("Search Crew", text: $guestSearchText).textFieldStyle(RoundedBorderTextFieldStyle()) }
+                   VStack(alignment: .leading) { Text("Baggage (kg)").font(.subheadline); TextField("e.g. 23", text: $guestBaggage).textFieldStyle(RoundedBorderTextFieldStyle()) }
+                   Button("Add") { addPassenger() }.disabled(guestSearchText.isEmpty)
+               }
+               if !filteredCrewSuggestions.isEmpty {
+                   ScrollView {
+                       VStack(alignment: .leading, spacing: 0) {
+                           ForEach(filteredCrewSuggestions) { crew in
+                               Button(action: { guestSearchText = crew.name }) { HStack { Text(crew.name); Spacer() }.padding(8) }.buttonStyle(.plain)
+                            }
+                       }
+                   }.background(Color.gray.opacity(0.1)).cornerRadius(8).frame(maxHeight: 150)
+               }
+           }
+        }
+        
         private func addPassenger() {
             guard let crewMember = tourCrew.first(where: { $0.name == guestSearchText }), let crewID = crewMember.id else { return }
             let newEntry = Passenger(crewId: crewID, baggage: guestBaggage.isEmpty ? nil : guestBaggage)

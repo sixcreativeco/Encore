@@ -6,7 +6,7 @@ struct GuestListCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(guest.name).font(.headline)
+                Text(guest.name).font(.body)
                 if let additional = guest.additionalGuests, !additional.isEmpty, additional != "0" {
                     Text("+\(additional)").font(.subheadline).foregroundColor(.gray)
                 }
