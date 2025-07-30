@@ -10,10 +10,9 @@ struct Show: Codable, Identifiable {
     var venueName: String
     var venueAddress: String
     var timezone: String?
-    
-    // --- ADD THIS LINE ---
     var scanCode: String?
-    // --------------------
+    var showSpecificPosterUrl: String?
+    // REMOVED: var externalTicketsUrl: String?
 
     var contactName: String?
     var contactEmail: String?

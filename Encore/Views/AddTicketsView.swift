@@ -9,9 +9,10 @@ struct AddTicketsView: View {
     
     // Form State
     @State private var selectedShowID: String = ""
-    @State private var ticketTypes: [TicketType] = [TicketType(name: "General Admission", allocation: 0, price: 0.0, currency: "NZD")]
+    @State private var ticketTypes: [TicketType] = [TicketType(name: "General Admission", allocation: 100, price: 0.0, currency: "NZD", availability: .init(type: .always))]
     @State private var description: String = ""
-    @State private var restriction: TicketedEvent.Restriction = .allAges
+    // FIX: Replaced 'restriction' state with 'importantInfo'
+    @State private var importantInfo: String = ""
     
     // Data for Picker
     @State private var availableShows: [Show] = []
@@ -38,12 +39,13 @@ struct AddTicketsView: View {
                 if selectedShow != nil {
                     showPreview
                 }
-                
+            
                 ticketTypesSection
                 
                 descriptionSection
                 
-                restrictionsSection
+                // FIX: Replaced restrictionsSection with importantInfoSection
+                importantInfoSection
                 
                 Spacer()
             }
@@ -141,7 +143,7 @@ struct AddTicketsView: View {
             }
             
             Button {
-                ticketTypes.append(TicketType(name: "", allocation: 0, price: 0.0, currency: "NZD"))
+                 ticketTypes.append(TicketType(name: "", allocation: 0, price: 0.0, currency: "NZD"))
             } label: {
                 HStack { Image(systemName: "plus"); Text("Add Type") }
             }.buttonStyle(.borderless)
@@ -156,10 +158,12 @@ struct AddTicketsView: View {
         }
     }
     
-    private var restrictionsSection: some View {
+    // FIX: Renamed from restrictionsSection and changed to use CustomTextEditor
+    private var importantInfoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Restrictions").font(.headline)
-            CustomSegmentedPicker(selected: $restriction, options: TicketedEvent.Restriction.allCases)
+            Text("Important Info").font(.headline)
+            CustomTextEditor(placeholder: "Enter age restrictions or other important info for buyers...", text: $importantInfo)
+                .frame(minHeight: 100)
         }
     }
     
@@ -248,13 +252,14 @@ struct AddTicketsView: View {
         
         let validTicketTypes = ticketTypes.filter { !$0.name.isEmpty && $0.allocation > 0 }
         
+        // FIX: Replaced 'restrictions' with 'importantInfo'
         let newEvent = TicketedEvent(
             ownerId: ownerId,
             tourId: tour.id!,
             showId: show.id!,
             status: .draft,
-            description: description,
-            restrictions: restriction,
+            description: description.isEmpty ? nil : description,
+            importantInfo: importantInfo.isEmpty ? nil : importantInfo,
             ticketTypes: validTicketTypes
         )
         

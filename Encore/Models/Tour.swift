@@ -10,6 +10,8 @@ struct Tour: Codable, Identifiable, Equatable, Hashable {
     var startDate: Timestamp
     var endDate: Timestamp
     var posterURL: String?
+    var landingPageUrl: String?
+    var landingPageHeaderImageUrl: String?
     @ServerTimestamp var createdAt: Timestamp?
 
     // Conformance to Equatable (already present)
