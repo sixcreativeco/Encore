@@ -33,6 +33,11 @@ class AppState: ObservableObject {
           
             DispatchQueue.main.async {
                 self?.userID = user?.uid
+                
+                // --- FIX START ---
+                // The original logic that clears data is commented out to prevent
+                // your tours from disappearing during an unexpected sign-out event.
+                /*
                 if user == nil {
                     // Clear all data on sign out
                     self?.tours.removeAll()
@@ -45,6 +50,12 @@ class AppState: ObservableObject {
                     self?.loadTours()
                     self?.listenForNotifications()
                 }
+                */
+                
+                // For now, we always attempt to load data to ensure it appears.
+                self?.loadTours()
+                self?.listenForNotifications()
+                // --- FIX END ---
             }
         }
     }
@@ -73,7 +84,7 @@ class AppState: ObservableObject {
         guard let userID = userID else { return }
         let db = Firestore.firestore()
         
-        // --- FIX IS HERE: Using a Set guarantees uniqueness ---
+        // --- Using a Set guarantees uniqueness ---
         var allToursSet = Set<Tour>()
         let group = DispatchGroup()
 
@@ -90,28 +101,28 @@ class AppState: ObservableObject {
         // 2. Fetch tours where the user is an accepted crew member
         group.enter()
         db.collection("tourCrew")
-          .whereField("userId", isEqualTo: userID)
-          .whereField("status", isEqualTo: InviteStatus.accepted.rawValue)
-          .getDocuments { snapshot, _ in
-            guard let documents = snapshot?.documents, !documents.isEmpty else {
-                group.leave()
-                return
-            }
-            
-            let crewTourIDs = documents.compactMap { $0["tourId"] as? String }
-
-            guard !crewTourIDs.isEmpty else {
-                group.leave()
-                return
-            }
-            
-            db.collection("tours").whereField(FieldPath.documentID(), in: crewTourIDs)
-                .getDocuments { tourSnapshot, _ in
-                    let crewTours = tourSnapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []
-                    allToursSet.formUnion(crewTours)
+            .whereField("userId", isEqualTo: userID)
+            .whereField("status", isEqualTo: InviteStatus.accepted.rawValue)
+            .getDocuments { snapshot, _ in
+                guard let documents = snapshot?.documents, !documents.isEmpty else {
                     group.leave()
+                    return
                 }
-        }
+            
+                let crewTourIDs = documents.compactMap { $0["tourId"] as? String }
+
+                guard !crewTourIDs.isEmpty else {
+                    group.leave()
+                    return
+                }
+            
+                db.collection("tours").whereField(FieldPath.documentID(), in: crewTourIDs)
+                    .getDocuments { tourSnapshot, _ in
+                        let crewTours = tourSnapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []
+                        allToursSet.formUnion(crewTours)
+                        group.leave()
+                    }
+            }
 
         group.notify(queue: .main) {
             // Convert the Set back to a sorted Array

@@ -66,7 +66,6 @@ class InvitationService {
                     return
                 }
 
-                // Pass the original code along with the fetched details
                 let details = InvitationDetails(code: code, invitation: invitation, tour: tour, crew: crew)
                 completion(.success(details))
             }
@@ -85,20 +84,32 @@ class InvitationService {
                 return nil
             }
             
-            guard let crewDocId = invitationSnapshot.data()?["crewDocId"] as? String else {
-                let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [ NSLocalizedDescriptionKey: "Crew document ID missing from invitation."])
+            guard let crewDocId = invitationSnapshot.data()?["crewDocId"] as? String,
+                  let tourId = invitationSnapshot.data()?["tourId"] as? String else {
+                let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [ NSLocalizedDescriptionKey: "Crew or Tour ID missing from invitation."])
                 errorPointer?.pointee = error
                 return nil
             }
             
+            // --- FIX START ---
+            // 1. Get a reference to the tourCrew document
             let crewRef = self.db.collection("tourCrew").document(crewDocId)
             
+            // 2. Update the crew document with the new user's ID and an "accepted" status
             transaction.updateData([
                 "userId": userId,
                 "status": InviteStatus.accepted.rawValue
             ], forDocument: crewRef)
             
+            // 3. Get a reference to the main tour document
+            let tourRef = self.db.collection("tours").document(tourId)
+
+            // 4. Add the new user's ID to the 'members' map on that tour document
+            transaction.setData(["members": [userId: "crew"]], forDocument: tourRef, merge: true)
+            
+            // 5. Delete the now-used invitation document
             transaction.deleteDocument(invitationRef)
+            // --- FIX END ---
             
             return nil
         }) { (object, error) in

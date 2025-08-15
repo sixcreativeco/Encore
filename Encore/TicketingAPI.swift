@@ -1,5 +1,10 @@
 import Foundation
+// FIX: Conditionally import AppKit for macOS and UIKit for iOS
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 
 class TicketingAPI {
     static let shared = TicketingAPI()
@@ -90,7 +95,6 @@ class TicketingAPI {
                 return
             }
             
-            // Log the raw response for debugging
             if let responseString = String(data: data, encoding: .utf8) {
                 print("📄 Raw response: \(responseString)")
             }
@@ -142,8 +146,6 @@ class TicketingAPI {
         }.resume()
     }
     
-    // Add these new functions to the TicketingAPI class:
-
     func fetchWalletBalance(userId: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         guard let url = URL(string: "\(possibleBaseURLs[0])/api/get-wallet") else {
             completion(.failure(APIError.invalidURL))
@@ -194,13 +196,23 @@ class TicketingAPI {
             return
         }
         
+        // FIX: Use platform-specific code to open URL
+        #if os(macOS)
         NSWorkspace.shared.open(url)
+        #elseif os(iOS)
+        UIApplication.shared.open(url)
+        #endif
     }
     
     func copyToClipboard(_ text: String) {
+        // FIX: Use platform-specific code for clipboard
+        #if os(macOS)
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        #elseif os(iOS)
+        UIPasteboard.general.string = text
+        #endif
         print("📋 Copied to clipboard: \(text)")
     }
 }

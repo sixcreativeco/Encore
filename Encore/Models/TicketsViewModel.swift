@@ -40,15 +40,17 @@ class TicketsViewModel: ObservableObject {
     private var listeners: [ListenerRegistration] = []
     private let db = Firestore.firestore()
     private let currentUserID: String?
-
     struct SummaryStats {
-        var orderCount: Int = 0; var ticketsIssued: Int = 0; var totalRevenue: Double = 0.0
+        var orderCount: Int = 0; var ticketsIssued: Int = 0;
+        var totalRevenue: Double = 0.0
     }
     
     struct TicketSale: Identifiable {
-        let id = UUID(); let purchaseId: String?; let ticketedEventId: String; let showId: String; let tourId: String; let quantity: Int; let totalPrice: Double; let buyerEmail: String; let purchaseDate: Date
+        let id = UUID(); let purchaseId: String?; let ticketedEventId: String; let showId: String; let tourId: String; let quantity: Int; let totalPrice: Double;
+        let buyerEmail: String; let purchaseDate: Date
         init(from document: DocumentSnapshot) {
-            let data = document.data() ?? [:]; self.purchaseId = document.documentID; self.ticketedEventId = data["ticketedEventId"] as? String ?? ""; self.showId = data["showId"] as? String ?? ""; self.tourId = data["tourId"] as? String ?? ""; self.quantity = data["quantity"] as? Int ?? 0; self.totalPrice = data["totalPrice"] as? Double ?? 0.0; self.buyerEmail = data["buyerEmail"] as? String ?? ""; self.purchaseDate = (data["purchaseDate"] as? Timestamp)?.dateValue() ?? Date()
+            let data = document.data() ?? [:]; self.purchaseId = document.documentID; self.ticketedEventId = data["ticketedEventId"] as? String ?? ""; self.showId = data["showId"] as? String ?? "";
+            self.tourId = data["tourId"] as? String ?? ""; self.quantity = data["quantity"] as? Int ?? 0; self.totalPrice = data["totalPrice"] as? Double ?? 0.0; self.buyerEmail = data["buyerEmail"] as? String ?? ""; self.purchaseDate = (data["purchaseDate"] as? Timestamp)?.dateValue() ?? Date()
         }
     }
     
@@ -179,9 +181,18 @@ class TicketsViewModel: ObservableObject {
         guard let userID = currentUserID else { return }
         do {
             let userDoc = try await db.collection("users").document(userID).getDocument()
-            guard userDoc.data()?["stripeAccountId"] as? String != nil else {
-                self.hasStripeAccount = false; return
+            
+            // --- THIS IS THE FIX ---
+            // The code now checks for 'stripeAccountId' first, and if that's not found,
+            // it checks for 'stripeLiveAccountId', ensuring backward compatibility.
+            let stripeId = userDoc.data()?["stripeAccountId"] as? String ?? userDoc.data()?["stripeLiveAccountId"] as? String
+            
+            guard stripeId != nil else {
+                self.hasStripeAccount = false
+                return
             }
+            // --- END OF FIX ---
+
             self.hasStripeAccount = true
             let url = URL(string: "https://encoretickets.vercel.app/api/get-balance")!
             var request = URLRequest(url: url)
@@ -267,7 +278,6 @@ class TicketsViewModel: ObservableObject {
         self.alertTitle = title; self.alertMessage = message; self.showingAlert = true
     }
     
-    // FIX: Added 'self' to access class properties
     private func showPublishSuccess(url: String) {
         self.publishedURL = url
         self.alertTitle = "Tickets Published!"
@@ -275,7 +285,6 @@ class TicketsViewModel: ObservableObject {
         self.showingAlert = true
     }
     
-    // FIX: Added 'self' to access class properties
     private func showPublishError(message: String) {
         self.publishedURL = ""
         self.alertTitle = "Publishing Failed"

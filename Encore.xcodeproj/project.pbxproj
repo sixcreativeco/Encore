@@ -23,6 +23,7 @@
 		EF2BC4822E0B353A0055B8D3 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = EF2BC4812E0B353A0055B8D3 /* FirebaseAppCheck */; };
 		EF2BC4842E0B35420055B8D3 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = EF2BC4832E0B35420055B8D3 /* FirebaseAppCheck */; };
 		EF2BC4862E0C0E620055B8D3 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = EF2BC4852E0C0E620055B8D3 /* FirebaseMessaging */; };
+		EF3A36302E3B1CC800C20E87 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = EF3A362F2E3B1CC800C20E87 /* FirebaseStorage */; };
 		EF56FFD52DFA150A00AA14F3 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */; };
 		EFA43B892DEC9A11004781D4 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = EFA43B882DEC9A11004781D4 /* FirebaseAuth */; };
 		EFA43B8B2DEC9A11004781D4 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = EFA43B8A2DEC9A11004781D4 /* FirebaseCore */; };
@@ -141,6 +142,7 @@
 				StyledInputField.swift,
 				StyledStepper.swift,
 				StyledTimePicker.swift,
+				TicketingAPI.swift,
 				TourCard.swift,
 				Views/AddShowView.swift,
 				Views/BroadcastView.swift,
@@ -213,6 +215,7 @@
 				EF2B3F822E06FE230055B8D3 /* SDWebImageSwiftUI in Frameworks */,
 				EF2B3F7E2E06FE170055B8D3 /* GoogleSignInSwift in Frameworks */,
 				EF2B3F782E06FE0C0055B8D3 /* FirebaseCore in Frameworks */,
+				EF3A36302E3B1CC800C20E87 /* FirebaseStorage in Frameworks */,
 				EF2BC4822E0B353A0055B8D3 /* FirebaseAppCheck in Frameworks */,
 				EF2B3F762E06FE0C0055B8D3 /* FirebaseAuth in Frameworks */,
 			);
@@ -331,6 +334,7 @@
 				EF2BC4792E0B21660055B8D3 /* FirebaseMessaging */,
 				EF2BC47B2E0B2AFA0055B8D3 /* FirebaseFunctions */,
 				EF2BC4812E0B353A0055B8D3 /* FirebaseAppCheck */,
+				EF3A362F2E3B1CC800C20E87 /* FirebaseStorage */,
 			);
 			productName = "Encore Viewer";
 			productReference = EF2B3F272E06F9F00055B8D3 /* Encore Viewer.app */;
@@ -942,7 +946,7 @@
 					"$(PROJECT_DIR)/Encore/encore-ticketing-web/node_modules/@unrs/resolver-binding-darwin-arm64",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.9.9;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = SixCreative.Encore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -983,7 +987,7 @@
 					"$(PROJECT_DIR)/Encore/encore-ticketing-web/node_modules/@unrs/resolver-binding-darwin-arm64",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.9.9;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = SixCreative.Encore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1239,6 +1243,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
+		};
+		EF3A362F2E3B1CC800C20E87 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFA43B872DEC9A11004781D4 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 		EF56FFD42DFA150A00AA14F3 /* SDWebImageSwiftUI */ = {
 			isa = XCSwiftPackageProductDependency;

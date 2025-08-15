@@ -8,6 +8,8 @@ import FirebaseMessaging
 @main
 struct EncoreApp: App {
     @StateObject private var appState = AppState()
+    // Create an instance of the theme manager
+    @StateObject private var themeManager = ThemeManager()
     
     #if os(macOS)
     @StateObject private var airportDataManager = AirportDataManager()
@@ -21,15 +23,11 @@ struct EncoreApp: App {
 
     init() {
         #if os(iOS)
-        // This custom factory will now provide the correct App Check provider
-        // for both simulator and physical device builds.
         class MyAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
           func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
             #if targetEnvironment(simulator)
-            // Use the debug provider on the simulator
             return AppCheckDebugProvider(app: app)
             #else
-            // Use the Device Check provider on real devices
             return DeviceCheckProvider(app: app)
             #endif
           }
@@ -83,7 +81,10 @@ struct EncoreApp: App {
                 }
                 #endif
             }
-            .preferredColorScheme(.dark)
+            // Use the theme manager to set the color scheme for the entire app
+            .preferredColorScheme(themeManager.selectedColorScheme)
+            // Make the theme manager available to all child views
+            .environmentObject(themeManager)
         }
         #if os(macOS)
         .windowStyle(.hiddenTitleBar)
@@ -145,13 +146,9 @@ extension AppDelegate: UIApplicationDelegate, UNUserNotificationCenterDelegate, 
         AuthManager.shared.updateFCMToken()
     }
     
-    // ADD THIS FUNCTION
-    // This function handles incoming notifications when the app is in the foreground.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        
-        // Tells iOS to show the notification alert, play a sound, and update the badge icon.
         completionHandler([.banner, .sound, .badge])
     }
 }

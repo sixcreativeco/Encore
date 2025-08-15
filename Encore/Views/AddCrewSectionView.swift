@@ -22,7 +22,6 @@ struct AddCrewSectionView: View {
     @State private var emailCheckTask: Task<Void, Never>? = nil
     
     @State private var listener: ListenerRegistration?
-    
     @State private var roleOptions: [String] = [
         "Lead Artist", "Support Artist", "DJ", "Dancer", "Guest Performer", "Musician",
         "Content", "Tour Manager", "Artist Manager", "Road Manager", "Assistant Manager",
@@ -59,7 +58,7 @@ struct AddCrewSectionView: View {
                         case .checking:
                             ProgressView().scaleEffect(0.5)
                         case .valid:
-                             Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                            Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
                         case .invalid:
                              Image(systemName: "person.badge.plus").foregroundColor(.orange)
                         case .none:
@@ -189,8 +188,9 @@ struct AddCrewSectionView: View {
     }
     
     private func copyInviteDetails(code: String) {
+        let tourName = appState.tours.first { $0.id == tour.id }?.tourName ?? "the tour"
         let inviteString = """
-        Join the \(tour.tourName) tour by downloading Encore at:
+        Join \(tourName) by downloading Encore at:
         https://en-co.re
 
         Your joining code is \(code)
@@ -240,16 +240,11 @@ struct AddCrewSectionView: View {
     }
 
     private func saveCrewMember() async {
-        print("LOG: 'Add & Invite' button clicked. Running saveCrewMember().")
-        
-        // The guard condition now uses the injected 'tour' object directly.
         guard isFormValid, let ownerId = appState.userID, let tourID = tour.id else {
-            print("LOG: Guard condition failed. isFormValid: \(isFormValid), ownerId: \(appState.userID ?? "nil"), tourID: \(tour.id ?? "nil")")
             return
         }
         
         await MainActor.run { isSaving = true }
-        print("LOG: isSaving set to true.")
         
         let crewToSave = TourCrew(
             tourId: tourID,
@@ -267,11 +262,16 @@ struct AddCrewSectionView: View {
         )
 
         do {
-            let ref = try await Firestore.firestore().collection("tourCrew").addDocument(from: crewToSave)
-            print("LOG: Successfully saved new crew document with ID: \(ref.documentID).")
+            let db = Firestore.firestore()
+            let ref = try await db.collection("tourCrew").addDocument(from: crewToSave)
             
             if let recipientId = foundUserId {
-                print("LOG: Existing user found. Sending notification to \(recipientId).")
+                // --- FIX START ---
+                // If the user already exists, add them to the tour's members map immediately.
+                let tourRef = db.collection("tours").document(tourID)
+                try await tourRef.setData(["members": [recipientId: "crew"]], merge: true)
+                // --- FIX END ---
+                
                 FirebaseUserService.shared.createInvitationNotification(
                     for: tour,
                     recipientId: recipientId,
@@ -281,22 +281,17 @@ struct AddCrewSectionView: View {
                     roles: selectedRoles
                 )
             } else {
-                print("LOG: New user. Generating invitation code.")
                 let code = await withCheckedContinuation { continuation in
-                    FirebaseUserService.shared.createInvitation(for: ref.documentID, tourId: tourID, inviterId: ownerId) { code in
+                    FirebaseUserService.shared.createInvitation(for: ref.documentID, tourId: tour.id ?? "", inviterId: ownerId) { code in
                         continuation.resume(returning: code)
                     }
                 }
                 if let code = code {
                     try await ref.updateData(["invitationCode": code])
-                    print("LOG: Invitation code '\(code)' saved to crew document.")
-                } else {
-                    print("LOG: Failed to generate an invitation code.")
                 }
             }
             
             await MainActor.run {
-                print("LOG: Operation complete. Resetting form.")
                 resetForm()
             }
             
@@ -333,7 +328,6 @@ struct AddCrewSectionView: View {
                     print("Error loading crew: \(error?.localizedDescription ?? "Unknown")")
                     return
                 }
-                print("LOG: Firestore listener received \(documents.count) crew members.")
                 self.crewMembers = documents.compactMap { try? $0.data(as: TourCrew.self) }
             }
     }

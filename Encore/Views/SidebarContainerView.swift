@@ -3,21 +3,17 @@ import SwiftUI
 struct SidebarContainerView: View {
     @StateObject private var syncManager = OfflineSyncManager.shared
     @EnvironmentObject var appState: AppState
-    @Environment(\.colorScheme) private var systemColorScheme
-    
-    @State private var overrideColorScheme: ColorScheme? = nil
+    @Environment(\.colorScheme) var colorScheme
+
     @State private var isSidebarVisible = true
     @State private var isNotificationsPanelVisible = false
 
     var body: some View {
         NavigationStack {
             HStack(spacing: 0) {
-                // Main left sidebar is now always present, and handles its own collapsed state.
                 floatingSidebar
                 
-                // Center content area
                 VStack(spacing: 0) {
-                    // Top bar
                     HStack {
                         Button(action: { withAnimation { isSidebarVisible.toggle() } }) {
                             Image(systemName: isSidebarVisible ? "sidebar.left" : "sidebar.right")
@@ -28,7 +24,6 @@ struct SidebarContainerView: View {
                         
                         Spacer()
                         
-                        // Notifications Button
                         Button(action: { withAnimation { isNotificationsPanelVisible.toggle() } }) {
                             Image(systemName: "bell.fill")
                                 .font(.title2)
@@ -52,12 +47,10 @@ struct SidebarContainerView: View {
                     .padding(.top, 30)
                     .padding(.bottom, 10)
 
-                    // Main Content View
                     contentView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 
-                // Right-side notifications panel
                 if isNotificationsPanelVisible {
                     NotificationsView(isPresented: $isNotificationsPanelVisible)
                         .frame(width: 320)
@@ -65,7 +58,6 @@ struct SidebarContainerView: View {
                 }
             }
         }
-        .preferredColorScheme(overrideColorScheme ?? systemColorScheme)
     }
 
     @ViewBuilder
@@ -89,7 +81,7 @@ struct SidebarContainerView: View {
                     TicketsDashboardView()
                         .environmentObject(appState)
                 case "Database":
-                    DatabaseView(userID: appState.userID ?? "")
+                     DatabaseView(userID: appState.userID ?? "")
                 case "MyAccount":
                     MyAccountView().environmentObject(appState)
                 case "NewTour":
@@ -103,7 +95,12 @@ struct SidebarContainerView: View {
     }
 
     private var floatingSidebar: some View {
-            VStack(alignment: .leading, spacing: 0) {
+        // FIX: Updated light mode color to the specified RGB value
+        let sidebarBackgroundColor = colorScheme == .light ?
+            Color(red: 178/255, green: 203/255, blue: 206/255).opacity(0.85) :
+            Color(red: 31/255, green: 46/255, blue: 52/255).opacity(0.85)
+        
+        return VStack(alignment: .leading, spacing: 0) {
                 if isSidebarVisible {
                     expandedSidebarContent
                 } else {
@@ -121,7 +118,7 @@ struct SidebarContainerView: View {
                         .fill(.regularMaterial)
                     
                     RoundedRectangle(cornerRadius: 24)
-                        .fill(Color(red: 31/255, green: 46/255, blue: 52/255).opacity(0.85))
+                        .fill(sidebarBackgroundColor)
                 }
                 .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
             )
@@ -203,30 +200,24 @@ struct SidebarContainerView: View {
     }
 
     private var logoSectionExpanded: some View {
-        Button(action: { toggleColorMode() }) {
-            Image("EncoreLogo")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 120)
-                .foregroundColor(.primary)
-                .padding(.top, 10)
-                .padding(.bottom, 20)
-        }
-        .buttonStyle(PlainButtonStyle())
+        Image("EncoreLogo")
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 120)
+            .foregroundColor(.white)
+            .padding(.top, 10)
+            .padding(.bottom, 20)
     }
 
     private var logoSectionCollapsed: some View {
-        Button(action: { toggleColorMode() }) {
-            Image("EncoreE")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 24, height: 24)
-                .foregroundColor(.primary)
-                .padding(.top, 4)
-        }
-        .buttonStyle(PlainButtonStyle())
+        Image("EncoreE")
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 24, height: 24)
+            .foregroundColor(.white)
+            .padding(.top, 4)
     }
     
     private var addTourButtonExpanded: some View {
@@ -237,8 +228,8 @@ struct SidebarContainerView: View {
             }
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .center)
-            .background(Color.white)
-            .foregroundColor(.black)
+            .background(Color.white.opacity(0.15))
+            .foregroundColor(.white)
             .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
@@ -248,17 +239,9 @@ struct SidebarContainerView: View {
         Button(action: { appState.selectedTab = "NewTour"; appState.selectedTour = nil; appState.selectedShow = nil }) {
             Image(systemName: "plus.circle.fill")
                 .font(.system(size: 24))
-                .foregroundColor(.primary)
+                .foregroundColor(.white)
         }
         .buttonStyle(PlainButtonStyle())
-    }
-
-    private func toggleColorMode() {
-        if overrideColorScheme == .dark {
-            overrideColorScheme = .light
-        } else {
-            overrideColorScheme = .dark
-        }
     }
 }
 
@@ -271,6 +254,7 @@ struct SidebarLabel: View {
     let action: () -> Void
 
     var body: some View {
+        // FIX: Text color is now static white, with opacity for unselected state
         Button(action: action) {
             HStack(spacing: spacing) {
                 Image(systemName: icon)
@@ -279,7 +263,7 @@ struct SidebarLabel: View {
                 Text(title)
                     .font(.system(size: 15, weight: isSelected ? .bold : .regular))
             }
-            .foregroundColor(isSelected ? .white : Color.white.opacity(0.5))
+            .foregroundColor(isSelected ? .white : .white.opacity(0.6))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(PlainButtonStyle())
@@ -293,10 +277,11 @@ struct SidebarIcon: View {
     let action: () -> Void
 
     var body: some View {
+        // FIX: Icon color is now static white, with opacity for unselected state
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundColor(isSelected ? .white : Color.white.opacity(0.5))
+                .foregroundColor(isSelected ? .white : .white.opacity(0.5))
         }
         .buttonStyle(PlainButtonStyle())
         .frame(maxWidth: .infinity)

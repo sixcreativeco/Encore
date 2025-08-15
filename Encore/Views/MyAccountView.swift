@@ -4,10 +4,10 @@ import FirebaseAuth
 
 struct MyAccountView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var themeManager: ThemeManager
     @StateObject private var syncManager = OfflineSyncManager.shared
     @StateObject private var viewModel = MyAccountViewModel()
 
-    // User Profile State
     @State private var userName: String = Auth.auth().currentUser?.displayName ?? "Loading..."
     @State private var userEmail: String = Auth.auth().currentUser?.email ?? ""
 
@@ -29,6 +29,12 @@ struct MyAccountView: View {
                         .font(.largeTitle.bold())
                     #endif
 
+                    // --- THIS IS THE TEMPORARY ADMIN TOOL ---
+                    // Run the app, navigate to this screen, and press the button inside this view.
+                    // Once the script is complete, you can remove this line.
+                    AdminBackfillView()
+                    // ------------------------------------------
+
                     accountCard
                     stripeSection
                     supportSection
@@ -42,63 +48,64 @@ struct MyAccountView: View {
             .background(Color.clear)
             #endif
         }
-        // --- Add this alert modifier ---
         .alert(viewModel.alertTitle, isPresented: $viewModel.showingAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.alertMessage)
         }
-        // ------------------------------
     }
 
-    // MARK: - Main UI Sections
-
     private var accountCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 16) {
-                KFImage(Auth.auth().currentUser?.photoURL)
-                    .placeholder {
-                        Image(systemName: "person.crop.circle.fill")
-                            .resizable()
-                            .foregroundColor(.gray)
-                    }
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 60, height: 60)
-                    .clipShape(Circle())
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 16) {
+                    KFImage(Auth.auth().currentUser?.photoURL)
+                        .placeholder {
+                            Image(systemName: "person.crop.circle.fill")
+                                .resizable()
+                                .foregroundColor(.gray)
+                        }
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 60, height: 60)
+                        .clipShape(Circle())
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(userName)
-                        .font(.title2.bold())
-                    Text("userid: \(appState.userID ?? "N/A")")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(userName)
+                            .font(.title2.bold())
+                        Text("userid: \(appState.userID ?? "N/A")")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                 }
-            }
-            
-            Label(userEmail, systemImage: "envelope.fill")
-                .font(.subheadline)
-            
-            Divider()
-            
-            HStack {
-                Text("Encore Indie Plan")
-                    .font(.headline.bold())
-                Spacer()
+                
+                Label(userEmail, systemImage: "envelope.fill")
+                    .font(.subheadline)
+                
+                Divider()
+                
                 HStack {
-                    Circle()
-                        .fill(syncManager.isOnline ? Color.green : Color.gray)
-                        .frame(width: 8, height: 8)
-                    Text(syncManager.isOnline ? "Online" : "Offline")
-                        .font(.caption)
+                    Text("Encore Indie Plan")
+                        .font(.headline.bold())
+                    Spacer()
+                    HStack {
+                        Circle()
+                            .fill(syncManager.isOnline ? Color.green : Color.gray)
+                            .frame(width: 8, height: 8)
+                        Text(syncManager.isOnline ? "Online" : "Offline")
+                            .font(.caption)
+                    }
                 }
             }
+            .padding()
+            .background(.thinMaterial)
+            .cornerRadius(16)
+            
+            ThemeSwitchView(selectedTheme: $themeManager.selectedTheme)
+                .padding(8)
         }
-        .padding()
-        .background(.thinMaterial)
-        .cornerRadius(16)
     }
     
     @ViewBuilder

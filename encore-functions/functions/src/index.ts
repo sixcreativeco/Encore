@@ -1,5 +1,5 @@
 import {onRequest} from "firebase-functions/v2/https";
-import {onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onDocumentUpdated, onDocumentCreated} from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
@@ -96,6 +96,93 @@ export const onItineraryUpdate = onDocumentUpdated("itineraryItems/{itemId}", as
   const tokens = await getTokensForTour(tourId);
 
   await sendFcmMessages(tokens, {title: tourName, body: changeDescription});
+});
+
+
+// --- NEW TICKET AVAILABILITY FUNCTION ---
+
+interface TicketType {
+  name: string;
+  allocation: number;
+  availability?: {
+    type: string;
+  };
+}
+
+interface TicketedEvent {
+  ticketTypes: TicketType[];
+  earlyBirdSoldOutNotified?: boolean;
+  ownerId: string;
+  showId: string;
+  tourId: string;
+}
+
+export const onTicketSaleCreateCheckAvailability = onDocumentCreated("ticketSales/{saleId}", async (event) => {
+  const saleSnap = event.data;
+  if (!saleSnap) {
+    logger.log("No data associated with the event.");
+    return;
+  }
+  const saleData = saleSnap.data();
+  const eventId = saleData.ticketedEventId;
+
+  if (!eventId) {
+    logger.log(`Ticket sale ${saleSnap.id} is missing an eventId.`);
+    return;
+  }
+
+  logger.log(`Checking ticket availability for event: ${eventId}`);
+
+  const eventRef = db.collection("ticketedEvents").doc(eventId);
+
+  return db.runTransaction(async (transaction) => {
+    const eventDoc = await transaction.get(eventRef);
+    if (!eventDoc.exists) {
+      logger.error(`Event document ${eventId} not found.`);
+      return;
+    }
+
+    const eventData = eventDoc.data() as TicketedEvent;
+
+    if (eventData.earlyBirdSoldOutNotified) {
+      logger.log(`Notification for event ${eventId} already sent. Skipping.`);
+      return;
+    }
+
+    const ticketTypes: TicketType[] = eventData.ticketTypes;
+
+    const earlyBirdSoldOut = ticketTypes.some(
+      (tt) => tt.availability?.type === "Early Bird" && tt.allocation <= 0
+    );
+
+    if (earlyBirdSoldOut) {
+      logger.log(`Early Bird tickets for event ${eventId} have sold out. Creating notification.`);
+
+      const showDoc = await db.collection("shows").doc(eventData.showId).get();
+      const tourDoc = await db.collection("tours").doc(eventData.tourId).get();
+      const showName = showDoc.data()?.city || "a show";
+      const tourName = tourDoc.data()?.tourName || "your tour";
+      const artistName = tourDoc.data()?.artist || "";
+      const message = `Early Bird tickets for ${artistName} in ${showName} have sold out. Release the next ticket type?`;
+
+      const notification = {
+        recipientId: eventData.ownerId,
+        tourId: eventData.tourId,
+        showId: eventData.showId,
+        ticketedEventId: eventId,
+        type: "EARLY_BIRD_SOLD_OUT",
+        message: message,
+        tourName: tourName,
+        artistName: artistName,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        isRead: false,
+      };
+
+      await db.collection("notifications").add(notification);
+      transaction.update(eventRef, { earlyBirdSoldOutNotified: true });
+      logger.log(`Successfully created sold-out notification for owner ${eventData.ownerId}.`);
+    }
+  });
 });
 
 

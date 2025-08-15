@@ -11,11 +11,11 @@ struct TourDetailView: View {
             VStack(spacing: 32) {
                 TourHeaderView(tour: tour)
                     .padding(.horizontal, 24)
-                                
+                        
                 TourSummaryCardsView(tourID: tour.id ?? "", ownerUserID: tour.ownerId)
                     .environmentObject(appState)
                     .padding(.horizontal, 24)
-                                
+                            
                 HStack(alignment: .top, spacing: 24) {
                     // Create the itinerary view with explicit initialization
                     TourItineraryView(tour: tour)
@@ -27,9 +27,13 @@ struct TourDetailView: View {
                                 tourID: tour.id ?? "",
                                 ownerUserID: tour.ownerId
                             )
-                            TourFlightsView(
-                                tourID: tour.id ?? ""
-                            )
+
+                            // --- THIS IS THE FIX ---
+                            // The TourFlightsView now receives the entire `tour` object.
+                            // This gives it access to the `ownerId` needed for saving new flights securely.
+                            TourFlightsView(tour: tour)
+                            // --- END OF FIX ---
+
                             TourHotelsView(
                                 tourID: tour.id ?? ""
                             )

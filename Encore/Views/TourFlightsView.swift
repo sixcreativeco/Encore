@@ -2,7 +2,9 @@ import SwiftUI
 import FirebaseFirestore
 
 struct TourFlightsView: View {
-    var tourID: String
+    // --- THIS IS THE FIX: Part 1 ---
+    // The view now accepts the entire Tour object instead of just an ID.
+    let tour: Tour
 
     @State private var flights: [Flight] = []
     @State private var tourCrew: [TourCrew] = []
@@ -20,15 +22,15 @@ struct TourFlightsView: View {
             if flights.isEmpty {
                 placeholderView
             } else {
-                 flightList
+                flightList
             }
         }
         .onAppear(perform: loadData)
         .onDisappear { flightListener?.remove() }
         .sheet(isPresented: $showAddFlight) {
-            if let tour = appState.tours.first(where: { $0.id == tourID }) {
-                AddFlightView(tour: tour, onFlightAdded: {})
-            }
+            // --- THIS IS THE FIX: Part 2 ---
+            // We can now directly pass the `tour` object to the AddFlightView.
+            AddFlightView(tour: tour, onFlightAdded: {})
         }
     }
 
@@ -36,7 +38,7 @@ struct TourFlightsView: View {
         Text("No flights yet.")
             .frame(maxWidth: .infinity, minHeight: 50)
             .padding()
-             .background(Color.gray.opacity(0.1))
+            .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
     }
 
@@ -47,7 +49,7 @@ struct TourFlightsView: View {
                     flight: flight,
                     crew: tourCrew,
                     airports: airports,
-                     isExpanded: expandedFlightID == flight.id,
+                    isExpanded: expandedFlightID == flight.id,
                     onExpandToggle: { toggleExpanded(flight) },
                     onEdit: { /* Placeholder */ },
                     onDelete: { deleteFlight(flight) }
@@ -58,6 +60,7 @@ struct TourFlightsView: View {
     }
     
     private func loadData() {
+        guard let tourID = tour.id else { return } // Use the ID from the tour object
         flightListener?.remove()
         flightListener = FirebaseFlightService.addFlightsListener(forTour: tourID) { loadedFlights in
             self.flights = loadedFlights.sorted(by: { $0.departureTimeUTC.dateValue() < $1.departureTimeUTC.dateValue() })
@@ -76,6 +79,7 @@ struct TourFlightsView: View {
     }
     
     private func fetchCrew() {
+        guard let tourID = tour.id else { return } // Use the ID from the tour object
         Task {
             do {
                 self.tourCrew = try await FirebaseTourService.loadCrew(forTour: tourID)

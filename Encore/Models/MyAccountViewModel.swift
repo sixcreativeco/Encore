@@ -1,6 +1,11 @@
 import Foundation
-import AppKit
 import FirebaseAuth
+// FIX: Conditionally import AppKit for macOS and UIKit for iOS
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 @MainActor
 class MyAccountViewModel: ObservableObject {
@@ -101,7 +106,12 @@ class MyAccountViewModel: ObservableObject {
         guard let userID = currentUserID else { return }
         let setupURL = "https://encoretickets.vercel.app/dashboard/stripe/setup?userId=\(userID)"
         if let url = URL(string: setupURL) {
+            // FIX: Use the correct method to open a URL for each platform
+            #if os(macOS)
             NSWorkspace.shared.open(url)
+            #elseif os(iOS)
+            UIApplication.shared.open(url)
+            #endif
         }
     }
     
