@@ -67,7 +67,7 @@ fileprivate struct GuestInputView: View {
                            Button(action: { guestSearchText = crew.name }) {
                                HStack { Text(crew.name); Spacer() }.padding(8)
                            }.buttonStyle(.plain)
-                        }
+                       }
                    }
                }.background(Color.gray.opacity(0.1)).cornerRadius(8).frame(maxHeight: 150)
            }
@@ -377,7 +377,7 @@ struct AddFlightView: View {
                 case .success(let flights):
                     let airlineCode = String(self.autoFlightNumber.prefix { $0.isLetter })
                     let number = String(self.autoFlightNumber.drop { $0.isLetter })
-                                        
+                                    
                     if let match = flights.first(where: { $0.carrier.fs.uppercased() == airlineCode.uppercased() && $0.carrier.flightNumber == number }) {
                         guard let dep = self.allAirports.first(where: { $0.iata == departureAirport.iata }),
                               let arr = self.allAirports.first(where: { $0.iata == match.airport.fs }),
@@ -387,23 +387,21 @@ struct AddFlightView: View {
                             return
                         }
                         
-                        // Create departure time in departure timezone, then convert to UTC
                         let depDate = self.createDateInTimezone(date: self.autoFlightDate, timeString: match.departureTime?.time24 ?? "00:00", timezone: depTZ)
-                        
-                        // Create arrival time in arrival timezone, then convert to UTC
                         var arrDate = self.createDateInTimezone(date: self.autoFlightDate, timeString: match.arrivalTime?.time24 ?? "00:00", timezone: arrTZ)
                         
-                        // Handle overnight flights - if arrival is before departure, add a day
                         if arrDate < depDate {
                             arrDate = Calendar.current.date(byAdding: .day, value: 1, to: arrDate) ?? arrDate
                         }
                         
-                        // Convert both times to UTC for storage
                         let utcDepDate = self.convertToUTC(date: depDate, fromTimezone: depTZ)
                         let utcArrDate = self.convertToUTC(date: arrDate, fromTimezone: arrTZ)
-                                                
+                                       
+                        // --- THIS IS THE FIX ---
+                        // The ownerId is now correctly passed when creating the Flight object.
                         self.fetchedFlight = Flight(
                             tourId: self.tour.id ?? "",
+                            ownerId: self.tour.ownerId, // Added ownerId
                             airline: match.carrier.name,
                             flightNumber: "\(match.carrier.fs)\(match.carrier.flightNumber)",
                             departureTimeUTC: Timestamp(date: utcDepDate),
@@ -413,6 +411,7 @@ struct AddFlightView: View {
                             notes: self.notes,
                             passengers: []
                         )
+                        // --- END OF FIX ---
                     } else {
                         self.errorMessage = "No matching flight found for this date."
                     }
@@ -439,14 +438,12 @@ struct AddFlightView: View {
         
         let fullFlightNumber = manualAirlineCode.uppercased() + manualFlightNumber
         
-        // For manual entry, we need to convert the local times to UTC properly
         guard let originTZ = TimeZone(identifier: origin.tz),
               let destTZ = TimeZone(identifier: destination.tz) else {
             errorMessage = "Could not determine timezone for airports."
             return
         }
         
-        // Combine date and time in local timezone, then convert to UTC
         let localDepTime = combineDateAndTime(date: manualDepartureDate, time: manualDepartureTime)
         let localArrTime = combineDateAndTime(date: manualArrivalDate, time: manualArrivalTime)
         
@@ -456,8 +453,11 @@ struct AddFlightView: View {
         let depTimestamp = Timestamp(date: utcDepTime)
         let arrTimestamp = Timestamp(date: utcArrTime)
                 
+        // --- THIS IS THE FIX ---
+        // The ownerId is now correctly passed when creating the Flight object.
         let flightToSave = Flight(
             tourId: tourID,
+            ownerId: self.tour.ownerId, // Added ownerId
             airline: manualAirlineName,
             flightNumber: fullFlightNumber,
             departureTimeUTC: depTimestamp,
@@ -467,6 +467,7 @@ struct AddFlightView: View {
             notes: notes,
             passengers: passengerEntries
         )
+        // --- END OF FIX ---
                 
         saveFlight(flightToSave, originAirport: origin, destinationAirport: destination)
     }
@@ -523,16 +524,13 @@ struct AddFlightView: View {
         return calendar.date(from: finalComponents) ?? date
     }
     
-    // New helper function to convert local time to UTC
     func convertToUTC(date: Date, fromTimezone: TimeZone) -> Date {
         let utcCalendar = Calendar.current
         var localCalendar = Calendar.current
         localCalendar.timeZone = fromTimezone
         
-        // Get the components in the local timezone
         let components = localCalendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
         
-        // Create the date in UTC
         return utcCalendar.date(from: components) ?? date
     }
         

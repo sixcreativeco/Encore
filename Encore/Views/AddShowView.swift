@@ -10,13 +10,16 @@ struct AddShowView: View {
     var artistName: String
     var onSave: () -> Void
 
-    // Venue state
+    // Network & Search Services
+    @StateObject private var syncManager = OfflineSyncManager.shared
     @StateObject private var venueSearch = VenueSearchService()
+
+    // Form State
     @State private var venueQuery = ""
     @State private var showVenueSuggestions = false
     @State private var selectedVenue: VenueResult?
+    @State private var selectedTimezoneIdentifier: String = TimeZone.current.identifier
     
-    // Show details state
     @State private var city = ""
     @State private var country = ""
     @State private var venueName = ""
@@ -25,7 +28,6 @@ struct AddShowView: View {
     @State private var contactEmail = ""
     @State private var contactPhone = ""
     
-    // Date and time state
     @State private var showDate = Date()
     @State private var venueAccess = defaultTime(hour: 12)
     @State private var loadIn = defaultTime(hour: 15)
@@ -35,7 +37,6 @@ struct AddShowView: View {
     @State private var packOut = defaultTime(hour: 23)
     @State private var packOutNextDay = false
     
-    // Support Act State
     @State private var supportActs: [SupportActInput] = [SupportActInput()]
     @State private var allSupportActs: [String] = []
     
@@ -59,17 +60,7 @@ struct AddShowView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
-                HStack {
-                    Text("Add Show").font(.largeTitle.bold())
-                    Spacer()
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 24, weight: .medium))
-                            .padding(10)
-                    }
-                    .buttonStyle(.plain)
-                }
-                
+                header
                 showDetailsSection
                 timingSection
                 supportActSection
@@ -91,6 +82,19 @@ struct AddShowView: View {
         .frame(minWidth: 600, maxWidth: .infinity)
     }
 
+    private var header: some View {
+        HStack {
+            Text("Add Show").font(.largeTitle.bold())
+            Spacer()
+            Button(action: { dismiss() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 24, weight: .medium))
+                    .padding(10)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private var showDetailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Date").font(.headline)
@@ -104,22 +108,16 @@ struct AddShowView: View {
                         if newValue != selectedVenue?.name {
                             self.selectedVenue = nil
                             showVenueSuggestions = !newValue.isEmpty
-                            venueSearch.searchVenues(query: newValue)
+                            if syncManager.isOnline {
+                                venueSearch.searchVenues(query: newValue)
+                            }
                         }
                     }
                 
                 if showVenueSuggestions && !venueSearch.results.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(venueSearch.results) { result in
-                            Button(action: {
-                                self.selectedVenue = result
-                                self.venueName = result.name
-                                self.address = result.address
-                                self.city = result.city
-                                self.country = result.country
-                                self.venueQuery = result.name
-                                self.showVenueSuggestions = false
-                            }) {
+                            Button(action: { selectVenue(result) }) {
                                 VStack(alignment: .leading) {
                                     Text(result.name).font(.body)
                                     Text(result.address).font(.caption).foregroundColor(.gray)
@@ -131,17 +129,49 @@ struct AddShowView: View {
                     .background(Color.gray.opacity(0.1)).cornerRadius(8)
                 }
             }
+            
+            HStack(spacing: 16) {
+                StyledInputField(placeholder: "Address", text: $address)
+                if !syncManager.isOnline {
+                    timezonePicker.frame(width: 200)
+                }
+            }
+            
             HStack(spacing: 16) {
                 StyledInputField(placeholder: "City", text: $city)
                 StyledInputField(placeholder: "Country (optional)", text: $country)
             }
-            StyledInputField(placeholder: "Address", text: $address)
+            
             HStack(spacing: 16) {
                 StyledInputField(placeholder: "Venue Contact Name", text: $contactName)
                 StyledInputField(placeholder: "Email", text: $contactEmail)
                 StyledInputField(placeholder: "Phone Number", text: $contactPhone)
             }
         }
+    }
+    
+    private var timezonePicker: some View {
+        Menu {
+            ForEach(TimezoneHelper.regions) { region in
+                Section(header: Text(region.name)) {
+                    ForEach(region.timezones) { timezone in
+                        Button(timezone.name) {
+                            self.selectedTimezoneIdentifier = timezone.identifier
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack {
+                Text(selectedTimezoneIdentifier.split(separator: "/").last?.replacingOccurrences(of: "_", with: " ") ?? "Select")
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+            }
+            .padding(10)
+            .background(Color.black.opacity(0.15))
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
     }
 
     private var timingSection: some View {
@@ -248,50 +278,49 @@ struct AddShowView: View {
         .disabled(isSaving)
     }
 
-    private func getEventTimezone() async throws -> TimeZone {
-        if let timeZone = selectedVenue?.timeZone { return timeZone }
-        
-        guard !address.isEmpty else {
-            throw NSError(domain: "AppError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Please select a venue from the search results or enter a full address to determine the timezone."])
-        }
-        
-        let geocoder = CLGeocoder()
-        let placemarks = try? await geocoder.geocodeAddressString(address)
-        
-        if let timeZone = placemarks?.first?.timeZone {
-            return timeZone
-        } else {
-            throw NSError(domain: "AppError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not determine a timezone for the address entered. Please check the address is complete."])
+    private func selectVenue(_ result: VenueResult) {
+        self.selectedVenue = result
+        self.venueName = result.name
+        self.address = result.address
+        self.city = result.city
+        self.country = result.country
+        self.venueQuery = result.name
+        self.showVenueSuggestions = false
+        // Automatically update the timezone when a venue is selected
+        if let timezone = result.timeZone {
+            self.selectedTimezoneIdentifier = timezone.identifier
         }
     }
-    
-    // --- THIS FUNCTION CONTAINS THE CORE FIX ---
+
     private func saveShow() async {
         isSaving = true
-        do {
-            let eventTimeZone = try await getEventTimezone()
+        
+        // --- THIS IS THE FIX ---
+        // The timezone is now taken directly from the state, which is updated
+        // by both the venue search and the manual picker.
+        let eventTimeZone = TimeZone(identifier: selectedTimezoneIdentifier) ?? .current
+        
+        func createTimestampInEventZone(for time: Date, on day: Date, in timezone: TimeZone) -> Timestamp {
+            let localCalendar = Calendar.current
+            let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: day)
+            let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
             
-            // This helper function now correctly creates a Timestamp based on the venue's timezone.
-            func createTimestampInEventZone(for time: Date, on day: Date, in timezone: TimeZone) -> Timestamp {
-                let localCalendar = Calendar.current
-                let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: day)
-                let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
-                
-                var eventCalendar = Calendar(identifier: .gregorian)
-                eventCalendar.timeZone = timezone
+            var eventCalendar = Calendar(identifier: .gregorian)
+            eventCalendar.timeZone = timezone
 
-                var finalComponents = DateComponents()
-                finalComponents.year = dateComponents.year
-                finalComponents.month = dateComponents.month
-                finalComponents.day = dateComponents.day
-                finalComponents.hour = timeComponents.hour
-                finalComponents.minute = timeComponents.minute
-                finalComponents.timeZone = timezone
-                
-                let finalDate = eventCalendar.date(from: finalComponents) ?? Date()
-                return Timestamp(date: finalDate)
-            }
+            var finalComponents = DateComponents()
+            finalComponents.year = dateComponents.year
+            finalComponents.month = dateComponents.month
+            finalComponents.day = dateComponents.day
+            finalComponents.hour = timeComponents.hour
+            finalComponents.minute = timeComponents.minute
+            finalComponents.timeZone = timezone
             
+            let finalDate = eventCalendar.date(from: finalComponents) ?? Date()
+            return Timestamp(date: finalDate)
+        }
+        
+        do {
             let db = Firestore.firestore()
             let batch = db.batch()
             var supportActIDsToSave: [String] = []
@@ -340,6 +369,7 @@ struct AddShowView: View {
                 self.onSave()
                 self.dismiss()
             }
+            
         } catch {
             await MainActor.run {
                 self.alertMessage = error.localizedDescription
@@ -348,16 +378,24 @@ struct AddShowView: View {
             }
         }
     }
-
+  
     private func createItineraryItems(for show: Show, batch: WriteBatch, eventTimeZone: TimeZone) {
         guard let showId = show.id else { return }
         
         func createItineraryItem(forDate date: Timestamp?, type: ItineraryItemType, title: String) {
             guard let date = date else { return }
             let item = ItineraryItem(
-                tourId: self.tourID, showId: showId, title: title, type: type.rawValue, timeUTC: date,
-                subtitle: nil, notes: nil, timezone: eventTimeZone.identifier,
-                visibility: "Everyone", visibleTo: nil
+                ownerId: self.userID,
+                tourId: self.tourID,
+                showId: showId,
+                title: title,
+                type: type.rawValue,
+                timeUTC: date,
+                subtitle: nil,
+                notes: nil,
+                timezone: eventTimeZone.identifier,
+                visibility: "Everyone",
+                visibleTo: nil
             )
             let itemRef = Firestore.firestore().collection("itineraryItems").document()
             try? batch.setData(from: item, forDocument: itemRef)
@@ -371,7 +409,6 @@ struct AddShowView: View {
         createItineraryItem(forDate: show.packOut, type: .packOut, title: "Pack Out")
 
         for sa in supportActs.filter({ !$0.name.isEmpty }) {
-            // This logic needs to be timezone-aware as well
             var calendar = Calendar.current
             calendar.timeZone = eventTimeZone
             let showDayComponents = calendar.dateComponents([.year, .month, .day], from: show.date.dateValue())

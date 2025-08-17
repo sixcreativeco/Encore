@@ -3,6 +3,9 @@ import FirebaseFirestore
 
 struct ShowEditView: View {
     @Environment(\.dismiss) var dismiss
+    // --- THIS IS THE FIX: Part 1 ---
+    // We need access to the app's state to clear the selected show after deletion.
+    @EnvironmentObject var appState: AppState
     let tour: Tour
     
     @Binding var show: Show
@@ -34,7 +37,7 @@ struct ShowEditView: View {
             let components = eventCalendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: eventDate)
 
             // Create a new date from those same components, but in the user's local calendar
-            var userCalendar = Calendar.current // This uses the device's timezone
+            let userCalendar = Calendar.current // This uses the device's timezone
             return userCalendar.date(from: components)
         }
         
@@ -253,12 +256,12 @@ struct ShowEditView: View {
                     
                     var newTime: Timestamp?
                     switch itemType {
-                    case .loadIn:           newTime = self.show.loadIn
-                    case .soundcheck:       newTime = self.show.soundCheck
-                    case .doors:            newTime = self.show.doorsOpen
-                    case .headline:         newTime = self.show.headlinerSetTime
-                    case .packOut:          newTime = self.show.packOut
-                    default:                 return
+                    case .loadIn:          newTime = self.show.loadIn
+                    case .soundcheck:      newTime = self.show.soundCheck
+                    case .doors:           newTime = self.show.doorsOpen
+                    case .headline:        newTime = self.show.headlinerSetTime
+                    case .packOut:         newTime = self.show.packOut
+                    default:               return
                     }
                     
                     if let newTime = newTime {
@@ -298,14 +301,19 @@ struct ShowEditView: View {
                 batch.deleteDocument(document.reference)
             }
             
-            // NOTE: A full production implementation should use a Cloud Function
-            // to delete other related data like setlists, guest lists, and ticketed events
-            // to ensure data integrity. This client-side delete is limited in scope.
-
             // 3. Commit the batch
             try await batch.commit()
             print("✅ Show and associated itinerary items deleted successfully.")
-            dismiss()
+
+            // --- THIS IS THE FIX: Part 2 ---
+            // On the main thread, clear the selected show from the app state and then dismiss the view.
+            // This ensures the app navigates back to the TourDetailView correctly.
+            await MainActor.run {
+                appState.selectedShow = nil
+                dismiss()
+            }
+            // --- END OF FIX ---
+
         } catch {
             print("❌ Error deleting show: \(error.localizedDescription)")
             // Optionally, show an error alert to the user

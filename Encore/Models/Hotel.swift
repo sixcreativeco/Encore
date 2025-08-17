@@ -19,6 +19,10 @@ struct HotelRoom: Codable, Identifiable, Hashable {
 struct Hotel: Codable, Identifiable {
     @DocumentID var id: String?
     let tourId: String
+    // --- THIS IS THE FIX ---
+    // The ownerId is added here to be passed to itinerary items upon creation.
+    var ownerId: String
+    // --- END OF FIX ---
     var name: String
     var address: String
     var city: String

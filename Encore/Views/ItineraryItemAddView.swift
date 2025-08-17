@@ -273,7 +273,13 @@ struct ItineraryItemAddView: View {
             return
         }
 
+        // In ItineraryItemAddView.swift -> inside the saveItem() function
+
         let newItem = ItineraryItem(
+            // --- THIS IS THE FIX ---
+            // The ownerId is now correctly passed from the userID property.
+            ownerId: self.userID,
+            // -----------------------
             tourId: self.tourID,
             showId: showForTimezone?.id,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),

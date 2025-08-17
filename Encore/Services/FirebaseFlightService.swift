@@ -4,8 +4,11 @@ import FirebaseFirestore
 struct FirebaseFlightService {
     static let db = Firestore.firestore()
 
-    // --- THIS IS THE NEW, CORRECTED SAVE FUNCTION ---
-    // It accepts the full airport details to reliably get timezone info.
+    // --- THIS IS THE FIX ---
+    // This new, corrected save function now passes the `ownerId` from the flight
+    // to the itinerary items, which is required for the security rules.
+    // In FirebaseFlightService.swift
+
     static func saveFlight(_ flight: Flight, originAirport: AirportEntry, destinationAirport: AirportEntry, completion: @escaping (Error?, String?) -> Void) {
         print("INFO: Saving flight with full airport details. Origin: \(originAirport.name), Destination: \(destinationAirport.name)")
         let batch = db.batch()
@@ -14,36 +17,38 @@ struct FirebaseFlightService {
         
         // Create the "Flight" itinerary item for departure
         let departureItem = ItineraryItem(
+            ownerId: flight.ownerId, // This now works correctly
             tourId: flight.tourId,
-            showId: nil, // Flights are not tied to a single show
+            showId: nil,
             title: "Flight to \(flight.destination)",
             type: ItineraryItemType.flight.rawValue,
             timeUTC: flight.departureTimeUTC,
             subtitle: "\(flight.airline ?? "") \(flight.flightNumber ?? "")",
             notes: flight.notes,
-            timezone: originAirport.tz, // Use origin timezone
+            timezone: originAirport.tz,
             visibility: "everyone",
             visibleTo: nil
         )
         let departureItemRef = db.collection("itineraryItems").document()
         
-        // Create the "Arrival" itinerary item with the correct subtitle
+        // Create the "Arrival" itinerary item
         let arrivalItem = ItineraryItem(
+            ownerId: flight.ownerId, // This now works correctly
             tourId: flight.tourId,
             showId: nil,
             title: "Arrival in \(flight.destination)",
             type: ItineraryItemType.arrival.rawValue,
             timeUTC: flight.arrivalTimeUTC,
-            subtitle: "\(destinationAirport.city) Time", // The requested timezone note
+            subtitle: "\(destinationAirport.city) Time",
             notes: nil,
-            timezone: destinationAirport.tz, // Use destination timezone
+            timezone: destinationAirport.tz,
             visibility: "everyone",
             visibleTo: nil
         )
         let arrivalItemRef = db.collection("itineraryItems").document()
 
         do {
-            // Add all three documents to a single batch to ensure they all save together
+            // Add all three documents to a single batch
             try batch.setData(from: flight, forDocument: flightRef)
             try batch.setData(from: departureItem, forDocument: departureItemRef)
             try batch.setData(from: arrivalItem, forDocument: arrivalItemRef)

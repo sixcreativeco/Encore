@@ -218,7 +218,7 @@ fileprivate struct TypingEffectTextView: View {
 
     var body: some View {
         Text(String(words[currentWordIndex].prefix(visibleCharacters)))
-             .frame(width: 250, alignment: .leading)
+              .frame(width: 250, alignment: .leading)
             .onReceive(timer) { _ in
                 animateText()
             }
@@ -241,7 +241,7 @@ fileprivate struct TypingEffectTextView: View {
             }
         case .deleting:
             if visibleCharacters > 0 {
-                 visibleCharacters -= 1
+                  visibleCharacters -= 1
             } else {
                 state = .typing
                 currentWordIndex = (currentWordIndex + 1) % words.count
@@ -256,13 +256,15 @@ fileprivate struct TypingEffectTextView: View {
 fileprivate enum DummySignInData {
     private static func time(hour: Int, minute: Int) -> Date { Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: Date()) ?? Date() }
     
-    // FIX: Updated to create instances of the new 'Flight' model with the correct passenger type.
-    static let nzFlight = Flight(tourId: "d1", airline: "Air New Zealand", flightNumber: "NZ102", departureTimeUTC: Timestamp(date: time(hour: 8, minute: 0)), arrivalTimeUTC: Timestamp(date: time(hour: 11, minute: 30)), origin: "AKL", destination: "SYD", passengers: [])
-    static let aaFlight = Flight(tourId: "d2", airline: "American Airlines", flightNumber: "AA118", departureTimeUTC: Timestamp(date: time(hour: 18, minute: 30)), arrivalTimeUTC: Timestamp(date: time(hour: 23, minute: 50)), origin: "LAX", destination: "JFK", passengers: [])
-    static let qfFlight = Flight(tourId: "d3", airline: "Qantas", flightNumber: "QF44", departureTimeUTC: Timestamp(date: time(hour: 10, minute: 0)), arrivalTimeUTC: Timestamp(date: time(hour: 14, minute: 0)), origin: "SYD", destination: "LAX", passengers: [])
-    static let sqFlight = Flight(tourId: "d4", airline: "Singapore Airlines", flightNumber: "SQ317", departureTimeUTC: Timestamp(date: time(hour: 23, minute: 0)), arrivalTimeUTC: Timestamp(date: time(hour: 5, minute: 0)), origin: "SIN", destination: "LHR", passengers: [])
-    static let ekFlight = Flight(tourId: "d5", airline: "Emirates", flightNumber: "EK413", departureTimeUTC: Timestamp(date: time(hour: 10, minute: 50)), arrivalTimeUTC: Timestamp(date: time(hour: 18, minute: 20)), origin: "DXB", destination: "AKL", passengers: [])
-    static let uaFlight = Flight(tourId: "d6", airline: "United Airlines", flightNumber: "UA90", departureTimeUTC: Timestamp(date: time(hour: 22, minute: 45)), arrivalTimeUTC: Timestamp(date: time(hour: 6, minute: 15)), origin: "SFO", destination: "SYD", passengers: [])
+    // --- THIS IS THE FIX ---
+    // A dummy `ownerId` is now added to each placeholder Flight object.
+    static let nzFlight = Flight(tourId: "d1", ownerId: "dummyOwner", airline: "Air New Zealand", flightNumber: "NZ102", departureTimeUTC: Timestamp(date: time(hour: 8, minute: 0)), arrivalTimeUTC: Timestamp(date: time(hour: 11, minute: 30)), origin: "AKL", destination: "SYD", passengers: [])
+    static let aaFlight = Flight(tourId: "d2", ownerId: "dummyOwner", airline: "American Airlines", flightNumber: "AA118", departureTimeUTC: Timestamp(date: time(hour: 18, minute: 30)), arrivalTimeUTC: Timestamp(date: time(hour: 23, minute: 50)), origin: "LAX", destination: "JFK", passengers: [])
+    static let qfFlight = Flight(tourId: "d3", ownerId: "dummyOwner", airline: "Qantas", flightNumber: "QF44", departureTimeUTC: Timestamp(date: time(hour: 10, minute: 0)), arrivalTimeUTC: Timestamp(date: time(hour: 14, minute: 0)), origin: "SYD", destination: "LAX", passengers: [])
+    static let sqFlight = Flight(tourId: "d4", ownerId: "dummyOwner", airline: "Singapore Airlines", flightNumber: "SQ317", departureTimeUTC: Timestamp(date: time(hour: 23, minute: 0)), arrivalTimeUTC: Timestamp(date: time(hour: 5, minute: 0)), origin: "SIN", destination: "LHR", passengers: [])
+    static let ekFlight = Flight(tourId: "d5", ownerId: "dummyOwner", airline: "Emirates", flightNumber: "EK413", departureTimeUTC: Timestamp(date: time(hour: 10, minute: 50)), arrivalTimeUTC: Timestamp(date: time(hour: 18, minute: 20)), origin: "DXB", destination: "AKL", passengers: [])
+    static let uaFlight = Flight(tourId: "d6", ownerId: "dummyOwner", airline: "United Airlines", flightNumber: "UA90", departureTimeUTC: Timestamp(date: time(hour: 22, minute: 45)), arrivalTimeUTC: Timestamp(date: time(hour: 6, minute: 15)), origin: "SFO", destination: "SYD", passengers: [])
+    // --- END OF FIX ---
     
     static let hiltonCheckin = DummyItineraryItem(type: .hotel, title: "Check into Hilton", time: time(hour: 15, minute: 0), subtitle: "Room 1204")
     static let soundcheck = DummyItineraryItem(type: .mic, title: "Soundcheck", time: time(hour: 16, minute: 0), subtitle: "Spark Arena")
@@ -305,7 +307,7 @@ fileprivate struct PlaceholderFlightCard: View {
     var body: some View {
         HStack(spacing: 16) {
             Image(logoName).resizable().aspectRatio(contentMode: .fit).frame(width: 44, height: 44)
-             VStack(alignment: .leading, spacing: 2) {
+              VStack(alignment: .leading, spacing: 2) {
                 Text("\(flight.origin) → \(flight.destination)").font(.system(size: 20, weight: .bold))
                 Text("\(flight.airline ?? "") \(flight.flightNumber ?? "")").font(.caption).opacity(0.8)
             }
@@ -333,7 +335,7 @@ fileprivate struct PlaceholderContactCard: View {
     let contact: DummyContactItem
     var body: some View {
         HStack(spacing: 16) {
-             Image(systemName: "person.text.rectangle.fill").font(.title2.weight(.medium)).foregroundColor(.accentColor).frame(width: 30)
+              Image(systemName: "person.text.rectangle.fill").font(.title2.weight(.medium)).foregroundColor(.accentColor).frame(width: 30)
             VStack(alignment: .leading) {
                 Text(contact.name).fontWeight(.bold)
                 Text(contact.role).font(.subheadline).foregroundColor(.secondary)

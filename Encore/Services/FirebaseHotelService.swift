@@ -41,7 +41,9 @@ class FirebaseHotelService {
         }
         
         // 3. Create Itinerary Item for Check-in
+        // --- THIS IS THE FIX ---
         let checkInItem = ItineraryItem(
+            ownerId: hotel.ownerId, // The ownerId is now passed here
             tourId: hotel.tourId,
             showId: nil, // Hotels are not tied to specific shows
             title: "Check-in: \(hotel.name)",
@@ -49,7 +51,7 @@ class FirebaseHotelService {
             timeUTC: hotel.checkInDate,
             subtitle: hotel.address,
             notes: hotel.bookingReference,
-            timezone: hotel.timezone, // MODIFIED: Pass the hotel's timezone
+            timezone: hotel.timezone,
             visibility: "Everyone",
             visibleTo: nil
         )
@@ -58,6 +60,7 @@ class FirebaseHotelService {
         
         // 4. Create Itinerary Item for Check-out
         let checkOutItem = ItineraryItem(
+            ownerId: hotel.ownerId, // The ownerId is now passed here
             tourId: hotel.tourId,
             showId: nil,
             title: "Check-out: \(hotel.name)",
@@ -65,10 +68,11 @@ class FirebaseHotelService {
             timeUTC: hotel.checkOutDate,
             subtitle: hotel.address,
             notes: nil,
-            timezone: hotel.timezone, // MODIFIED: Pass the hotel's timezone
+            timezone: hotel.timezone,
             visibility: "Everyone",
             visibleTo: nil
         )
+        // --- END OF FIX ---
         let checkOutRef = db.collection("itineraryItems").document()
         try? batch.setData(from: checkOutItem, forDocument: checkOutRef)
         

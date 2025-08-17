@@ -11,6 +11,10 @@ struct Passenger: Codable, Identifiable, Hashable {
 struct Flight: Codable, Identifiable {
     @DocumentID var id: String?
     let tourId: String
+    // --- THIS IS THE FIX ---
+    // The ownerId property is now correctly added to the model.
+    var ownerId: String
+    // -----------------------
     var airline: String?
     var flightNumber: String?
     var departureTimeUTC: Timestamp

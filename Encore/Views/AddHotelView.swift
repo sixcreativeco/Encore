@@ -204,18 +204,22 @@ struct AddHotelView: View {
                 return Timestamp(date: finalDate)
             }
             
+            // --- THIS IS THE FIX ---
+            // The `ownerId` is now correctly passed from the tour object.
             let newHotel = Hotel(
                 tourId: tourID,
+                ownerId: tour.ownerId, // Added ownerId from tour
                 name: hotelName,
                 address: address,
                 city: city,
                 country: country,
-                timezone: eventTimeZone.identifier, // ADDED: Saving the timezone identifier
+                timezone: eventTimeZone.identifier,
                 checkInDate: combine(date: checkInDate, time: checkInTime, in: eventTimeZone),
                 checkOutDate: combine(date: checkOutDate, time: checkOutTime, in: eventTimeZone),
                 bookingReference: bookingReference.isEmpty ? nil : bookingReference,
                 rooms: rooms
             )
+            // --- END OF FIX ---
             
             FirebaseHotelService.shared.saveHotel(newHotel) { error in
                 isSaving = false

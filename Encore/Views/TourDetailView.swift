@@ -6,6 +6,9 @@ struct TourDetailView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     
+    // State to control the presentation of the CrewEditView sheet.
+    @State private var isShowingCrewEditView = false
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 32) {
@@ -17,22 +20,30 @@ struct TourDetailView: View {
                     .padding(.horizontal, 24)
                             
                 HStack(alignment: .top, spacing: 24) {
-                    // Create the itinerary view with explicit initialization
                     TourItineraryView(tour: tour)
                         .environmentObject(appState)
                     
                     ScrollView {
                         VStack(spacing: 24) {
-                            TourCrewView(
-                                tourID: tour.id ?? "",
-                                ownerUserID: tour.ownerId
-                            )
-
+                            
                             // --- THIS IS THE FIX ---
-                            // The TourFlightsView now receives the entire `tour` object.
-                            // This gives it access to the `ownerId` needed for saving new flights securely.
-                            TourFlightsView(tour: tour)
+                            // The TourCrewView is now a simple, clickable summary card.
+                            // The SectionHeader provides the title and "add" button functionality.
+                            VStack(alignment: .leading, spacing: 16) {
+                                SectionHeader(title: "Crew") {
+                                    isShowingCrewEditView = true
+                                }
+                                Button(action: { isShowingCrewEditView = true }) {
+                                    TourCrewView(
+                                        tourID: tour.id ?? "",
+                                        ownerUserID: tour.ownerId
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
                             // --- END OF FIX ---
+                            
+                            TourFlightsView(tour: tour)
 
                             TourHotelsView(
                                 tourID: tour.id ?? ""
@@ -58,5 +69,8 @@ struct TourDetailView: View {
             .padding(.vertical)
         }
         .ignoresSafeArea(edges: .bottom)
+        .sheet(isPresented: $isShowingCrewEditView) {
+            CrewEditView(tour: tour)
+        }
     }
 }
