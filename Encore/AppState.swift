@@ -11,6 +11,8 @@ class AppState: ObservableObject {
     @Published var selectedShow: Show? = nil
     @Published var tours: [Tour] = []
     
+    @Published var showingAbleset: Bool = false
+    
     @Published var notifications: [TourInvitationNotification] = []
     private var notificationListener: ListenerRegistration?
     private var authStateHandle: AuthStateDidChangeListenerHandle?
@@ -35,6 +37,7 @@ class AppState: ObservableObject {
                 self?.userID = user?.uid
                 
                 // --- FIX START ---
+           
                 // The original logic that clears data is commented out to prevent
                 // your tours from disappearing during an unexpected sign-out event.
                 /*
@@ -42,11 +45,13 @@ class AppState: ObservableObject {
                     // Clear all data on sign out
                     self?.tours.removeAll()
                     self?.selectedTour = nil
+            
                     self?.selectedShow = nil
                     self?.notifications.removeAll()
                     self?.notificationListener?.remove()
                 } else {
                     // Load data on sign in
+       
                     self?.loadTours()
                     self?.listenForNotifications()
                 }

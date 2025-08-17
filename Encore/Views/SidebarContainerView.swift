@@ -63,7 +63,10 @@ struct SidebarContainerView: View {
     @ViewBuilder
     private func contentView() -> some View {
         VStack(spacing: 0) {
-            if let show = appState.selectedShow, let tour = appState.selectedTour {
+            if appState.showingAbleset {
+                AblesetView()
+                    .environmentObject(appState)
+            } else if let show = appState.selectedShow, let tour = appState.selectedTour {
                 ShowDetailView(tour: tour, show: show)
                     .environmentObject(appState)
             } else if let tour = appState.selectedTour {
@@ -95,7 +98,6 @@ struct SidebarContainerView: View {
     }
 
     private var floatingSidebar: some View {
-        // FIX: Updated light mode color to the specified RGB value
         let sidebarBackgroundColor = colorScheme == .light ?
             Color(red: 178/255, green: 203/255, blue: 206/255).opacity(0.85) :
             Color(red: 31/255, green: 46/255, blue: 52/255).opacity(0.85)
@@ -254,7 +256,6 @@ struct SidebarLabel: View {
     let action: () -> Void
 
     var body: some View {
-        // FIX: Text color is now static white, with opacity for unselected state
         Button(action: action) {
             HStack(spacing: spacing) {
                 Image(systemName: icon)
@@ -277,7 +278,6 @@ struct SidebarIcon: View {
     let action: () -> Void
 
     var body: some View {
-        // FIX: Icon color is now static white, with opacity for unselected state
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 16))

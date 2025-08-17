@@ -24,7 +24,7 @@ fileprivate struct TicketSale: Identifiable {
     let status: String
     
     init(from document: DocumentSnapshot) {
-         let data = document.data() ?? [:]
+        let data = document.data() ?? [:]
         self.purchaseId = document.documentID
         self.ticketedEventId = data["ticketedEventId"] as? String ?? ""
         self.showId = data["showId"] as? String ?? ""
@@ -98,7 +98,7 @@ struct ShowDetailView: View {
 
     private let progressGradient = LinearGradient(
         gradient: Gradient(colors: [
-           Color(red: 216/255, green: 122/255, blue: 239/255),
+            Color(red: 216/255, green: 122/255, blue: 239/255),
             Color(red: 191/255, green: 93/255, blue: 93/255)
         ]),
         startPoint: .leading,
@@ -122,7 +122,7 @@ struct ShowDetailView: View {
 
     var body: some View {
         ScrollView {
-             VStack(alignment: .leading, spacing: 32) {
+            VStack(alignment: .leading, spacing: 32) {
                 headerSection
                 Divider()
                 
@@ -193,7 +193,7 @@ struct ShowDetailView: View {
                                 Image(systemName: "chevron.left")
                                 Text("Back")
                             }
-                             .font(.system(size: 13, weight: .medium)).foregroundColor(.primary)
+                            .font(.system(size: 13, weight: .medium)).foregroundColor(.primary)
                             .padding(.vertical, 4).padding(.horizontal, 10)
                             .background(Color.black.opacity(0.15)).cornerRadius(6)
                         }
@@ -201,14 +201,14 @@ struct ShowDetailView: View {
 
                         Text(show.city.uppercased())
                             .font(.system(size: 55, weight: .bold)).lineLimit(1).minimumScaleFactor(0.5)
-                     
+                        
                         HStack(alignment: .lastTextBaseline, spacing: 12) {
                             Text(show.venueName)
                                 .font(.system(size: 22, weight: .medium))
                                 .foregroundColor(.white)
                             
                             Text(formattedShowDate(for: show))
-                                 .font(.system(size: 16))
+                                .font(.system(size: 16))
                                 .foregroundColor(.white.opacity(0.8))
                         }
 
@@ -227,7 +227,7 @@ struct ShowDetailView: View {
                                      .font(.system(size: 13, weight: .semibold))
                             } icon: {
                                 Image(systemName: "truck")
-                                     .font(.system(size: 13))
+                                    .font(.system(size: 13))
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .background(Color.black.opacity(0.15)).cornerRadius(6)
@@ -235,18 +235,18 @@ struct ShowDetailView: View {
                     }
                     Spacer()
                     Map(coordinateRegion: $mapRegion, annotationItems: annotationItems()) { item in
-                         MapMarker(coordinate: item.coordinate, tint: .red)
+                        MapMarker(coordinate: item.coordinate, tint: .red)
                     }
                     .cornerRadius(12).frame(width: mapWidth, height: 180)
                 }
             }
             .frame(height: 200)
 
-             HStack(alignment: .top, spacing: 40) {
+            HStack(alignment: .top, spacing: 40) {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 10) {
                         Image(systemName: "mappin.and.ellipse").font(.system(size: 18))
-                         Button(action: openInMaps) {
+                        Button(action: openInMaps) {
                             Text(show.venueAddress).font(.system(size: 16))
                         }.buttonStyle(PlainButtonStyle())
                     }
@@ -256,10 +256,10 @@ struct ShowDetailView: View {
                             .font(.system(size: 16))
                             .onTapGesture { withAnimation { showContactDetails.toggle() } }
                         if showContactDetails {
-                             if let email = show.contactEmail {
+                            if let email = show.contactEmail {
                                 Text(email).font(.system(size: 14)).foregroundColor(.gray)
                             }
-                             if let phone = show.contactPhone {
+                            if let phone = show.contactPhone {
                                 Text(phone).font(.system(size: 14)).foregroundColor(.gray)
                             }
                         }
@@ -271,7 +271,10 @@ struct ShowDetailView: View {
                         Label("Open Live Setlist", systemImage: "play.display")
                             .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.black.opacity(0.15)).cornerRadius(10)
                     }.buttonStyle(.plain)
-                    
+                    Button(action: { appState.showingAbleset = true }) {
+                        Label("Connect to Ableset", systemImage: "network")
+                            .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.black.opacity(0.15)).cornerRadius(10)
+                    }.buttonStyle(.plain)
                     Button(action: { showEditShow = true }) {
                         Label("Edit Show", systemImage: "pencil")
                             .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.black.opacity(0.15)).cornerRadius(10)
@@ -285,7 +288,7 @@ struct ShowDetailView: View {
 
     private var showTimingsPanel: some View {
         VStack(alignment: .leading) {
-             HStack {
+            HStack {
                 Text("Show Timings").font(.headline)
                 Spacer()
             }.padding(.bottom, 4)
@@ -341,7 +344,7 @@ struct ShowDetailView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack {
                                 Text(guest.name).font(.headline)
-                                 if let additional = guest.additionalGuests, !additional.isEmpty, additional != "0" {
+                                if let additional = guest.additionalGuests, !additional.isEmpty, additional != "0" {
                                     Text("+\(additional)").font(.subheadline).foregroundColor(.gray)
                                 }
                             }
@@ -385,19 +388,18 @@ struct ShowDetailView: View {
             let ticketsSold = ticketSummary.ticketsIssued
 
             VStack(spacing: 16) {
-                 HStack(alignment: .top, spacing: 20) {
+                HStack(alignment: .top, spacing: 20) {
                     KFImage(URL(string: tour.posterURL ?? ""))
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                         .frame(width: 120, height: 180)
-                        .cornerRadius(8)
+                        .frame(width: 120, height: 180).cornerRadius(8)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                         Text("\(tour.artist) - \(tour.tourName)")
+                        Text("\(tour.artist) - \(tour.tourName)")
                             .font(.caption).foregroundColor(.secondary)
                         Text(show.city).font(.system(size: 32, weight: .bold))
                         Text("Date: \(show.date.dateValue().formatted(date: .numeric, time: .omitted))")
-                             .font(.subheadline).foregroundColor(.secondary)
+                            .font(.subheadline).foregroundColor(.secondary)
                         Spacer().frame(height: 10)
                         Text("Venue: \(show.venueName)").font(.caption).bold()
                         Text(show.venueAddress).font(.caption).foregroundColor(.secondary)
@@ -407,37 +409,37 @@ struct ShowDetailView: View {
 
                     VStack(alignment: .trailing, spacing: 12) {
                         let isPublished = event.status == .published
-                         ActionButton(
+                        ActionButton(
                             title: isPublished ? "Unpublish Tickets" : "Publish Tickets",
                             icon: isPublished ? "eye.slash" : "globe",
                             color: isPublished ? Color(red: 193/255, green: 94/255, blue: 94/255) : Color(red: 94/255, green: 149/255, blue: 73/255),
                             isLoading: isPublishingToWeb && !isPublished,
                             action: {
-                                 if isPublished {
+                                if isPublished {
                                     unpublishTickets(for: event)
                                 } else {
-                                     publishTicketsToWeb(for: event)
+                                    publishTicketsToWeb(for: event)
                                 }
                             }
                         )
-                         .disabled(isPublishingToWeb)
+                        .disabled(isPublishingToWeb)
                     }
                     .frame(width: 180)
                 }
                 
-                 VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
                     GeometryReader { geometry in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.2)).frame(height: 12)
-                             let progress = originalAllocation > 0 ? Double(ticketsSold) / Double(originalAllocation) : 0.0
+                            let progress = originalAllocation > 0 ? Double(ticketsSold) / Double(originalAllocation) : 0.0
                             RoundedRectangle(cornerRadius: 6).fill(progressGradient)
                                 .frame(width: geometry.size.width * progress, height: 12)
-                                 .animation(.easeInOut(duration: 0.8), value: progress)
+                                .animation(.easeInOut(duration: 0.8), value: progress)
                         }
                     }
                     .frame(height: 12)
                     Text("\(ticketsSold) of \(originalAllocation) Tickets Sold")
-                         .font(.caption).foregroundColor(.secondary)
+                        .font(.caption).foregroundColor(.secondary)
                 }
             }
             .padding(20)
@@ -446,6 +448,7 @@ struct ShowDetailView: View {
         }
     }
 
+    
     // MARK: - Data Loading & Actions
 
     private func loadAllShowDetails() {
@@ -470,10 +473,10 @@ struct ShowDetailView: View {
                 if let eventId = self.ticketedEvent?.id {
                     let salesListener = db.collection("ticketSales").whereField("ticketedEventId", isEqualTo: eventId)
                         .addSnapshotListener { salesSnapshot, salesError in
-                             guard let salesDocs = salesSnapshot?.documents else { return }
+                            guard let salesDocs = salesSnapshot?.documents else { return }
                             let sales = salesDocs.map { TicketSale(from: $0) }
                             self.ticketSales = sales
-                             self.updateTicketSummary()
+                            self.updateTicketSummary()
                             
                         }
                     self.ticketListeners.append(salesListener)
@@ -505,7 +508,7 @@ struct ShowDetailView: View {
             }
 
             if let time = show.venueAccess?.dateValue(), !events.contains(where: { $0.label == "Venue Access" }) {
-                 events.append(ShowTimelineEvent(time: time, label: "Venue Access"))
+                events.append(ShowTimelineEvent(time: time, label: "Venue Access"))
             }
 
             events.sort()
@@ -517,7 +520,7 @@ struct ShowDetailView: View {
     }
 
     private func loadGuestList() {
-         guard let showID = show.id, let tourId = tour.id else { return }
+        guard let showID = show.id, let tourId = tour.id else { return }
         let db = Firestore.firestore()
         db.collection("users").document(tour.ownerId).collection("tours").document(tourId).collection("shows").document(showID).collection("guestlist")
             .getDocuments { snapshot, _ in
@@ -553,7 +556,7 @@ struct ShowDetailView: View {
         let search = MKLocalSearch(request: searchRequest)
         search.start { response, _ in
             if let mapItem = response?.mapItems.first {
-                 mapItem.openInMaps()
+                mapItem.openInMaps()
             }
         }
     }
@@ -565,7 +568,7 @@ struct ShowDetailView: View {
 
     private func publishTicketsToWeb(for event: TicketedEvent) {
         guard let eventID = event.id else {
-             showPublishError(message: "Invalid event ID")
+            showPublishError(message: "Invalid event ID")
             return
         }
         isPublishingToWeb = true
@@ -573,12 +576,12 @@ struct ShowDetailView: View {
         TicketingAPI.shared.publishTickets(ticketedEventId: eventID) { result in
             DispatchQueue.main.async {
                 self.isPublishingToWeb = false
-                 switch result {
+                switch result {
                 case .success(let response):
                     self.showPublishSuccess(url: response.ticketSaleUrl)
                 case .failure(let error):
                     self.updateEventStatus(for: event, to: .draft)
-                     self.showPublishError(message: error.localizedDescription)
+                    self.showPublishError(message: error.localizedDescription)
                 }
             }
         }
