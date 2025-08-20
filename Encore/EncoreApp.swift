@@ -81,9 +81,12 @@ struct EncoreApp: App {
                 }
                 #endif
             }
-            // Use the theme manager to set the color scheme for the entire app
-            .preferredColorScheme(themeManager.selectedColorScheme)
-            // Make the theme manager available to all child views
+            // Use a compiler directive to set the color scheme based on the platform
+            #if os(iOS)
+            .preferredColorScheme(.dark) // Force dark mode on iOS
+            #else
+            .preferredColorScheme(themeManager.selectedColorScheme) // Keep theme switching for macOS
+            #endif
             .environmentObject(themeManager)
         }
         #if os(macOS)

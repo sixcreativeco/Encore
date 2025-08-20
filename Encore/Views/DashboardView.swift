@@ -1,6 +1,6 @@
 import SwiftUI
-import FirebaseFirestore
 import Kingfisher
+import FirebaseFirestore
 
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
@@ -204,7 +204,6 @@ struct DashboardView: View {
             #if os(macOS)
             HStack(alignment: .bottom, spacing: 16) {
                 DashboardTourCard(posterURL: tour.posterURL)
-                    .frame(width: 180)
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text(tour.tourName)
@@ -260,7 +259,6 @@ struct DashboardView: View {
             #else
             HStack(alignment: .top, spacing: 16) {
                 DashboardTourCard(posterURL: tour.posterURL)
-                    .frame(width: 100)
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(tour.tourName)
@@ -312,7 +310,9 @@ struct DashboardView: View {
             KFImage(URL(string: posterURL ?? ""))
                 .placeholder { ZStack { Color.gray.opacity(0.1); Image(systemName: "photo") } }
                 .resizable()
-                .aspectRatio(2/3, contentMode: .fit)
+                .scaledToFill()
+                .frame(width: 180, height: 270)
+                .clipped()
                 .cornerRadius(8)
         }
     }

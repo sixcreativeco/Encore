@@ -69,8 +69,8 @@ struct SidebarContainerView: View {
             } else if let show = appState.selectedShow, let tour = appState.selectedTour {
                 ShowDetailView(tour: tour, show: show)
                     .environmentObject(appState)
-            } else if let tour = appState.selectedTour {
-                 TourDetailView(tour: tour)
+            } else if let tour = appState.selectedTour, let tourID = tour.id {
+                TourDetailView(tourID: tourID)
                     .environmentObject(appState)
             } else {
                 switch appState.selectedTab {

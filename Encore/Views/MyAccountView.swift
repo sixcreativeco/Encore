@@ -29,12 +29,6 @@ struct MyAccountView: View {
                         .font(.largeTitle.bold())
                     #endif
 
-                    // --- THIS IS THE TEMPORARY ADMIN TOOL ---
-                    // Run the app, navigate to this screen, and press the button inside this view.
-                    // Once the script is complete, you can remove this line.
-                    AdminBackfillView()
-                    // ------------------------------------------
-
                     accountCard
                     stripeSection
                     supportSection

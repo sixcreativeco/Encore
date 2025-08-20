@@ -114,6 +114,7 @@
 				Models/Hotel.swift,
 				Models/ItineraryDayModel.swift,
 				Models/ItineraryItem.swift,
+				Models/ItineraryViewModel.swift,
 				Models/LandingPageViewModel.swift,
 				Models/MyAccountViewModel.swift,
 				Models/PersonalNote.swift,
@@ -142,7 +143,9 @@
 				StyledInputField.swift,
 				StyledStepper.swift,
 				StyledTimePicker.swift,
+				ThemeManager.swift,
 				TicketingAPI.swift,
+				TimezoneHelper.swift,
 				TourCard.swift,
 				Views/AddShowView.swift,
 				Views/BroadcastView.swift,
@@ -155,6 +158,7 @@
 				Views/SignInDynamicContentView.swift,
 				Views/SignInView.swift,
 				Views/SignUpView.swift,
+				Views/ThemeSwitchView.swift,
 				Views/TourItineraryView.swift,
 				Views/TourListView.swift,
 			);
@@ -669,7 +673,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.9.8;
+				MARKETING_VERSION = 2.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sixcreative.encoreviewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -705,7 +709,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.9.8;
+				MARKETING_VERSION = 2.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sixcreative.encoreviewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -946,7 +950,7 @@
 					"$(PROJECT_DIR)/Encore/encore-ticketing-web/node_modules/@unrs/resolver-binding-darwin-arm64",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 2.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = SixCreative.Encore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -987,7 +991,7 @@
 					"$(PROJECT_DIR)/Encore/encore-ticketing-web/node_modules/@unrs/resolver-binding-darwin-arm64",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 2.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = SixCreative.Encore;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
