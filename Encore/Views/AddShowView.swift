@@ -132,9 +132,7 @@ struct AddShowView: View {
             
             HStack(spacing: 16) {
                 StyledInputField(placeholder: "Address", text: $address)
-                if !syncManager.isOnline {
-                    timezonePicker.frame(width: 200)
-                }
+                timezonePicker.frame(width: 200)
             }
             
             HStack(spacing: 16) {
@@ -189,6 +187,7 @@ struct AddShowView: View {
     private var supportActSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Support Acts").font(.headline)
+            
             ForEach($supportActs) { $sa in
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 16) {
@@ -286,7 +285,6 @@ struct AddShowView: View {
         self.country = result.country
         self.venueQuery = result.name
         self.showVenueSuggestions = false
-        // Automatically update the timezone when a venue is selected
         if let timezone = result.timeZone {
             self.selectedTimezoneIdentifier = timezone.identifier
         }
@@ -295,9 +293,6 @@ struct AddShowView: View {
     private func saveShow() async {
         isSaving = true
         
-        // --- THIS IS THE FIX ---
-        // The timezone is now taken directly from the state, which is updated
-        // by both the venue search and the manual picker.
         let eventTimeZone = TimeZone(identifier: selectedTimezoneIdentifier) ?? .current
         
         func createTimestampInEventZone(for time: Date, on day: Date, in timezone: TimeZone) -> Timestamp {
@@ -369,7 +364,7 @@ struct AddShowView: View {
                 self.onSave()
                 self.dismiss()
             }
-            
+        
         } catch {
             await MainActor.run {
                 self.alertMessage = error.localizedDescription
@@ -394,6 +389,7 @@ struct AddShowView: View {
                 subtitle: nil,
                 notes: nil,
                 timezone: eventTimeZone.identifier,
+                isShowTiming: true, // Set to true for default show timings
                 visibility: "Everyone",
                 visibleTo: nil
             )

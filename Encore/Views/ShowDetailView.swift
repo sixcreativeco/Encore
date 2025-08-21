@@ -86,6 +86,7 @@ struct ShowDetailView: View {
     @State private var showEditShow = false
     @State private var showContactDetails = false
     @State private var showLiveSetlist = false
+    @State private var showAblesetView = false
 
     @EnvironmentObject var appState: AppState
 
@@ -154,6 +155,9 @@ struct ShowDetailView: View {
         }
         .sheet(isPresented: $showLiveSetlist) {
             LiveSetlistView(tour: tour, show: show)
+        }
+        .sheet(isPresented: $showAblesetView) {
+            AblesetView()
         }
         .alert(publishAlertTitle, isPresented: $showingPublishAlert) {
             if !publishedURL.isEmpty {
@@ -496,21 +500,29 @@ struct ShowDetailView: View {
             guard let showID = show.id else { return }
             let db = Firestore.firestore()
             var events: [ShowTimelineEvent] = []
+            
+            // 1. Add default timings from the Show object itself
+            if let time = show.venueAccess { events.append(.init(time: time.dateValue(), label: "Venue Access")) }
+            if let time = show.loadIn { events.append(.init(time: time.dateValue(), label: "Load In")) }
+            if let time = show.soundCheck { events.append(.init(time: time.dateValue(), label: "Soundcheck")) }
+            if let time = show.doorsOpen { events.append(.init(time: time.dateValue(), label: "Doors Open")) }
+            if let time = show.headlinerSetTime { events.append(.init(time: time.dateValue(), label: "\(tour.artist) Set")) }
+            if let time = show.packOut { events.append(.init(time: time.dateValue(), label: "Pack Out")) }
 
+            // 2. Fetch and add custom itinerary items marked as show timings
             let itinerarySnapshot = try? await db.collection("itineraryItems")
                 .whereField("showId", isEqualTo: showID)
                 .getDocuments()
 
             let itineraryItems = itinerarySnapshot?.documents.compactMap { try? $0.data(as: ItineraryItem.self) } ?? []
             
-            for item in itineraryItems {
+            let customShowTimings = itineraryItems.filter { $0.isShowTiming == true }
+            
+            for item in customShowTimings {
                 events.append(ShowTimelineEvent(time: item.timeUTC.dateValue(), label: item.title))
             }
 
-            if let time = show.venueAccess?.dateValue(), !events.contains(where: { $0.label == "Venue Access" }) {
-                events.append(ShowTimelineEvent(time: time, label: "Venue Access"))
-            }
-
+            // 3. Sort all events by time to ensure correct order
             events.sort()
 
             await MainActor.run {

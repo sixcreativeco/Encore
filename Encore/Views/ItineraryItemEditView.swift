@@ -5,13 +5,17 @@ struct ItineraryItemEditView: View {
     @Binding var item: ItineraryItem
     var onSave: () -> Void
     @Environment(\.dismiss) var dismiss
+    
+    // Local state for the form
     @State private var eventDate: Date
     @State private var time: Date
     @State private var notes: String
+    @State private var isShowTiming: Bool // New state for the checkbox
     @State private var visibility: String
     @State private var tourCrew: [TourCrew] = []
     @State private var selectedCrewIDs: Set<String>
     @State private var isSaving = false
+    
     private let columns = [GridItem(.adaptive(minimum: 120))]
         
     init(item: Binding<ItineraryItem>, onSave: @escaping () -> Void) {
@@ -28,10 +32,11 @@ struct ItineraryItemEditView: View {
         var localCalendar = Calendar.current
         let displayDate = localCalendar.date(from: eventComponents) ?? originalUTCDate
         
+        // Initialize local state from the bound item
         self._eventDate = State(initialValue: displayDate)
         self._time = State(initialValue: displayDate)
-                
         self._notes = State(initialValue: item.wrappedValue.notes ?? "")
+        self._isShowTiming = State(initialValue: item.wrappedValue.isShowTiming ?? false) // Initialize from item
         self._visibility = State(initialValue: item.wrappedValue.visibility ?? "Everyone")
         self._selectedCrewIDs = State(initialValue: Set(item.wrappedValue.visibleTo ?? []))
     }
@@ -75,13 +80,17 @@ struct ItineraryItemEditView: View {
                 }
                                 
                 CustomTextEditor(placeholder: "Notes", text: $notes)
+                
+                // Added Toggle
+                Toggle("Add to Show Timings", isOn: $isShowTiming)
+                    .toggleStyle(.checkbox)
                                 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Visibility").font(.headline)
                     HStack {
                         Button("Everyone") { visibility = "Everyone" }
                         .buttonStyle(PrimaryButtonStyle(color: visibility == "Everyone" ? .accentColor : .gray.opacity(0.3)))
-                                                
+                                           
                         Button("Choose Crew") { visibility = "Custom" }
                         .buttonStyle(PrimaryButtonStyle(color: visibility == "Custom" ? .accentColor : .gray.opacity(0.3)))
                     }
@@ -134,13 +143,15 @@ struct ItineraryItemEditView: View {
                 Form {
                     Section(header: Text("Event Details")) {
                         HStack {
-                             Image(systemName: ItineraryItemType(rawValue: item.type)?.iconName ?? "calendar")
+                            Image(systemName: ItineraryItemType(rawValue: item.type)?.iconName ?? "calendar")
                                 .foregroundColor(.accentColor)
                             TextField("Event Title", text: $item.title)
                                 .onChange(of: item.title) { _, newValue in updateType(from: newValue) }
                         }
                         DatePicker("Date", selection: $eventDate, displayedComponents: .date)
                         DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+                        // Added Toggle
+                        Toggle("Add to Show Timings", isOn: $isShowTiming)
                     }
                     
                     Section(header: Text("Notes")) {
@@ -301,6 +312,7 @@ struct ItineraryItemEditView: View {
                 
         item.timeUTC = Timestamp(date: finalDate)
         item.notes = notes.isEmpty ? nil : notes
+        item.isShowTiming = self.isShowTiming // Save the value from the checkbox
         item.visibility = visibility
         item.visibleTo = visibility == "Custom" ? Array(selectedCrewIDs) : nil
         

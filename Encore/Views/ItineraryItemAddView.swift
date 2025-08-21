@@ -14,6 +14,7 @@ struct ItineraryItemAddView: View {
     @State private var note = ""
     @State private var eventDate: Date
     @State private var time: Date
+    @State private var isShowTiming = false // New state for the checkbox
     
     // Visibility State
     @State private var visibility: String = "Everyone"
@@ -46,12 +47,13 @@ struct ItineraryItemAddView: View {
         iOSBody
         #endif
     }
-    
+        
     @ViewBuilder
     private var macOSBody: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
-                Text("Add Itinerary Item").font(.largeTitle.bold())
+                Text("Add Itinerary Item")
+                    .font(.largeTitle.bold())
                 Spacer()
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
@@ -74,7 +76,13 @@ struct ItineraryItemAddView: View {
                     StyledDateField(date: $eventDate)
                     StyledTimePicker(label: "", time: $time)
                 }
+                                
                 CustomTextEditor(placeholder: "Notes (optional)", text: $note)
+                
+                // New "Add to Show Timings" Toggle
+                Toggle("Add to Show Timings", isOn: $isShowTiming)
+                    .toggleStyle(.checkbox)
+
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Visibility").font(.headline)
                     HStack {
@@ -83,14 +91,14 @@ struct ItineraryItemAddView: View {
                             showCrewSelector = false
                         }
                         .buttonStyle(PrimaryButtonStyle(color: visibility == "Everyone" ? .accentColor : .gray.opacity(0.3)))
-                        
+                                           
                         Button("Choose Crew") {
                             visibility = "Custom"
                             showCrewSelector = true
                         }
                         .buttonStyle(PrimaryButtonStyle(color: visibility == "Custom" ? .accentColor : .gray.opacity(0.3)))
                     }
-                
+                                    
                     if showCrewSelector {
                         crewGrid
                             .padding(.top, 8)
@@ -99,7 +107,7 @@ struct ItineraryItemAddView: View {
             }
 
             Spacer()
-            
+                        
             Button("Save Item", action: saveItem)
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -127,13 +135,15 @@ struct ItineraryItemAddView: View {
                 Form {
                     Section(header: Text("Event Details")) {
                         HStack {
-                             Image(systemName: type.iconName)
+                            Image(systemName: type.iconName)
                                 .foregroundColor(.accentColor)
                             TextField("Event Title", text: $title)
                                 .onChange(of: title) { _, newValue in updateType(from: newValue) }
                         }
                         DatePicker("Date", selection: $eventDate, displayedComponents: .date)
                         DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+                        // New "Add to Show Timings" Toggle for iOS
+                        Toggle("Add to Show Timings", isOn: $isShowTiming)
                     }
                     
                     Section(header: Text("Notes")) {
@@ -248,16 +258,13 @@ struct ItineraryItemAddView: View {
     private func saveItem() {
         let eventTimeZone = TimeZone(identifier: showForTimezone?.timezone ?? "UTC") ?? .current
         
-        // Use the user's current calendar to decompose the date picker values into raw numbers.
         let localCalendar = Calendar.current
         let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: eventDate)
         let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
         
-        // Create a new calendar that is configured to the EVENT's local timezone.
         var eventCalendar = Calendar.current
         eventCalendar.timeZone = eventTimeZone
 
-        // Combine the raw numbers into a new set of components for the EVENT's timezone.
         var finalComponents = DateComponents()
         finalComponents.year = dateComponents.year
         finalComponents.month = dateComponents.month
@@ -266,20 +273,13 @@ struct ItineraryItemAddView: View {
         finalComponents.minute = timeComponents.minute
         finalComponents.timeZone = eventTimeZone
         
-        // Create the final Date object. Because the calendar's timezone is correct,
-        // this date will represent the correct moment in time (UTC).
         guard let finalDate = eventCalendar.date(from: finalComponents) else {
             print("Error: Could not construct final date from components.")
             return
         }
 
-        // In ItineraryItemAddView.swift -> inside the saveItem() function
-
         let newItem = ItineraryItem(
-            // --- THIS IS THE FIX ---
-            // The ownerId is now correctly passed from the userID property.
             ownerId: self.userID,
-            // -----------------------
             tourId: self.tourID,
             showId: showForTimezone?.id,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -288,6 +288,7 @@ struct ItineraryItemAddView: View {
             subtitle: nil,
             notes: note.isEmpty ? nil : note,
             timezone: eventTimeZone.identifier,
+            isShowTiming: self.isShowTiming, // Save the value from the checkbox
             visibility: visibility,
             visibleTo: visibility == "Custom" ? Array(selectedCrewIDs) : nil
         )
