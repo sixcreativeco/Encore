@@ -85,6 +85,9 @@ struct SidebarContainerView: View {
                         .environmentObject(appState)
                 case "Database":
                      DatabaseView(userID: appState.userID ?? "")
+                case "Export":
+                    ExportView()
+                        .environmentObject(appState)
                 case "MyAccount":
                     MyAccountView().environmentObject(appState)
                 case "NewTour":
@@ -150,6 +153,9 @@ struct SidebarContainerView: View {
                 SidebarLabel(icon: "book.fill", title: "Database", isSelected: appState.selectedTab == "Database", spacing: 16) {
                     appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
+                SidebarLabel(icon: "square.and.arrow.up.fill", title: "Export", isSelected: appState.selectedTab == "Export", spacing: 16) {
+                    appState.selectedTab = "Export"; appState.selectedTour = nil; appState.selectedShow = nil
+                }
                 SidebarLabel(icon: "person.crop.circle", title: "My Account", isSelected: appState.selectedTab == "MyAccount", spacing: 17.0) {
                     appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
@@ -187,6 +193,9 @@ struct SidebarContainerView: View {
                 }
                 SidebarIcon(icon: "book.fill", isSelected: appState.selectedTab == "Database") {
                     appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
+                }
+                SidebarIcon(icon: "square.and.arrow.up.fill", isSelected: appState.selectedTab == "Export") {
+                    appState.selectedTab = "Export"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
                 SidebarIcon(icon: "person.crop.circle", isSelected: appState.selectedTab == "MyAccount") {
                     appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
