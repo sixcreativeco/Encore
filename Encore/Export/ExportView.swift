@@ -49,13 +49,12 @@ struct ExportView: View {
                             showConfiguration()
                         case .guestList:
                             guestListConfiguration()
+                        case .travel:
+                            travelConfiguration()
                         case .date:
                             dateConfiguration()
-                        default:
-                            configSection(title: "Preferences") {
-                                Text("This preset is not yet configured.")
-                                    .foregroundColor(.secondary)
-                            }
+                        case .fullTour:
+                            fullTourConfiguration()
                         }
                     } else {
                         Text("Select a tour to begin.")
@@ -73,13 +72,19 @@ struct ExportView: View {
                 
                 if viewModel.isLoading && viewModel.selectedTourID != nil {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let previewImage = viewModel.previewImage {
-                    Image(nsImage: previewImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .background(Color.black.opacity(0.2))
-                        .cornerRadius(12)
-                        .shadow(radius: 10)
+                } else if !viewModel.previewImages.isEmpty {
+                    VStack {
+                        Image(nsImage: viewModel.previewImages[viewModel.currentPreviewPage])
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .background(Color.black.opacity(0.2))
+                            .cornerRadius(12)
+                            .shadow(radius: 10)
+                        
+                        if viewModel.previewImages.count > 1 {
+                            paginationControls
+                        }
+                    }
                 } else {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.black.opacity(0.1))
@@ -88,6 +93,32 @@ struct ExportView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+    
+    private var paginationControls: some View {
+        HStack {
+            Button(action: {
+                if viewModel.currentPreviewPage > 0 {
+                    viewModel.currentPreviewPage -= 1
+                }
+            }) {
+                Image(systemName: "chevron.left")
+            }
+            .disabled(viewModel.currentPreviewPage == 0)
+            
+            Text("Page \(viewModel.currentPreviewPage + 1) of \(viewModel.previewImages.count)")
+                .font(.caption)
+            
+            Button(action: {
+                if viewModel.currentPreviewPage < viewModel.previewImages.count - 1 {
+                    viewModel.currentPreviewPage += 1
+                }
+            }) {
+                Image(systemName: "chevron.right")
+            }
+            .disabled(viewModel.currentPreviewPage == viewModel.previewImages.count - 1)
+        }
+        .buttonStyle(.plain)
     }
     
     private func tourSelector() -> some View {
@@ -193,6 +224,19 @@ struct ExportView: View {
             .menuStyle(.borderlessButton)
             .frame(maxWidth: .infinity)
 
+            exportButton()
+        }
+    }
+    
+    private func travelConfiguration() -> some View {
+        configSection(title: "Travel Preferences") {
+            exportButton()
+        }
+    }
+    
+    private func fullTourConfiguration() -> some View {
+        configSection(title: "Full Tour Preferences") {
+            Toggle("Include Cover Page", isOn: $viewModel.config.includeCoverPage).toggleStyle(.checkbox)
             exportButton()
         }
     }

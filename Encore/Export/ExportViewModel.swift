@@ -15,7 +15,7 @@ class ExportViewModel: ObservableObject {
                 selectedTourData = nil
                 showsForSelectedTour = []
                 crewForSelectedTour = []
-                previewImage = nil
+                previewImages = []
             }
         }
     }
@@ -33,7 +33,8 @@ class ExportViewModel: ObservableObject {
 
     // Configuration & Preview
     @Published var config = ExportConfiguration()
-    @Published var previewImage: NSImage?
+    @Published var previewImages: [NSImage] = [] // Changed to an array for multiple pages
+    @Published var currentPreviewPage: Int = 0
 
     private let db = Firestore.firestore()
     private let userID: String?
@@ -151,8 +152,12 @@ class ExportViewModel: ObservableObject {
             
         case .travel:
             let travelItinerary = itineraryForSelectedTour.filter { ItineraryItemType(rawValue: $0.type) == .travel || ItineraryItemType(rawValue: $0.type) == .flight || ItineraryItemType(rawValue: $0.type) == .hotel }
-            viewToRender = AnyView(TravelPDF(tour: tour, itinerary: travelItinerary, flights: flightsForSelectedTour, hotels: hotelsForSelectedTour))
+            viewToRender = AnyView(TravelPDF(tour: tour, itinerary: travelItinerary, flights: flightsForSelectedTour, hotels: hotelsForSelectedTour, crew: crewForSelectedTour, posterImage: poster))
             suggestedName = "\(tour.artist) - Travel Itinerary.pdf"
+            
+        case .fullTour:
+            viewToRender = AnyView(FullTourPDF(tour: tour, shows: showsForSelectedTour, itinerary: itineraryForSelectedTour, flights: flightsForSelectedTour, hotels: hotelsForSelectedTour, crew: crewForSelectedTour, posterImage: poster))
+            suggestedName = "\(tour.artist) - \(tour.tourName) Full Itinerary.pdf"
 
         default:
             viewToRender = AnyView(Text("Export for \(config.selectedPreset.rawValue) not yet available.").frame(width: 595, height: 842).background(Color.white))
@@ -163,13 +168,39 @@ class ExportViewModel: ObservableObject {
     
     func generatePreview() async {
         let result = await generateConfiguredPDFView()
-        if let view = result.view {
-            let renderer = ImageRenderer(content: view)
-            renderer.scale = 1.0
-            self.previewImage = renderer.nsImage
-        } else {
-            self.previewImage = nil
+        guard let view = result.view else {
+            self.previewImages = []
+            return
         }
+
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 1.0
+
+        guard let fullImage = renderer.nsImage else {
+            self.previewImages = []
+            return
+        }
+
+        let pageHeight: CGFloat = 842.0
+        let fullHeight = fullImage.size.height
+        let pageCount = Int(ceil(fullHeight / pageHeight))
+        var images: [NSImage] = []
+
+        if pageCount > 0 {
+            for i in 0..<pageCount {
+                let yOffset = CGFloat(i) * pageHeight
+                let cropOriginY = fullHeight - yOffset - pageHeight
+                let rectToDraw = NSRect(x: 0, y: cropOriginY, width: fullImage.size.width, height: pageHeight)
+                
+                if let croppedCGImage = fullImage.cgImage(forProposedRect: nil, context: nil, hints: nil)?.cropping(to: rectToDraw) {
+                    let pageImage = NSImage(cgImage: croppedCGImage, size: NSSize(width: 595, height: 842))
+                    images.append(pageImage)
+                }
+            }
+        }
+
+        self.previewImages = images
+        self.currentPreviewPage = 0
     }
     
     func initiateSavePDF() async {

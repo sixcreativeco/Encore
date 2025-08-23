@@ -1,27 +1,32 @@
 import Foundation
 import FirebaseFirestore
 
-// NEW: A struct to hold passenger info, including baggage.
 struct Passenger: Codable, Identifiable, Hashable {
-    var id: String { crewId } // Use crewId for Identifiable conformance
+    var id: String { crewId }
     let crewId: String
     var baggage: String?
 }
 
-struct Flight: Codable, Identifiable {
+struct Flight: Codable, Identifiable, Hashable {
     @DocumentID var id: String?
     let tourId: String
-    // --- THIS IS THE FIX ---
-    // The ownerId property is now correctly added to the model.
     var ownerId: String
-    // -----------------------
     var airline: String?
     var flightNumber: String?
     var departureTimeUTC: Timestamp
     var arrivalTimeUTC: Timestamp
-    var origin: String // Airport code, e.g., "JFK"
-    var destination: String // Airport code, e.g., "LHR"
+    var origin: String
+    var destination: String
     var notes: String?
-    // UPDATED: The passengers property now uses the new Passenger struct.
     var passengers: [Passenger]
+
+    // Conformance to Hashable
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    // Conformance to Equatable
+    static func == (lhs: Flight, rhs: Flight) -> Bool {
+        lhs.id == rhs.id
+    }
 }

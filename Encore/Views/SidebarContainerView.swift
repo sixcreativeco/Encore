@@ -50,6 +50,8 @@ struct SidebarContainerView: View {
                     contentView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+                // This modifier forcefully sets the color scheme for the content area to dark.
+                .environment(\.colorScheme, .dark)
                 
                 if isNotificationsPanelVisible {
                     NotificationsView(isPresented: $isNotificationsPanelVisible)

@@ -1,33 +1,27 @@
 import Foundation
 import FirebaseFirestore
 
-// Represents a guest staying in a hotel room.
 struct HotelGuest: Codable, Identifiable, Hashable {
-    var id: String { crewId } // Conform to Identifiable using crewId
+    var id: String { crewId }
     let crewId: String
-    var name: String // Denormalized for easy display
+    var name: String
 }
 
-// Represents a single room in a hotel booking.
 struct HotelRoom: Codable, Identifiable, Hashable {
     var id = UUID().uuidString
     var roomNumber: String?
     var guests: [HotelGuest] = []
 }
 
-// Represents a complete hotel booking for a tour.
-struct Hotel: Codable, Identifiable {
+struct Hotel: Codable, Identifiable, Hashable {
     @DocumentID var id: String?
     let tourId: String
-    // --- THIS IS THE FIX ---
-    // The ownerId is added here to be passed to itinerary items upon creation.
     var ownerId: String
-    // --- END OF FIX ---
     var name: String
     var address: String
     var city: String
     var country: String
-    var timezone: String? // ADDED: To store the hotel's local timezone identifier.
+    var timezone: String?
     
     var checkInDate: Timestamp
     var checkOutDate: Timestamp
@@ -35,4 +29,14 @@ struct Hotel: Codable, Identifiable {
     var rooms: [HotelRoom] = []
     
     @ServerTimestamp var createdAt: Timestamp?
+
+    // Conformance to Hashable
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    // Conformance to Equatable
+    static func == (lhs: Hotel, rhs: Hotel) -> Bool {
+        lhs.id == rhs.id
+    }
 }

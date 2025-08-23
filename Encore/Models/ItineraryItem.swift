@@ -1,7 +1,7 @@
 import Foundation
 import FirebaseFirestore
 
-struct ItineraryItem: Codable, Identifiable, Equatable {
+struct ItineraryItem: Codable, Identifiable, Equatable, Hashable {
     @DocumentID var id: String?
     let ownerId: String
     let tourId: String
@@ -14,10 +14,15 @@ struct ItineraryItem: Codable, Identifiable, Equatable {
     var notes: String?
     var timezone: String?
     
-    var isShowTiming: Bool? // New property to identify show-specific timings
+    var isShowTiming: Bool?
     
-    var visibility: String? // "everyone" or "custom"
-    var visibleTo: [String]? // Array of crew member document IDs
+    var visibility: String?
+    var visibleTo: [String]?
+    
+    // Conformance to Hashable
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
     
     // Custom equality to help SwiftUI detect changes
     static func == (lhs: ItineraryItem, rhs: ItineraryItem) -> Bool {
