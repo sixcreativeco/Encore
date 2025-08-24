@@ -4,7 +4,6 @@ import Kingfisher
 
 struct ExportView: View {
     @StateObject private var viewModel: ExportViewModel
-    @EnvironmentObject var appState: AppState
 
     init() {
         _viewModel = StateObject(wrappedValue: ExportViewModel(userID: Auth.auth().currentUser?.uid))
@@ -12,9 +11,10 @@ struct ExportView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            header()
-            
-            if viewModel.isLoading {
+            Text("Export")
+                .font(.largeTitle.bold())
+
+            if viewModel.isLoadingTours {
                 ProgressView("Loading Tours...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.tours.isEmpty {
@@ -22,7 +22,7 @@ struct ExportView: View {
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                exportConfigurationView()
+                exportConfigurationView
             }
             
             Spacer()
@@ -30,31 +30,26 @@ struct ExportView: View {
         .padding(30)
     }
 
-    private func header() -> some View {
-        Text("Export")
-            .font(.largeTitle.bold())
-    }
-
-    private func exportConfigurationView() -> some View {
+    private var exportConfigurationView: some View {
         HStack(alignment: .top, spacing: 30) {
             // Left Column: Configuration
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    tourSelector()
-                    presetsSection()
+                    tourSelector
+                    presetsSection
                     
                     if viewModel.selectedTourID != nil {
                         switch viewModel.config.selectedPreset {
                         case .show:
-                            showConfiguration()
+                            showConfiguration
                         case .guestList:
-                            guestListConfiguration()
+                            guestListConfiguration
                         case .travel:
-                            travelConfiguration()
+                            travelConfiguration
                         case .date:
-                            dateConfiguration()
+                            dateConfiguration
                         case .fullTour:
-                            fullTourConfiguration()
+                            fullTourConfiguration
                         }
                     } else {
                         Text("Select a tour to begin.")
@@ -67,16 +62,18 @@ struct ExportView: View {
             .frame(width: 350)
             
             // Right Column: Preview
-            rightPreviewPanel()
+            rightPreviewPanel
         }
     }
     
-    private func rightPreviewPanel() -> some View {
+    private var rightPreviewPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Preview").font(.headline).foregroundColor(.secondary)
             
-            if viewModel.isLoading && viewModel.selectedTourID != nil {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            if viewModel.isLoadingDetails {
+                ProgressView("Loading Tour Details...").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.isGeneratingPreview {
+                ProgressView("Generating Preview...").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !viewModel.previewImages.isEmpty {
                 VStack {
                     Image(nsImage: viewModel.previewImages[viewModel.currentPreviewPage])
@@ -87,7 +84,7 @@ struct ExportView: View {
                         .shadow(radius: 10)
                     
                     if viewModel.previewImages.count > 1 {
-                        paginationControls()
+                        paginationControls
                     }
                 }
             } else {
@@ -99,7 +96,7 @@ struct ExportView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    private func paginationControls() -> some View {
+    private var paginationControls: some View {
         HStack {
             Button(action: {
                 if viewModel.currentPreviewPage > 0 { viewModel.currentPreviewPage -= 1 }
@@ -117,7 +114,7 @@ struct ExportView: View {
         .buttonStyle(.plain)
     }
     
-    private func tourSelector() -> some View {
+    private var tourSelector: some View {
         configSection(title: "Tour") {
             Menu {
                 ForEach(viewModel.tours) { tour in
@@ -139,7 +136,7 @@ struct ExportView: View {
         }
     }
 
-    private func presetsSection() -> some View {
+    private var presetsSection: some View {
         configSection(title: "Presets") {
             HStack(spacing: 10) {
                 presetButton(preset: .show)
@@ -153,9 +150,9 @@ struct ExportView: View {
         }
     }
     
-    private func showConfiguration() -> some View {
+    private var showConfiguration: some View {
         configSection(title: "Show Preferences") {
-            showPickerMenu()
+            showPickerMenu
             Toggle("Include Notes Section", isOn: $viewModel.config.includeNotesSection).toggleStyle(.checkbox)
             if viewModel.config.includeNotesSection {
                 CustomTextEditor(placeholder: "Add custom notes for the PDF...", text: $viewModel.config.notes)
@@ -164,24 +161,24 @@ struct ExportView: View {
                     .cornerRadius(10)
             }
             Toggle("Include Crew List", isOn: $viewModel.config.includeCrew).toggleStyle(.checkbox)
-            exportButton()
+            exportButton
         }
     }
     
-    private func guestListConfiguration() -> some View {
+    private var guestListConfiguration: some View {
         configSection(title: "Guest List Preferences") {
-            showPickerMenu()
-            exportButton()
+            showPickerMenu
+            exportButton
         }
     }
     
-    private func travelConfiguration() -> some View {
+    private var travelConfiguration: some View {
         configSection(title: "Travel Preferences") {
-            exportButton()
+            exportButton
         }
     }
     
-    private func fullTourConfiguration() -> some View {
+    private var fullTourConfiguration: some View {
         configSection(title: "Full Tour Preferences") {
             Toggle("Include Cover Page", isOn: $viewModel.config.includeCoverPage).toggleStyle(.checkbox)
             if viewModel.config.includeCoverPage {
@@ -195,20 +192,20 @@ struct ExportView: View {
                     }
                 }
             }
-            exportButton()
+            exportButton
         }
     }
     
-    private func dateConfiguration() -> some View {
+    private var dateConfiguration: some View {
         configSection(title: "Date Preferences") {
             Text("Date range pickers coming soon.")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            exportButton().disabled(true)
+            exportButton.disabled(true)
         }
     }
 
-    private func showPickerMenu() -> some View {
+    private var showPickerMenu: some View {
         Menu {
             ForEach(viewModel.showsForSelectedTour) { show in
                 Button("\(show.city) - \(show.venueName)") {
@@ -233,7 +230,7 @@ struct ExportView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func exportButton() -> some View {
+    private var exportButton: some View {
         Button(action: {
             Task { await viewModel.initiateSavePDF() }
         }) {
@@ -280,10 +277,12 @@ fileprivate struct ThemePreviewCard: View {
     let theme: ExportConfiguration.CoverPageTheme
     let isSelected: Bool
     
-    private let theme1Gradient = LinearGradient(
-        gradient: Gradient(colors: [Color(hex: "3a6073"), Color(hex: "16222a")]),
-        startPoint: .top, endPoint: .bottom
-    )
+    private var theme1Gradient: LinearGradient {
+        LinearGradient(
+            gradient: Gradient(colors: [Color(red: 58/255, green: 96/255, blue: 115/255), Color(red: 22/255, green: 34/255, blue: 42/255)]),
+            startPoint: .top, endPoint: .bottom
+        )
+    }
     
     var body: some View {
         VStack(spacing: 8) {
@@ -301,17 +300,17 @@ fileprivate struct ThemePreviewCard: View {
                     VStack(spacing: 0) {
                         theme1Gradient
                         Rectangle().fill(Color.white)
-                            .overlay(alignment: .topLeading) { // Correctly align content
+                            .overlay(alignment: .topLeading) {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Capsule().frame(width: 30, height: 5).foregroundColor(.gray.opacity(0.7))
                                     Capsule().frame(width: 70, height: 7).foregroundColor(.black.opacity(0.8))
                                 }
-                                .padding(12) // Add padding
+                                .padding(12)
                             }
                     }
                 }
             }
-            .frame(width: 120, height: 170) // A4-like aspect ratio
+            .frame(width: 120, height: 170)
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -324,33 +323,5 @@ fileprivate struct ThemePreviewCard: View {
                 .foregroundColor(isSelected ? .primary : .secondary)
         }
         .frame(maxWidth: .infinity)
-    }
-}
-
-// Helper for using hex colors
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3:
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
     }
 }

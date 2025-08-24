@@ -9,18 +9,18 @@ class ExportViewModel: ObservableObject {
     @Published var tours: [Tour] = []
     @Published var selectedTourID: String? {
         didSet {
+            previewTask?.cancel()
             if let tourID = selectedTourID {
                 fetchDataForTour(tourID: tourID)
             } else {
-                selectedTourData = nil
-                showsForSelectedTour = []
-                crewForSelectedTour = []
-                previewImages = []
+                clearTourData()
             }
         }
     }
-    @Published var isLoading = false
+    @Published var isLoadingTours = false
+    @Published var isLoadingDetails = false
     @Published var isGeneratingPDF = false
+    @Published var isGeneratingPreview = false
 
     // Data for the selected tour
     @Published var selectedTourData: Tour?
@@ -39,6 +39,7 @@ class ExportViewModel: ObservableObject {
     private let db = Firestore.firestore()
     private let userID: String?
     private var configCancellable: AnyCancellable?
+    private var previewTask: Task<Void, Never>?
 
     init(userID: String?) {
         self.userID = userID
@@ -48,21 +49,21 @@ class ExportViewModel: ObservableObject {
         configCancellable = $config
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
-                Task { await self?.generatePreview() }
+                self?.schedulePreviewGeneration()
             }
     }
 
     private func fetchTours(for userID: String) {
-        isLoading = true
+        isLoadingTours = true
         db.collection("tours").whereField("ownerId", isEqualTo: userID)
             .order(by: "startDate", descending: true)
             .getDocuments { [weak self] snapshot, error in
                 guard let self = self, let documents = snapshot?.documents else {
-                    self?.isLoading = false
+                    self?.isLoadingTours = false
                     return
                 }
                 self.tours = documents.compactMap { try? $0.data(as: Tour.self) }
-                self.isLoading = false
+                self.isLoadingTours = false
             }
     }
 
@@ -71,7 +72,7 @@ class ExportViewModel: ObservableObject {
         self.config = ExportConfiguration()
         
         Task {
-            isLoading = true
+            isLoadingDetails = true
             do {
                 let shows = try await FirebaseTourService.fetchShows(forTour: tourID)
                 self.showsForSelectedTour = shows
@@ -85,13 +86,24 @@ class ExportViewModel: ObservableObject {
 
                 _ = await [crewTask, itineraryTask, flightsTask, hotelsTask, guestListTask]
                 
-                await generatePreview()
+                schedulePreviewGeneration()
 
             } catch {
                 print("Error fetching tour details: \(error.localizedDescription)")
             }
-            isLoading = false
+            isLoadingDetails = false
         }
+    }
+
+    private func clearTourData() {
+        selectedTourData = nil
+        showsForSelectedTour = []
+        crewForSelectedTour = []
+        itineraryForSelectedTour = []
+        flightsForSelectedTour = []
+        hotelsForSelectedTour = []
+        guestLists = [:]
+        previewImages = []
     }
     
     private func fetchCrew(for tourID: String) async {
@@ -166,40 +178,52 @@ class ExportViewModel: ObservableObject {
         return (viewToRender, suggestedName)
     }
     
-    func generatePreview() async {
-        let result = await generateConfiguredPDFView()
-        guard let view = result.view else {
-            self.previewImages = []
-            return
-        }
+    private func schedulePreviewGeneration() {
+        previewTask?.cancel()
+        
+        isGeneratingPreview = true
+        
+        previewTask = Task {
+            let result = await generateConfiguredPDFView()
+            
+            if Task.isCancelled { return }
+            
+            guard let view = result.view else {
+                self.previewImages = []
+                self.isGeneratingPreview = false
+                return
+            }
 
-        let renderer = ImageRenderer(content: view)
-        renderer.scale = 1.0
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 1.0
 
-        guard let fullImage = renderer.nsImage else {
-            self.previewImages = []
-            return
-        }
+            guard let fullImage = renderer.nsImage else {
+                self.previewImages = []
+                self.isGeneratingPreview = false
+                return
+            }
 
-        let pageHeight: CGFloat = 842.0
-        let fullHeight = fullImage.size.height
-        let pageCount = Int(ceil(fullHeight / pageHeight))
-        var images: [NSImage] = []
+            let pageHeight: CGFloat = 842.0
+            let fullHeight = fullImage.size.height
+            let pageCount = Int(ceil(fullHeight / pageHeight))
+            var images: [NSImage] = []
 
-        if pageCount > 0 {
-            for i in 0..<pageCount {
-                let yOffset = CGFloat(i) * pageHeight
-                let rectToCrop = NSRect(x: 0, y: yOffset, width: fullImage.size.width, height: pageHeight)
-                
-                if let croppedCGImage = fullImage.cgImage(forProposedRect: nil, context: nil, hints: nil)?.cropping(to: rectToCrop) {
-                    let pageImage = NSImage(cgImage: croppedCGImage, size: NSSize(width: 595, height: 842))
-                    images.append(pageImage)
+            if pageCount > 0 {
+                for i in 0..<pageCount {
+                    let yOffset = CGFloat(i) * pageHeight
+                    let rectToCrop = NSRect(x: 0, y: yOffset, width: fullImage.size.width, height: pageHeight)
+                    
+                    if let croppedCGImage = fullImage.cgImage(forProposedRect: nil, context: nil, hints: nil)?.cropping(to: rectToCrop) {
+                        let pageImage = NSImage(cgImage: croppedCGImage, size: NSSize(width: 595, height: 842))
+                        images.append(pageImage)
+                    }
                 }
             }
-        }
 
-        self.previewImages = images
-        self.currentPreviewPage = 0
+            self.previewImages = images
+            self.currentPreviewPage = 0
+            self.isGeneratingPreview = false
+        }
     }
     
     func initiateSavePDF() async {
