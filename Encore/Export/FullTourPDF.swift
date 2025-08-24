@@ -49,7 +49,6 @@ struct FullTourPDF: View {
             if config.includeCoverPage {
                 CoverPage(tour: tour, posterImage: posterImage, theme: config.coverPageTheme)
             }
-
             ForEach(sortedDays, id: \.self) { day in
                 if let showForDay = shows.first(where: { Calendar.current.isDate($0.date.dateValue(), inSameDayAs: day) }) {
                     ShowDaySheetPDF(tour: tour, show: showForDay, crew: crew, config: config, posterImage: posterImage)
@@ -75,6 +74,8 @@ private struct CoverPage: View {
                 Theme1CoverPage(tour: tour, posterImage: posterImage)
             case .theme2:
                 Theme2CoverPage(tour: tour, posterImage: posterImage)
+            case .theme3:
+                Theme3CoverPage(tour: tour, posterImage: posterImage)
             }
         }
         .frame(width: 595, height: 842) // A4
@@ -171,6 +172,42 @@ private struct Theme2CoverPage: View {
     }
 }
 
+private struct Theme3CoverPage: View {
+    let tour: Tour
+    let posterImage: NSImage?
+    var body: some View {
+        ZStack {
+            Color(white: 0.95)
+            VStack(spacing: 24) {
+                Group {
+                    if let image = posterImage {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        ZStack {
+                            Color.gray.opacity(0.2)
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .frame(width: 300, height: 450)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(radius: 10)
+                
+                VStack(spacing: 8) {
+                    Text(tour.artist.uppercased())
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.secondary)
+                    Text(tour.tourName)
+                        .font(.system(size: 40, weight: .black))
+                }
+            }
+        }
+    }
+}
 
 private struct DailyItineraryPage: View {
     let date: Date

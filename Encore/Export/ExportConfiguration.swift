@@ -15,6 +15,7 @@ struct ExportConfiguration {
     enum CoverPageTheme: String, CaseIterable, Identifiable {
         case theme1 = "Theme 1"
         case theme2 = "Theme 2"
+        case theme3 = "Theme 3" // New theme added
         var id: String { self.rawValue }
     }
     var coverPageTheme: CoverPageTheme = .theme1
@@ -30,7 +31,6 @@ struct ExportConfiguration {
         var id: String { self.rawValue }
     }
     var selectedPreset: Preset = .show
-    var customPresetName: String = ""
     
     // Data Filtering
     var selectedShowID: String?

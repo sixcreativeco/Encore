@@ -4,6 +4,7 @@ import Kingfisher
 
 struct ExportView: View {
     @StateObject private var viewModel: ExportViewModel
+    @EnvironmentObject var appState: AppState
 
     init() {
         _viewModel = StateObject(wrappedValue: ExportViewModel(userID: Auth.auth().currentUser?.uid))
@@ -11,9 +12,8 @@ struct ExportView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Export")
-                .font(.largeTitle.bold())
-
+            header()
+            
             if viewModel.isLoadingTours {
                 ProgressView("Loading Tours...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -22,7 +22,7 @@ struct ExportView: View {
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                exportConfigurationView
+                exportConfigurationView()
             }
             
             Spacer()
@@ -30,26 +30,31 @@ struct ExportView: View {
         .padding(30)
     }
 
-    private var exportConfigurationView: some View {
+    private func header() -> some View {
+        Text("Export")
+            .font(.largeTitle.bold())
+    }
+
+    private func exportConfigurationView() -> some View {
         HStack(alignment: .top, spacing: 30) {
             // Left Column: Configuration
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    tourSelector
-                    presetsSection
+                    tourSelector()
+                    presetsSection()
                     
                     if viewModel.selectedTourID != nil {
                         switch viewModel.config.selectedPreset {
                         case .show:
-                            showConfiguration
+                            showConfiguration()
                         case .guestList:
-                            guestListConfiguration
+                            guestListConfiguration()
                         case .travel:
-                            travelConfiguration
+                            travelConfiguration()
                         case .date:
-                            dateConfiguration
+                            dateConfiguration()
                         case .fullTour:
-                            fullTourConfiguration
+                            fullTourConfiguration()
                         }
                     } else {
                         Text("Select a tour to begin.")
@@ -62,16 +67,16 @@ struct ExportView: View {
             .frame(width: 350)
             
             // Right Column: Preview
-            rightPreviewPanel
+            rightPreviewPanel()
         }
     }
     
-    private var rightPreviewPanel: some View {
+    private func rightPreviewPanel() -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Preview").font(.headline).foregroundColor(.secondary)
             
             if viewModel.isLoadingDetails {
-                ProgressView("Loading Tour Details...").frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.isGeneratingPreview {
                 ProgressView("Generating Preview...").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !viewModel.previewImages.isEmpty {
@@ -84,7 +89,7 @@ struct ExportView: View {
                         .shadow(radius: 10)
                     
                     if viewModel.previewImages.count > 1 {
-                        paginationControls
+                        paginationControls()
                     }
                 }
             } else {
@@ -96,7 +101,7 @@ struct ExportView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    private var paginationControls: some View {
+    private func paginationControls() -> some View {
         HStack {
             Button(action: {
                 if viewModel.currentPreviewPage > 0 { viewModel.currentPreviewPage -= 1 }
@@ -114,7 +119,7 @@ struct ExportView: View {
         .buttonStyle(.plain)
     }
     
-    private var tourSelector: some View {
+    private func tourSelector() -> some View {
         configSection(title: "Tour") {
             Menu {
                 ForEach(viewModel.tours) { tour in
@@ -136,7 +141,7 @@ struct ExportView: View {
         }
     }
 
-    private var presetsSection: some View {
+    private func presetsSection() -> some View {
         configSection(title: "Presets") {
             HStack(spacing: 10) {
                 presetButton(preset: .show)
@@ -150,9 +155,9 @@ struct ExportView: View {
         }
     }
     
-    private var showConfiguration: some View {
+    private func showConfiguration() -> some View {
         configSection(title: "Show Preferences") {
-            showPickerMenu
+            showPickerMenu()
             Toggle("Include Notes Section", isOn: $viewModel.config.includeNotesSection).toggleStyle(.checkbox)
             if viewModel.config.includeNotesSection {
                 CustomTextEditor(placeholder: "Add custom notes for the PDF...", text: $viewModel.config.notes)
@@ -161,24 +166,24 @@ struct ExportView: View {
                     .cornerRadius(10)
             }
             Toggle("Include Crew List", isOn: $viewModel.config.includeCrew).toggleStyle(.checkbox)
-            exportButton
+            exportButton()
         }
     }
     
-    private var guestListConfiguration: some View {
+    private func guestListConfiguration() -> some View {
         configSection(title: "Guest List Preferences") {
-            showPickerMenu
-            exportButton
+            showPickerMenu()
+            exportButton()
         }
     }
     
-    private var travelConfiguration: some View {
+    private func travelConfiguration() -> some View {
         configSection(title: "Travel Preferences") {
-            exportButton
+            exportButton()
         }
     }
     
-    private var fullTourConfiguration: some View {
+    private func fullTourConfiguration() -> some View {
         configSection(title: "Full Tour Preferences") {
             Toggle("Include Cover Page", isOn: $viewModel.config.includeCoverPage).toggleStyle(.checkbox)
             if viewModel.config.includeCoverPage {
@@ -189,23 +194,25 @@ struct ExportView: View {
                             .onTapGesture { viewModel.config.coverPageTheme = .theme1 }
                         ThemePreviewCard(theme: .theme2, isSelected: viewModel.config.coverPageTheme == .theme2)
                             .onTapGesture { viewModel.config.coverPageTheme = .theme2 }
+                        ThemePreviewCard(theme: .theme3, isSelected: viewModel.config.coverPageTheme == .theme3)
+                            .onTapGesture { viewModel.config.coverPageTheme = .theme3 }
                     }
                 }
             }
-            exportButton
+            exportButton()
         }
     }
     
-    private var dateConfiguration: some View {
+    private func dateConfiguration() -> some View {
         configSection(title: "Date Preferences") {
             Text("Date range pickers coming soon.")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            exportButton.disabled(true)
+            exportButton().disabled(true)
         }
     }
 
-    private var showPickerMenu: some View {
+    private func showPickerMenu() -> some View {
         Menu {
             ForEach(viewModel.showsForSelectedTour) { show in
                 Button("\(show.city) - \(show.venueName)") {
@@ -230,7 +237,7 @@ struct ExportView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var exportButton: some View {
+    private func exportButton() -> some View {
         Button(action: {
             Task { await viewModel.initiateSavePDF() }
         }) {
@@ -277,6 +284,22 @@ fileprivate struct ThemePreviewCard: View {
     let theme: ExportConfiguration.CoverPageTheme
     let isSelected: Bool
     
+    // Manual controls for Theme 3 layout
+    private struct LayoutConstants {
+        // Adjust this scale to make the entire card smaller or larger
+        static let scale: CGFloat = 0.9
+        
+        static let posterWidth: CGFloat = 50 * scale
+        static let posterHeight: CGFloat = 75 * scale
+        static let posterCornerRadius: CGFloat = 4 * scale
+        static let verticalSpacing: CGFloat = 12 * scale
+        static let textSpacing: CGFloat = 5 * scale
+        static let line1Width: CGFloat = 30 * scale
+        static let line1Height: CGFloat = 4 * scale
+        static let line2Width: CGFloat = 50 * scale
+        static let line2Height: CGFloat = 6 * scale
+    }
+    
     private var theme1Gradient: LinearGradient {
         LinearGradient(
             gradient: Gradient(colors: [Color(red: 58/255, green: 96/255, blue: 115/255), Color(red: 22/255, green: 34/255, blue: 42/255)]),
@@ -308,12 +331,25 @@ fileprivate struct ThemePreviewCard: View {
                                 .padding(12)
                             }
                     }
+                case .theme3:
+                    ZStack {
+                        Color(white: 0.95)
+                        VStack(spacing: LayoutConstants.verticalSpacing) {
+                            theme1Gradient
+                                .frame(width: LayoutConstants.posterWidth, height: LayoutConstants.posterHeight)
+                                .clipShape(RoundedRectangle(cornerRadius: LayoutConstants.posterCornerRadius))
+                            VStack(spacing: LayoutConstants.textSpacing) {
+                                Capsule().frame(width: LayoutConstants.line1Width, height: LayoutConstants.line1Height).foregroundColor(.gray.opacity(0.7))
+                                Capsule().frame(width: LayoutConstants.line2Width, height: LayoutConstants.line2Height).foregroundColor(.black.opacity(0.8))
+                            }
+                        }
+                    }
                 }
             }
-            .frame(width: 120, height: 170)
-            .cornerRadius(8)
+            .frame(width: 120 * LayoutConstants.scale, height: 170 * LayoutConstants.scale)
+            .cornerRadius(8 * LayoutConstants.scale)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 8 * LayoutConstants.scale)
                     .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: isSelected ? 3 : 1)
             )
             .padding(2)
