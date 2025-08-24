@@ -33,7 +33,7 @@ class ExportViewModel: ObservableObject {
 
     // Configuration & Preview
     @Published var config = ExportConfiguration()
-    @Published var previewImages: [NSImage] = [] // Changed to an array for multiple pages
+    @Published var previewImages: [NSImage] = []
     @Published var currentPreviewPage: Int = 0
 
     private let db = Firestore.firestore()
@@ -156,7 +156,7 @@ class ExportViewModel: ObservableObject {
             suggestedName = "\(tour.artist) - Travel Itinerary.pdf"
             
         case .fullTour:
-            viewToRender = AnyView(FullTourPDF(tour: tour, shows: showsForSelectedTour, itinerary: itineraryForSelectedTour, flights: flightsForSelectedTour, hotels: hotelsForSelectedTour, crew: crewForSelectedTour, posterImage: poster))
+            viewToRender = AnyView(FullTourPDF(tour: tour, shows: showsForSelectedTour, itinerary: itineraryForSelectedTour, flights: flightsForSelectedTour, hotels: hotelsForSelectedTour, crew: crewForSelectedTour, posterImage: poster, config: config))
             suggestedName = "\(tour.artist) - \(tour.tourName) Full Itinerary.pdf"
 
         default:
@@ -189,10 +189,9 @@ class ExportViewModel: ObservableObject {
         if pageCount > 0 {
             for i in 0..<pageCount {
                 let yOffset = CGFloat(i) * pageHeight
-                let cropOriginY = fullHeight - yOffset - pageHeight
-                let rectToDraw = NSRect(x: 0, y: cropOriginY, width: fullImage.size.width, height: pageHeight)
+                let rectToCrop = NSRect(x: 0, y: yOffset, width: fullImage.size.width, height: pageHeight)
                 
-                if let croppedCGImage = fullImage.cgImage(forProposedRect: nil, context: nil, hints: nil)?.cropping(to: rectToDraw) {
+                if let croppedCGImage = fullImage.cgImage(forProposedRect: nil, context: nil, hints: nil)?.cropping(to: rectToCrop) {
                     let pageImage = NSImage(cgImage: croppedCGImage, size: NSSize(width: 595, height: 842))
                     images.append(pageImage)
                 }

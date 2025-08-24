@@ -10,19 +10,16 @@ struct FullTourPDF: View {
     let hotels: [Hotel]
     let crew: [TourCrew]
     let posterImage: NSImage?
+    let config: ExportConfiguration
 
-    // Group all events by day
     private var eventsByDay: [Date: [AnyHashable]] {
         var dict: [Date: [AnyHashable]] = [:]
         let calendar = Calendar.current
-
-        // Add all event types to the dictionary, keyed by their date
         for item in itinerary { dict[calendar.startOfDay(for: item.timeUTC.dateValue()), default: []].append(item) }
         for flight in flights { dict[calendar.startOfDay(for: flight.departureTimeUTC.dateValue()), default: []].append(flight) }
         for hotel in hotels { dict[calendar.startOfDay(for: hotel.checkInDate.dateValue()), default: []].append(hotel) }
         for show in shows { dict[calendar.startOfDay(for: show.date.dateValue()), default: []].append(show) }
         
-        // Sort items within each day chronologically
         for (day, items) in dict {
             dict[day] = items.sorted(by: { item1, item2 in
                 let date1 = getDate(from: item1)
@@ -49,69 +46,131 @@ struct FullTourPDF: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Page 1: Cover Page
             if config.includeCoverPage {
-                CoverPage(tour: tour, posterImage: posterImage)
+                CoverPage(tour: tour, posterImage: posterImage, theme: config.coverPageTheme)
             }
 
-            // Subsequent Pages: Daily Itineraries
             ForEach(sortedDays, id: \.self) { day in
-                // Check if this day is a show day
                 if let showForDay = shows.first(where: { Calendar.current.isDate($0.date.dateValue(), inSameDayAs: day) }) {
-                    ShowDayPDFPage(date: day, tour: tour, show: showForDay, items: eventsByDay[day] ?? [], crew: crew, config: config, posterImage: posterImage)
+                    ShowDaySheetPDF(tour: tour, show: showForDay, crew: crew, config: config, posterImage: posterImage)
                 } else {
                     DailyItineraryPage(date: day, tour: tour, items: eventsByDay[day] ?? [], crew: crew)
                 }
             }
         }
     }
-    
-    // This is a global configuration used by sub-views
-    private var config: ExportConfiguration {
-        var tempConfig = ExportConfiguration()
-        tempConfig.includeCrew = true
-        tempConfig.includeNotesSection = false
-        return tempConfig
-    }
 }
-
 
 // MARK: - PDF Page Subviews
 
 private struct CoverPage: View {
     let tour: Tour
     let posterImage: NSImage?
-    
+    let theme: ExportConfiguration.CoverPageTheme
+
+    var body: some View {
+        Group {
+            switch theme {
+            case .theme1:
+                Theme1CoverPage(tour: tour, posterImage: posterImage)
+            case .theme2:
+                Theme2CoverPage(tour: tour, posterImage: posterImage)
+            }
+        }
+        .frame(width: 595, height: 842) // A4
+    }
+}
+
+private struct Theme1CoverPage: View {
+    let tour: Tour
+    let posterImage: NSImage?
     var body: some View {
         ZStack {
             if let image = posterImage {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
-                    .overlay(Color.black.opacity(0.5))
-            } else {
-                Color.black
-            }
-            
-            VStack {
+                    .overlay(Color.black.opacity(0.4))
+            } else { Color.black }
+
+            VStack(spacing: 12) {
                 Spacer()
                 Text(tour.artist.uppercased())
-                    .font(.system(size: 24, weight: .bold)).kerning(4)
-                    .foregroundColor(.white.opacity(0.8))
+                    .font(.system(size: 24, weight: .bold))
+                    .kerning(4)
+                    .foregroundColor(.white.opacity(0.9))
                 Text(tour.tourName)
                     .font(.system(size: 60, weight: .black))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal)
                 Spacer()
                 Image("EncoreLogo")
                     .resizable().renderingMode(.template).scaledToFit()
-                    .frame(height: 30).foregroundColor(.white)
+                    .frame(height: 30).foregroundColor(.white.opacity(0.8))
             }
             .padding(60)
         }
-        .frame(width: 595, height: 842) // A4
     }
 }
+
+private struct Theme2CoverPage: View {
+    let tour: Tour
+    let posterImage: NSImage?
+    var body: some View {
+        VStack(spacing: 0) {
+            Group {
+                if let image = posterImage {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    ZStack {
+                        Color.gray.opacity(0.2)
+                        Image(systemName: "photo")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .frame(height: 400)
+            .clipped()
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(tour.artist.uppercased())
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.secondary)
+                Text(tour.tourName)
+                    .font(.system(size: 48, weight: .black))
+                Spacer()
+                HStack {
+                    VStack(spacing: 4) {
+                        Rectangle().frame(height: 4)
+                        Rectangle().frame(height: 4)
+                        Rectangle().frame(height: 4)
+                    }
+                    .foregroundColor(Color(red: 0.2, green: 0.4, blue: 0.5))
+                    .frame(width: 50)
+
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("POWERED BY")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        Image("EncoreLogo")
+                            .resizable().renderingMode(.template)
+                            .scaledToFit()
+                            .frame(height: 24)
+                    }
+                }
+            }
+            .padding(40)
+        }
+        .background(Color.white)
+    }
+}
+
 
 private struct DailyItineraryPage: View {
     let date: Date
@@ -127,7 +186,6 @@ private struct DailyItineraryPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Page Header
             HStack {
                 VStack(alignment: .leading) {
                     Text(tour.tourName).font(.system(size: 14, weight: .bold))
@@ -138,7 +196,6 @@ private struct DailyItineraryPage: View {
             }
             Divider()
 
-            // Page Content
             ForEach(items, id: \.self) { item in
                 if let itineraryItem = item as? ItineraryItem {
                     ItineraryRow(item: itineraryItem)
@@ -151,30 +208,11 @@ private struct DailyItineraryPage: View {
             Spacer()
         }
         .padding(40)
-        .frame(width: 595, height: 842) // A4
+        .frame(width: 595, height: 842)
         .background(Color.white)
         .foregroundColor(.black)
     }
 }
-
-// This view replicates the ShowDaySheet for use within the Full Tour PDF
-private struct ShowDayPDFPage: View {
-    let date: Date
-    let tour: Tour
-    let show: Show
-    let items: [AnyHashable]
-    let crew: [TourCrew]
-    let config: ExportConfiguration
-    let posterImage: NSImage?
-
-    var body: some View {
-        // We reuse the exact layout from the single Show Day Sheet PDF here
-        ShowDaySheetPDF(tour: tour, show: show, crew: crew, config: config, posterImage: posterImage)
-    }
-}
-
-
-// MARK: - PDF Row Components
 
 private struct ItineraryRow: View {
     let item: ItineraryItem
@@ -209,10 +247,16 @@ private struct ItineraryRow: View {
 private struct HotelPDFCard: View {
     let hotel: Hotel
     var body: some View {
-        Text("Hotel: \(hotel.name)")
-            .font(.system(size: 11))
-            .padding(8)
-            .background(Color.blue.opacity(0.1))
-            .cornerRadius(6)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Hotel: \(hotel.name)").font(.headline)
+            Text("Check-in: \(hotel.checkInDate.dateValue().formatted(date: .abbreviated, time: .shortened))")
+                .font(.subheadline)
+            Text("Address: \(hotel.address)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(12)
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(8)
     }
 }

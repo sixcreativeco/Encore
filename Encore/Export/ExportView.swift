@@ -67,55 +67,51 @@ struct ExportView: View {
             .frame(width: 350)
             
             // Right Column: Preview
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Preview").font(.headline).foregroundColor(.secondary)
-                
-                if viewModel.isLoading && viewModel.selectedTourID != nil {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if !viewModel.previewImages.isEmpty {
-                    VStack {
-                        Image(nsImage: viewModel.previewImages[viewModel.currentPreviewPage])
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .background(Color.black.opacity(0.2))
-                            .cornerRadius(12)
-                            .shadow(radius: 10)
-                        
-                        if viewModel.previewImages.count > 1 {
-                            paginationControls
-                        }
-                    }
-                } else {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.black.opacity(0.1))
-                        .overlay(Text("Select a tour and preset to see a preview.").foregroundColor(.secondary))
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            rightPreviewPanel()
         }
     }
     
-    private var paginationControls: some View {
+    private func rightPreviewPanel() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Preview").font(.headline).foregroundColor(.secondary)
+            
+            if viewModel.isLoading && viewModel.selectedTourID != nil {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !viewModel.previewImages.isEmpty {
+                VStack {
+                    Image(nsImage: viewModel.previewImages[viewModel.currentPreviewPage])
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .background(Color.black.opacity(0.2))
+                        .cornerRadius(12)
+                        .shadow(radius: 10)
+                    
+                    if viewModel.previewImages.count > 1 {
+                        paginationControls()
+                    }
+                }
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.black.opacity(0.1))
+                    .overlay(Text("Select a tour and preset to see a preview.").foregroundColor(.secondary))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    private func paginationControls() -> some View {
         HStack {
             Button(action: {
-                if viewModel.currentPreviewPage > 0 {
-                    viewModel.currentPreviewPage -= 1
-                }
-            }) {
-                Image(systemName: "chevron.left")
-            }
+                if viewModel.currentPreviewPage > 0 { viewModel.currentPreviewPage -= 1 }
+            }) { Image(systemName: "chevron.left") }
             .disabled(viewModel.currentPreviewPage == 0)
             
             Text("Page \(viewModel.currentPreviewPage + 1) of \(viewModel.previewImages.count)")
                 .font(.caption)
             
             Button(action: {
-                if viewModel.currentPreviewPage < viewModel.previewImages.count - 1 {
-                    viewModel.currentPreviewPage += 1
-                }
-            }) {
-                Image(systemName: "chevron.right")
-            }
+                if viewModel.currentPreviewPage < viewModel.previewImages.count - 1 { viewModel.currentPreviewPage += 1 }
+            }) { Image(systemName: "chevron.right") }
             .disabled(viewModel.currentPreviewPage == viewModel.previewImages.count - 1)
         }
         .buttonStyle(.plain)
@@ -125,9 +121,7 @@ struct ExportView: View {
         configSection(title: "Tour") {
             Menu {
                 ForEach(viewModel.tours) { tour in
-                    Button(tour.tourName) {
-                        viewModel.selectedTourID = tour.id
-                    }
+                    Button(tour.tourName) { viewModel.selectedTourID = tour.id }
                 }
             } label: {
                 HStack {
@@ -161,69 +155,22 @@ struct ExportView: View {
     
     private func showConfiguration() -> some View {
         configSection(title: "Show Preferences") {
-            Menu {
-                ForEach(viewModel.showsForSelectedTour) { show in
-                    Button("\(show.city) - \(show.venueName)") {
-                        viewModel.config.selectedShowID = show.id
-                    }
-                }
-            } label: {
-                HStack {
-                    if let show = viewModel.showsForSelectedTour.first(where: { $0.id == viewModel.config.selectedShowID }) {
-                        Text("\(show.city) - \(show.venueName)")
-                    } else {
-                        Text("Select a show...").foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                }
-                .padding(12)
-                .background(Color.black.opacity(0.2))
-                .cornerRadius(10)
-            }
-            .menuStyle(.borderlessButton)
-            .frame(maxWidth: .infinity)
-
+            showPickerMenu()
             Toggle("Include Notes Section", isOn: $viewModel.config.includeNotesSection).toggleStyle(.checkbox)
-            
             if viewModel.config.includeNotesSection {
                 CustomTextEditor(placeholder: "Add custom notes for the PDF...", text: $viewModel.config.notes)
                     .frame(height: 100)
                     .background(Color.black.opacity(0.2))
                     .cornerRadius(10)
             }
-            
             Toggle("Include Crew List", isOn: $viewModel.config.includeCrew).toggleStyle(.checkbox)
-
             exportButton()
         }
     }
     
     private func guestListConfiguration() -> some View {
         configSection(title: "Guest List Preferences") {
-            Menu {
-                ForEach(viewModel.showsForSelectedTour) { show in
-                    Button("\(show.city) - \(show.venueName)") {
-                        viewModel.config.selectedShowID = show.id
-                    }
-                }
-            } label: {
-                HStack {
-                    if let show = viewModel.showsForSelectedTour.first(where: { $0.id == viewModel.config.selectedShowID }) {
-                        Text("\(show.city) - \(show.venueName)")
-                    } else {
-                        Text("Select a show...").foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                }
-                .padding(12)
-                .background(Color.black.opacity(0.2))
-                .cornerRadius(10)
-            }
-            .menuStyle(.borderlessButton)
-            .frame(maxWidth: .infinity)
-
+            showPickerMenu()
             exportButton()
         }
     }
@@ -237,6 +184,17 @@ struct ExportView: View {
     private func fullTourConfiguration() -> some View {
         configSection(title: "Full Tour Preferences") {
             Toggle("Include Cover Page", isOn: $viewModel.config.includeCoverPage).toggleStyle(.checkbox)
+            if viewModel.config.includeCoverPage {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Theme").font(.caption).foregroundColor(.secondary)
+                    HStack(spacing: 12) {
+                        ThemePreviewCard(theme: .theme1, isSelected: viewModel.config.coverPageTheme == .theme1)
+                            .onTapGesture { viewModel.config.coverPageTheme = .theme1 }
+                        ThemePreviewCard(theme: .theme2, isSelected: viewModel.config.coverPageTheme == .theme2)
+                            .onTapGesture { viewModel.config.coverPageTheme = .theme2 }
+                    }
+                }
+            }
             exportButton()
         }
     }
@@ -248,6 +206,31 @@ struct ExportView: View {
                 .foregroundColor(.secondary)
             exportButton().disabled(true)
         }
+    }
+
+    private func showPickerMenu() -> some View {
+        Menu {
+            ForEach(viewModel.showsForSelectedTour) { show in
+                Button("\(show.city) - \(show.venueName)") {
+                    viewModel.config.selectedShowID = show.id
+                }
+            }
+        } label: {
+            HStack {
+                if let show = viewModel.showsForSelectedTour.first(where: { $0.id == viewModel.config.selectedShowID }) {
+                    Text("\(show.city) - \(show.venueName)")
+                } else {
+                    Text("Select a show...").foregroundColor(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.down")
+            }
+            .padding(12)
+            .background(Color.black.opacity(0.2))
+            .cornerRadius(10)
+        }
+        .menuStyle(.borderlessButton)
+        .frame(maxWidth: .infinity)
     }
 
     private func exportButton() -> some View {
@@ -289,5 +272,85 @@ struct ExportView: View {
         }
         .buttonStyle(.plain)
         .disabled(viewModel.selectedTourID == nil)
+    }
+}
+
+// MARK: - Theme Preview Card
+fileprivate struct ThemePreviewCard: View {
+    let theme: ExportConfiguration.CoverPageTheme
+    let isSelected: Bool
+    
+    private let theme1Gradient = LinearGradient(
+        gradient: Gradient(colors: [Color(hex: "3a6073"), Color(hex: "16222a")]),
+        startPoint: .top, endPoint: .bottom
+    )
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Group {
+                switch theme {
+                case .theme1:
+                    ZStack {
+                        theme1Gradient
+                        VStack(spacing: 6) {
+                            Capsule().frame(width: 40, height: 5).foregroundColor(.white.opacity(0.8))
+                            Capsule().frame(width: 60, height: 7).foregroundColor(.white)
+                        }
+                    }
+                case .theme2:
+                    VStack(spacing: 0) {
+                        theme1Gradient
+                        Rectangle().fill(Color.white)
+                            .overlay(alignment: .topLeading) { // Correctly align content
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Capsule().frame(width: 30, height: 5).foregroundColor(.gray.opacity(0.7))
+                                    Capsule().frame(width: 70, height: 7).foregroundColor(.black.opacity(0.8))
+                                }
+                                .padding(12) // Add padding
+                            }
+                    }
+                }
+            }
+            .frame(width: 120, height: 170) // A4-like aspect ratio
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: isSelected ? 3 : 1)
+            )
+            .padding(2)
+            
+            Text(theme.rawValue)
+                .font(.caption)
+                .foregroundColor(isSelected ? .primary : .secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// Helper for using hex colors
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3:
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6:
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8:
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }

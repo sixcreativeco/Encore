@@ -8,10 +8,16 @@ struct ExportConfiguration {
     var includeCrew: Bool = true
     var includeShowDetails: Bool = true
     var includeNotesSection: Bool = true
-    var notes: String = "" // New property for user-inputted notes
+    var notes: String = ""
 
-    // File Output Toggles
+    // File Output & Cover Page Toggles
     var includeCoverPage: Bool = true
+    enum CoverPageTheme: String, CaseIterable, Identifiable {
+        case theme1 = "Theme 1"
+        case theme2 = "Theme 2"
+        var id: String { self.rawValue }
+    }
+    var coverPageTheme: CoverPageTheme = .theme1
     var separateFilesPerShow: Bool = false
     
     // Preset Management
