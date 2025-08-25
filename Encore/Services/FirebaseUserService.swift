@@ -1,10 +1,23 @@
 import Foundation
 import FirebaseFirestore
+import FirebaseAuth
 
 class FirebaseUserService {
     
     static let shared = FirebaseUserService()
     private let db = Firestore.firestore()
+    
+    /// Saves the collected onboarding survey data to the user's document in Firestore.
+    func saveOnboardingData(_ data: OnboardingData, for userId: String, completion: @escaping (Error?) -> Void) {
+        let userRef = db.collection("users").document(userId)
+        do {
+            // Use merge: true to add the new onboarding fields without overwriting existing user data.
+            try userRef.setData(from: data, merge: true, completion: completion)
+        } catch {
+            print("Error encoding onboarding data for Firestore: \(error.localizedDescription)")
+            completion(error)
+        }
+    }
     
     func checkUserExists(byEmail email: String, completion: @escaping (String?) -> Void) {
         db.collection("users").whereField("email", isEqualTo: email).getDocuments { snapshot, error in
@@ -36,10 +49,8 @@ class FirebaseUserService {
     }
     
     func createInvitation(for crewDocId: String, tourId: String, inviterId: String, completion: @escaping (String?) -> Void) {
-        // The fix is here: The map closure requires an argument, which we ignore with `_ in`.
         let code = String((0..<6).map{ _ in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".randomElement()! })
         let expirationDate = Calendar.current.date(byAdding: .day, value: 7, to: Date())!
-
         let invitationData: [String: Any] = [
             "tourId": tourId,
             "crewDocId": crewDocId,

@@ -4,9 +4,14 @@ import FirebaseAuth
 import Combine
 
 class AppState: ObservableObject {
+    // MARK: - Published Properties
     @Published var userID: String? = nil
     @Published var selectedTab: String = "Dashboard"
     
+    // Onboarding State Management
+    enum OnboardingState { case unknown, required, completed }
+    @Published var onboardingState: OnboardingState = .unknown
+
     @Published var selectedTour: Tour? = nil
     @Published var selectedShow: Show? = nil
     @Published var tours: [Tour] = []
@@ -14,9 +19,13 @@ class AppState: ObservableObject {
     @Published var showingAbleset: Bool = false
     
     @Published var notifications: [TourInvitationNotification] = []
+    
+    // MARK: - Private Properties
+    private var db = Firestore.firestore()
     private var notificationListener: ListenerRegistration?
     private var authStateHandle: AuthStateDidChangeListenerHandle?
 
+    // MARK: - Lifecycle
     init() {
         registerAuthStateHandler()
     }
@@ -28,53 +37,67 @@ class AppState: ObservableObject {
         notificationListener?.remove()
     }
 
+    // MARK: - Auth State
     private func registerAuthStateHandler() {
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] (_, user) in
-          
-            self?.objectWillChange.send()
-          
-            DispatchQueue.main.async {
-                self?.userID = user?.uid
-                
-                // --- FIX START ---
-           
-                // The original logic that clears data is commented out to prevent
-                // your tours from disappearing during an unexpected sign-out event.
-                /*
-                if user == nil {
-                    // Clear all data on sign out
-                    self?.tours.removeAll()
-                    self?.selectedTour = nil
+            guard let self = self else { return }
             
-                    self?.selectedShow = nil
-                    self?.notifications.removeAll()
-                    self?.notificationListener?.remove()
-                } else {
-                    // Load data on sign in
-       
-                    self?.loadTours()
-                    self?.listenForNotifications()
-                }
-                */
+            // All state changes are now safely on the main thread.
+            DispatchQueue.main.async {
+                self.userID = user?.uid
                 
-                // For now, we always attempt to load data to ensure it appears.
-                self?.loadTours()
-                self?.listenForNotifications()
-                // --- FIX END ---
+                if let user = user {
+                    print("✅ [AppState DEBUG] User is signed in with UID: \(user.uid). Checking onboarding status...")
+                    self.checkOnboardingStatus(for: user.uid)
+                    self.loadTours()
+                    self.listenForNotifications()
+                } else {
+                    print("🔴 [AppState DEBUG] User is signed out. Clearing data.")
+                    self.clearAllDataOnSignOut()
+                }
             }
         }
     }
     
+    private func checkOnboardingStatus(for userID: String) {
+        let userRef = db.collection("users").document(userID)
+        
+        userRef.getDocument { document, error in
+            DispatchQueue.main.async {
+                if let document = document, document.exists {
+                    if document.get("role") != nil {
+                        print("✅ [AppState DEBUG] User has completed onboarding (role field exists).")
+                        self.onboardingState = .completed
+                    } else {
+                        print("🟡 [AppState DEBUG] User has NOT completed onboarding (no role field).")
+                        self.onboardingState = .required
+                    }
+                } else {
+                    print("🟡 [AppState DEBUG] User document doesn't exist yet, onboarding required.")
+                    self.onboardingState = .required
+                }
+            }
+        }
+    }
+    
+    private func clearAllDataOnSignOut() {
+        self.tours.removeAll()
+        self.selectedTour = nil
+        self.selectedShow = nil
+        self.notifications.removeAll()
+        self.notificationListener?.remove()
+        self.onboardingState = .unknown
+    }
+    
+    // MARK: - Data Loading
     func listenForNotifications() {
         guard let userID = userID else { return }
         notificationListener?.remove()
         
-        let db = Firestore.firestore()
-        notificationListener = db.collection("notifications")
+        notificationListener = self.db.collection("notifications")
             .whereField("recipientId", isEqualTo: userID)
             .addSnapshotListener { snapshot, error in
                 guard let documents = snapshot?.documents else { return }
-                
                 self.notifications = documents.compactMap { try? $0.data(as: TourInvitationNotification.self) }
             }
     }
@@ -87,15 +110,12 @@ class AppState: ObservableObject {
 
     func loadTours() {
         guard let userID = userID else { return }
-        let db = Firestore.firestore()
         
-        // --- Using a Set guarantees uniqueness ---
         var allToursSet = Set<Tour>()
         let group = DispatchGroup()
 
-        // 1. Fetch tours the user owns
         group.enter()
-        db.collection("tours")
+        self.db.collection("tours")
             .whereField("ownerId", isEqualTo: userID)
             .getDocuments { snapshot, _ in
                 let ownedTours = snapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []
@@ -103,9 +123,8 @@ class AppState: ObservableObject {
                 group.leave()
             }
 
-        // 2. Fetch tours where the user is an accepted crew member
         group.enter()
-        db.collection("tourCrew")
+        self.db.collection("tourCrew")
             .whereField("userId", isEqualTo: userID)
             .whereField("status", isEqualTo: InviteStatus.accepted.rawValue)
             .getDocuments { snapshot, _ in
@@ -121,7 +140,7 @@ class AppState: ObservableObject {
                     return
                 }
             
-                db.collection("tours").whereField(FieldPath.documentID(), in: crewTourIDs)
+                self.db.collection("tours").whereField(FieldPath.documentID(), in: crewTourIDs)
                     .getDocuments { tourSnapshot, _ in
                         let crewTours = tourSnapshot?.documents.compactMap { try? $0.data(as: Tour.self) } ?? []
                         allToursSet.formUnion(crewTours)
@@ -130,7 +149,6 @@ class AppState: ObservableObject {
             }
 
         group.notify(queue: .main) {
-            // Convert the Set back to a sorted Array
             self.tours = Array(allToursSet).sorted(by: { $0.startDate.dateValue() < $1.startDate.dateValue() })
         }
     }

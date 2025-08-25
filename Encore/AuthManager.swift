@@ -23,7 +23,9 @@ class AuthManager: ObservableObject {
 
     @Published var user: User?
     
-    // --- UPDATED SIGN UP FUNCTION (phoneNumber removed) ---
+    // --- CORRECTED SIGN UP FUNCTION ---
+    // The signOut() call has been removed. The user will remain logged in
+    // to complete the onboarding process.
     func handleEmailSignUp(email: String, password: String, displayName: String) async throws -> (user: User?, needsVerification: Bool) {
         do {
             let authResult = try await Auth.auth().createUser(withEmail: email, password: password)
@@ -34,14 +36,12 @@ class AuthManager: ObservableObject {
 
             self.user = Auth.auth().currentUser
             
-            // Call createUserDocumentIfNeeded without a phone number
             await self.createUserDocumentIfNeeded(userID: authResult.user.uid, phoneNumber: nil)
             
             // Send the verification email
             try await authResult.user.sendEmailVerification()
             
-            // Sign the user out until they verify
-            signOut()
+            // DO NOT SIGN OUT HERE.
             
             return (authResult.user, true)
             

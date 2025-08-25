@@ -8,7 +8,6 @@ import FirebaseMessaging
 @main
 struct EncoreApp: App {
     @StateObject private var appState = AppState()
-    // Create an instance of the theme manager
     @StateObject private var themeManager = ThemeManager()
     
     #if os(macOS)
@@ -62,24 +61,43 @@ struct EncoreApp: App {
                     .opacity(globalBackgroundOpacity)
                 #endif
                 
-                #if os(macOS)
+                // --- THIS IS THE FIX ---
+                // This view logic now decides whether to show the sign-in screen,
+                // the onboarding flow, or the main application based on the AppState.
                 if appState.userID == nil {
-                    SignInView()
-                        .environmentObject(appState)
-                        .environmentObject(airportDataManager)
-                } else {
-                    SidebarContainerView()
-                        .environmentObject(appState)
-                }
-                #else
-                if appState.userID == nil {
+                    // User is not signed in at all.
                     SignInView()
                         .environmentObject(appState)
                 } else {
-                    MobileMainView()
-                        .environmentObject(appState)
+                    // User is signed in, now check their onboarding status.
+                    switch appState.onboardingState {
+                    case .unknown:
+                        // Still waiting for Firestore to tell us if onboarding is needed.
+                        ProgressView("Checking account...")
+                    case .required:
+                        // User is new and needs to go through the survey.
+                        OnboardingFlowView(userID: appState.userID!) {
+                            // This is called when onboarding is complete.
+                            // It sets the state to completed, which will redraw this view
+                            // and navigate the user to the main app content.
+                            print("✅ [EncoreApp DEBUG] Onboarding complete. Switching to main app view.")
+                            appState.onboardingState = .completed
+                        }
+                    case .completed:
+                        // User is fully authenticated and onboarded. Show the main app.
+                        #if os(macOS)
+                        SidebarContainerView()
+                            .environmentObject(appState)
+                            .environmentObject(airportDataManager)
+                        #else
+                        MobileMainView()
+                            .environmentObject(appState)
+                        #endif
+                    }
                 }
-                #endif
+            }
+            .onAppear {
+                print("🔵 [EncoreApp DEBUG] App appeared. Current state: UserID=\(appState.userID ?? "nil"), Onboarding=\(appState.onboardingState)")
             }
             // Use a compiler directive to set the color scheme based on the platform
             #if os(iOS)

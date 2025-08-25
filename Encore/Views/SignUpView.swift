@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 struct SignUpView: View {
     // Form state
@@ -12,6 +13,10 @@ struct SignUpView: View {
     @State private var isPasswordVisible = false
     @State private var showVerificationMessage = false
     
+    // State to trigger the onboarding flow
+    @State private var showOnboardingFlow = false
+    @State private var newUserID: String?
+    
     @Environment(\.dismiss) var dismiss
 
     var isFormValid: Bool {
@@ -20,6 +25,7 @@ struct SignUpView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            #if os(macOS)
             HStack {
                 Spacer()
                 Button(action: { dismiss() }) {
@@ -33,6 +39,7 @@ struct SignUpView: View {
             }
             .padding(.top, 8)
             .padding(.trailing, 8)
+            #endif
 
             Spacer()
 
@@ -46,6 +53,23 @@ struct SignUpView: View {
             Spacer()
         }
         .frame(width: 450, height: 550)
+        // --- THIS IS THE FIX ---
+        // The sheet is presented when showOnboardingFlow is true.
+        // When it dismisses, we sign the user out and show the verification message.
+        .sheet(isPresented: $showOnboardingFlow, onDismiss: {
+            print("🔵 [SignUpView DEBUG] Onboarding sheet dismissed. Signing user out.")
+            AuthManager.shared.signOut()
+            showVerificationMessage = true
+        }) {
+            if let userID = newUserID {
+                OnboardingFlowView(userID: userID) {
+                    // This completion is called from OnboardingFlowView when the user is done.
+                    // It tells this sheet to dismiss itself.
+                    print("🔵 [SignUpView DEBUG] Onboarding onComplete called. Dismissing sheet.")
+                    showOnboardingFlow = false
+                }
+            }
+        }
         .alert("Sign Up Error", isPresented: .constant(errorMessage != nil), actions: {
             Button("OK") { errorMessage = nil }
         }, message: {
@@ -109,7 +133,7 @@ struct SignUpView: View {
             Text("Check Your Email")
                 .font(.largeTitle.bold())
             
-            Text("We've sent a verification link to **\(email)**. Please check your inbox to activate your account.")
+            Text("We've sent a verification link to **\(email)**. Please check your inbox to activate your account before signing in.")
                 .font(.headline)
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
@@ -134,15 +158,22 @@ struct SignUpView: View {
         
         Task {
             do {
-                // Call the updated function without the phone number
-                let result = try await AuthManager.shared.handleEmailSignUp(email: email, password: password, displayName: name)
+                print("🔵 [SignUpView DEBUG] Attempting to create account...")
+                let result = try await AuthManager.shared.handleEmailSignUp(
+                    email: email,
+                    password: password,
+                    displayName: name
+                )
                 
-                if result.needsVerification {
-                    showVerificationMessage = true
+                if let newUser = result.user {
+                    print("✅ [SignUpView DEBUG] Account created for UID: \(newUser.uid). Triggering onboarding flow.")
+                    self.newUserID = newUser.uid
+                    self.showOnboardingFlow = true
                 } else {
-                    dismiss()
+                    errorMessage = "Could not create user account."
                 }
             } catch {
+                print("❌ [SignUpView DEBUG] Sign-up failed: \(error.localizedDescription)")
                 errorMessage = error.localizedDescription
             }
             isLoading = false
