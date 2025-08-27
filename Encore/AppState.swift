@@ -8,9 +8,11 @@ class AppState: ObservableObject {
     @Published var userID: String? = nil
     @Published var selectedTab: String = "Dashboard"
     
-    // Onboarding State Management
+    // Onboarding & Tutorial State Management
     enum OnboardingState { case unknown, required, completed }
     @Published var onboardingState: OnboardingState = .unknown
+    @Published var isShowingFirstRunTutorial = false
+    @Published var shouldShowTourCreationTutorial = false
 
     @Published var selectedTour: Tour? = nil
     @Published var selectedShow: Show? = nil
@@ -38,19 +40,27 @@ class AppState: ObservableObject {
     }
 
     // MARK: - Auth State
+    
+    /// Public function to allow views to trigger a manual refresh of the user's status.
+    func recheckAccountStatus() {
+        guard let userID = userID else { return }
+        print("🔵 [AppState DEBUG] Re-checking account status for \(userID)...")
+        checkAccountStatus(for: userID)
+    }
+    
     private func registerAuthStateHandler() {
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] (_, user) in
             guard let self = self else { return }
             
-            // All state changes are now safely on the main thread.
             DispatchQueue.main.async {
                 self.userID = user?.uid
                 
                 if let user = user {
-                    print("✅ [AppState DEBUG] User is signed in with UID: \(user.uid). Checking onboarding status...")
-                    self.checkOnboardingStatus(for: user.uid)
+                    print("✅ [AppState DEBUG] User is signed in with UID: \(user.uid). Checking account status...")
+                    self.checkAccountStatus(for: user.uid)
                     self.loadTours()
                     self.listenForNotifications()
+                    self.selectedTab = "Dashboard"
                 } else {
                     print("🔴 [AppState DEBUG] User is signed out. Clearing data.")
                     self.clearAllDataOnSignOut()
@@ -59,21 +69,41 @@ class AppState: ObservableObject {
         }
     }
     
-    private func checkOnboardingStatus(for userID: String) {
+    private func checkAccountStatus(for userID: String) {
         let userRef = db.collection("users").document(userID)
         
         userRef.getDocument { document, error in
             DispatchQueue.main.async {
-                if let document = document, document.exists {
-                    if document.get("role") != nil {
-                        print("✅ [AppState DEBUG] User has completed onboarding (role field exists).")
-                        self.onboardingState = .completed
+                guard let document = document, document.exists else {
+                    print("🟡 [AppState DEBUG] User document doesn't exist yet, onboarding required.")
+                    self.onboardingState = .required
+                    return
+                }
+                
+                let userData = document.data() ?? [:]
+                
+                if userData["role"] != nil {
+                    self.onboardingState = .completed
+                    print("✅ [AppState DEBUG] User has completed onboarding survey.")
+                    
+                    let hasSeenSidebarTutorial = userData["hasCompletedFirstRunTutorial"] as? Bool ?? false
+                    if !hasSeenSidebarTutorial {
+                        print("🟡 [AppState DEBUG] User has NOT seen the first-run tutorial. Showing it now.")
+                        self.isShowingFirstRunTutorial = true
                     } else {
-                        print("🟡 [AppState DEBUG] User has NOT completed onboarding (no role field).")
-                        self.onboardingState = .required
+                        self.isShowingFirstRunTutorial = false
+                        
+                        let hasSeenVideoTutorial = userData["hasCompletedTourCreationTutorial"] as? Bool ?? false
+                        if !hasSeenVideoTutorial {
+                             print("🟡 [AppState DEBUG] User has NOT seen the video tutorial. Flagging to show.")
+                            self.shouldShowTourCreationTutorial = true
+                        } else {
+                            print("✅ [AppState DEBUG] User has seen all tutorials.")
+                            self.shouldShowTourCreationTutorial = false
+                        }
                     }
                 } else {
-                    print("🟡 [AppState DEBUG] User document doesn't exist yet, onboarding required.")
+                    print("🟡 [AppState DEBUG] User has NOT completed onboarding survey (no role field).")
                     self.onboardingState = .required
                 }
             }
@@ -87,6 +117,9 @@ class AppState: ObservableObject {
         self.notifications.removeAll()
         self.notificationListener?.remove()
         self.onboardingState = .unknown
+        self.isShowingFirstRunTutorial = false
+        self.shouldShowTourCreationTutorial = false
+        self.selectedTab = "Dashboard"
     }
     
     // MARK: - Data Loading

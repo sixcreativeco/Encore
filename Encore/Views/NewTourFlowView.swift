@@ -15,6 +15,8 @@ struct NewTourFlowView: View {
     
     @State private var newTour: Tour? = nil
     @State private var isSaving = false
+    
+    @State private var isShowingTutorial = false
 
     var body: some View {
         ScrollView {
@@ -56,6 +58,7 @@ struct NewTourFlowView: View {
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color.black.opacity(0.15))
                                 .frame(width: 200, height: 240)
+                            
                             if let img = posterImage {
                                 Image(nsImage: img)
                                     .resizable().scaledToFill().frame(width: 200, height: 240)
@@ -75,7 +78,6 @@ struct NewTourFlowView: View {
                 }
 
                 if let tour = newTour {
-                    // Pass the entire Tour object instead of just the ID
                     AddCrewSectionView(tour: tour)
                     Divider()
                     VStack(alignment: .leading, spacing: 16) {
@@ -93,6 +95,22 @@ struct NewTourFlowView: View {
                 }
             }
             .padding(30)
+        }
+        .onAppear {
+            if appState.shouldShowTourCreationTutorial {
+                isShowingTutorial = true
+            }
+        }
+        .sheet(isPresented: $isShowingTutorial) {
+            // --- FIX IS HERE ---
+            // The closure now accepts the 'shouldPersist' boolean parameter.
+            FeatureTutorialView { shouldPersist in
+                isShowingTutorial = false
+                appState.shouldShowTourCreationTutorial = false
+                if let userID = appState.userID, shouldPersist {
+                    FirebaseUserService.shared.markTourCreationTutorialAsCompleted(for: userID)
+                }
+            }
         }
     }
 
@@ -136,7 +154,6 @@ struct NewTourFlowView: View {
             let ref = try Firestore.firestore().collection("tours").addDocument(from: newTourData)
             newTourData.id = ref.documentID
             
-            // Add the new tour to the global state so other views are aware of it
             appState.tours.append(newTourData)
             
             self.newTour = newTourData

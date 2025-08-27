@@ -9,54 +9,80 @@ struct SidebarContainerView: View {
     @State private var isNotificationsPanelVisible = false
 
     var body: some View {
-        NavigationStack {
-            HStack(spacing: 0) {
-                floatingSidebar
+        TutorialOverlayView(
+            isShowingTutorial: $appState.isShowingFirstRunTutorial,
+            onFinish: { shouldPersist in
+                // This closure now correctly handles the logic.
+                guard let userID = appState.userID else { return }
                 
-                VStack(spacing: 0) {
-                    HStack {
-                        Button(action: { withAnimation { isSidebarVisible.toggle() } }) {
-                            Image(systemName: isSidebarVisible ? "sidebar.left" : "sidebar.right")
-                                .font(.title2)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        Spacer()
-                        
-                        Button(action: { withAnimation { isNotificationsPanelVisible.toggle() } }) {
-                            Image(systemName: "bell.fill")
-                                .font(.title2)
-                                .foregroundColor(.white.opacity(0.8))
-                                .overlay(alignment: .topTrailing) {
-                                    if !appState.notifications.isEmpty {
-                                        Text("\(appState.notifications.count)")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.white)
-                                            .padding(5)
-                                            .background(Color.red)
-                                            .clipShape(Circle())
-                                            .offset(x: 8, y: -8)
-                                    }
-                                }
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                    .padding(.leading, 24)
-                    .padding(.trailing, 40)
-                    .padding(.top, 30)
-                    .padding(.bottom, 10)
-
-                    contentView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                appState.isShowingFirstRunTutorial = false // Always hide the current tutorial
+                
+                if shouldPersist {
+                    print("🔵 [SidebarContainerView DEBUG] Persisting sidebar tutorial completion.")
+                    FirebaseUserService.shared.markFirstRunTutorialAsCompleted(for: userID)
                 }
-                // This modifier forcefully sets the color scheme for the content area to dark.
-                .environment(\.colorScheme, .dark)
                 
-                if isNotificationsPanelVisible {
-                    NotificationsView(isPresented: $isNotificationsPanelVisible)
-                        .frame(width: 320)
-                        .transition(.move(edge: .trailing))
+                // Ask AppState to re-evaluate what to do next.
+                // It will now see the updated user status and decide if the video tutorial should be shown.
+                appState.recheckAccountStatus()
+            }
+        ) {
+            NavigationStack {
+                HStack(spacing: 0) {
+                    floatingSidebar
+                    
+                    VStack(spacing: 0) {
+                        HStack {
+                            Button(action: { withAnimation { isSidebarVisible.toggle() } }) {
+                                Image(systemName: isSidebarVisible ? "sidebar.left" : "sidebar.right")
+                                    .font(.title2)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .disabled(appState.isShowingFirstRunTutorial)
+                            
+                            Spacer()
+                            
+                            Button(action: { withAnimation { isNotificationsPanelVisible.toggle() } }) {
+                                Image(systemName: "bell.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .overlay(alignment: .topTrailing) {
+                                        if !appState.notifications.isEmpty {
+                                            Text("\(appState.notifications.count)")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .padding(5)
+                                                .background(Color.red)
+                                                .clipShape(Circle())
+                                                .offset(x: 8, y: -8)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        .padding(.leading, 24)
+                        .padding(.trailing, 40)
+                        .padding(.top, 30)
+                        .padding(.bottom, 10)
+
+                        contentView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .environment(\.colorScheme, .dark)
+                    
+                    if isNotificationsPanelVisible {
+                        NotificationsView(isPresented: $isNotificationsPanelVisible)
+                            .frame(width: 320)
+                            .transition(.move(edge: .trailing))
+                    }
+                }
+            }
+        }
+        .onChange(of: appState.isShowingFirstRunTutorial) { _, isShowing in
+            if isShowing {
+                withAnimation {
+                    isSidebarVisible = true
                 }
             }
         }
@@ -86,7 +112,7 @@ struct SidebarContainerView: View {
                     TicketsDashboardView()
                         .environmentObject(appState)
                 case "Database":
-                     DatabaseView(userID: appState.userID ?? "")
+                    DatabaseView(userID: appState.userID ?? "")
                 case "Export":
                     ExportView()
                         .environmentObject(appState)
@@ -146,21 +172,32 @@ struct SidebarContainerView: View {
                 SidebarLabel(icon: "rectangle.grid.2x2.fill", title: "Dashboard", isSelected: appState.selectedTab == "Dashboard", spacing: 16) {
                     appState.selectedTab = "Dashboard"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
+                .tutorialAnchor(id: .dashboard)
+                
                 SidebarLabel(icon: "calendar", title: "Tours", isSelected: appState.selectedTab == "Tours", spacing: 16.5) {
                     appState.selectedTab = "Tours"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
+                .tutorialAnchor(id: .tours)
+
                 SidebarLabel(icon: "ticket.fill", title: "Tickets", isSelected: appState.selectedTab == "Tickets", spacing: 16.5) {
                     appState.selectedTab = "Tickets"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
+                .tutorialAnchor(id: .tickets)
+
                 SidebarLabel(icon: "book.fill", title: "Database", isSelected: appState.selectedTab == "Database", spacing: 16) {
                     appState.selectedTab = "Database"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
+                .tutorialAnchor(id: .database)
+
                 SidebarLabel(icon: "square.and.arrow.up.fill", title: "Export", isSelected: appState.selectedTab == "Export", spacing: 16) {
                     appState.selectedTab = "Export"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
+                .tutorialAnchor(id: .export)
+
                 SidebarLabel(icon: "person.crop.circle", title: "My Account", isSelected: appState.selectedTab == "MyAccount", spacing: 17.0) {
                     appState.selectedTab = "MyAccount"; appState.selectedTour = nil; appState.selectedShow = nil
                 }
+                .tutorialAnchor(id: .myAccount)
             }
             .padding(.leading, 30)
 
@@ -168,6 +205,8 @@ struct SidebarContainerView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 addTourButtonExpanded
+                    .tutorialAnchor(id: .addTour)
+                
                 HStack(spacing: 6) {
                     Circle().fill(syncManager.isOnline ? Color.green : Color.gray).frame(width: 10, height: 10)
                     Text("Online").font(.footnote).foregroundColor(.secondary)

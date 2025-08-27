@@ -1,13 +1,16 @@
 import Foundation
 
 enum ItineraryItemType: String, Codable, CaseIterable {
+    // --- FIX: New case added ---
+    case venueAccess
+    
     case loadIn
     case soundcheck
     case doors
     case packOut
     case flight
     case arrival
-    case hotel // MODIFIED: This was previously in the codebase but is now being explicitly re-confirmed and used.
+    case hotel
     case meeting
     case freeTime
     case catering
@@ -20,6 +23,8 @@ enum ItineraryItemType: String, Codable, CaseIterable {
 
     var displayName: String {
         switch self {
+        // --- FIX: Display name added ---
+        case .venueAccess: return "Venue Access"
         case .loadIn: return "Load In"
         case .soundcheck: return "Soundcheck"
         case .doors: return "Doors Open"
@@ -41,13 +46,15 @@ enum ItineraryItemType: String, Codable, CaseIterable {
 
     var iconName: String {
         switch self {
+        // --- FIX: Icon name added ---
+        case .venueAccess: return "key.fill"
         case .loadIn: return "truck.box"
         case .soundcheck: return "music.mic"
         case .doors: return "door.left.hand.open"
         case .packOut: return "shippingbox"
         case .flight: return "airplane"
         case .arrival: return "airplane.arrival"
-        case .hotel: return "bed.double.fill" // MODIFIED: This was previously in the codebase but is now being explicitly re-confirmed and used.
+        case .hotel: return "bed.double.fill"
         case .meeting: return "person.2.fill"
         case .freeTime: return "clock.fill"
         case .catering: return "fork.knife"
@@ -62,7 +69,8 @@ enum ItineraryItemType: String, Codable, CaseIterable {
 
     var isShowTiming: Bool {
         switch self {
-        case .loadIn, .soundcheck, .doors, .headline, .packOut:
+        // --- FIX: Added to isShowTiming ---
+        case .venueAccess, .loadIn, .soundcheck, .doors, .headline, .packOut:
             return true
         default:
             return false
@@ -71,6 +79,8 @@ enum ItineraryItemType: String, Codable, CaseIterable {
 
     var firestoreShowKey: String? {
         switch self {
+        // --- FIX: Added Firestore key mapping ---
+        case .venueAccess: return "venueAccess"
         case .loadIn: return "loadIn"
         case .soundcheck: return "soundCheck"
         case .doors: return "doorsOpen"

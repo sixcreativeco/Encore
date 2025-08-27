@@ -228,7 +228,7 @@ struct ShowDetailView: View {
                             
                             Label {
                                 Text("Load In Time: \(formattedLoadInTime)")
-                                     .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: 13, weight: .semibold))
                             } icon: {
                                 Image(systemName: "truck")
                                     .font(.system(size: 13))
@@ -254,7 +254,7 @@ struct ShowDetailView: View {
                             Text(show.venueAddress).font(.system(size: 16))
                         }.buttonStyle(PlainButtonStyle())
                     }
-                     HStack(spacing: 10) {
+                    HStack(spacing: 10) {
                         Image(systemName: "person.fill").font(.system(size: 18))
                         Text(show.contactName ?? "Venue Contact")
                             .font(.system(size: 16))
@@ -271,10 +271,11 @@ struct ShowDetailView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 10) {
-                     Button(action: { showLiveSetlist = true }) {
+                    Button(action: { showLiveSetlist = true }) {
                         Label("Open Live Setlist", systemImage: "play.display")
                             .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.black.opacity(0.15)).cornerRadius(10)
                     }.buttonStyle(.plain)
+                    
                     Button(action: { appState.showingAbleset = true }) {
                         Label("Connect to Ableset", systemImage: "network")
                             .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.black.opacity(0.15)).cornerRadius(10)
@@ -407,8 +408,30 @@ struct ShowDetailView: View {
                         Spacer().frame(height: 10)
                         Text("Venue: \(show.venueName)").font(.caption).bold()
                         Text(show.venueAddress).font(.caption).foregroundColor(.secondary)
+                        
+                        if event.status == .published, let eventId = event.id {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("TICKET LINK")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                HStack {
+                                    let urlString = "https://encoretickets.vercel.app/event/\(eventId)"
+                                    Link("View Page", destination: URL(string: urlString)!)
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                    Button(action: {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(urlString, forType: .string)
+                                    }) {
+                                        Image(systemName: "doc.on.doc")
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.top, 8)
+                        }
                     }
-
+                    
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 12) {
@@ -472,7 +495,7 @@ struct ShowDetailView: View {
                     self.ticketedEvent = nil
                     return
                 }
-                 self.ticketedEvent = try? document.data(as: TicketedEvent.self)
+                self.ticketedEvent = try? document.data(as: TicketedEvent.self)
                 
                 if let eventId = self.ticketedEvent?.id {
                     let salesListener = db.collection("ticketSales").whereField("ticketedEventId", isEqualTo: eventId)
@@ -495,34 +518,28 @@ struct ShowDetailView: View {
         self.ticketSummary = SummaryStats(orderCount: ticketSales.count, ticketsIssued: totalTickets, totalRevenue: totalRevenue)
     }
 
+    // --- THIS IS THE FIX ---
+    // This function is simplified to only fetch ItineraryItems.
+    // This makes the Itinerary collection the single source of truth and removes duplicates.
     private func buildTimeline() {
         Task {
             guard let showID = show.id else { return }
             let db = Firestore.firestore()
-            var events: [ShowTimelineEvent] = []
             
-            // 1. Add default timings from the Show object itself
-            if let time = show.venueAccess { events.append(.init(time: time.dateValue(), label: "Venue Access")) }
-            if let time = show.loadIn { events.append(.init(time: time.dateValue(), label: "Load In")) }
-            if let time = show.soundCheck { events.append(.init(time: time.dateValue(), label: "Soundcheck")) }
-            if let time = show.doorsOpen { events.append(.init(time: time.dateValue(), label: "Doors Open")) }
-            if let time = show.headlinerSetTime { events.append(.init(time: time.dateValue(), label: "\(tour.artist) Set")) }
-            if let time = show.packOut { events.append(.init(time: time.dateValue(), label: "Pack Out")) }
-
-            // 2. Fetch and add custom itinerary items marked as show timings
+            // Fetch itinerary items marked as show timings for this specific show.
             let itinerarySnapshot = try? await db.collection("itineraryItems")
                 .whereField("showId", isEqualTo: showID)
+                .whereField("isShowTiming", isEqualTo: true)
                 .getDocuments()
 
             let itineraryItems = itinerarySnapshot?.documents.compactMap { try? $0.data(as: ItineraryItem.self) } ?? []
             
-            let customShowTimings = itineraryItems.filter { $0.isShowTiming == true }
-            
-            for item in customShowTimings {
-                events.append(ShowTimelineEvent(time: item.timeUTC.dateValue(), label: item.title))
+            // Map the fetched items to our timeline event model
+            var events = itineraryItems.map {
+                ShowTimelineEvent(time: $0.timeUTC.dateValue(), label: $0.title)
             }
-
-            // 3. Sort all events by time to ensure correct order
+            
+            // Sort all events by time to ensure correct order
             events.sort()
 
             await MainActor.run {
@@ -605,7 +622,7 @@ struct ShowDetailView: View {
 
     private func showPublishSuccess(url: String) {
         publishedURL = url
-         publishAlertTitle = "Tickets Published!"
+        publishAlertTitle = "Tickets Published!"
         publishAlertMessage = "Your ticket sale website is ready and the URL has been copied to your clipboard."
         showingPublishAlert = true
         openURL(url)

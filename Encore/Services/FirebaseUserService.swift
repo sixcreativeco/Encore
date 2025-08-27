@@ -7,6 +7,30 @@ class FirebaseUserService {
     static let shared = FirebaseUserService()
     private let db = Firestore.firestore()
     
+    /// Sets a flag in the user's document to indicate they have seen the video feature tutorial.
+    func markTourCreationTutorialAsCompleted(for userId: String) {
+        let userRef = db.collection("users").document(userId)
+        userRef.updateData(["hasCompletedTourCreationTutorial": true]) { error in
+            if let error = error {
+                print("❌ ERROR: Failed to mark tour creation tutorial as complete: \(error.localizedDescription)")
+            } else {
+                print("✅ [FirebaseUserService] Marked tour creation tutorial as complete for user: \(userId)")
+            }
+        }
+    }
+    
+    /// Sets a flag in the user's document to indicate they have seen the initial sidebar tutorial.
+    func markFirstRunTutorialAsCompleted(for userId: String) {
+        let userRef = db.collection("users").document(userId)
+        userRef.updateData(["hasCompletedFirstRunTutorial": true]) { error in
+            if let error = error {
+                print("❌ ERROR: Failed to mark tutorial as complete: \(error.localizedDescription)")
+            } else {
+                print("✅ [FirebaseUserService] Marked first run tutorial as complete for user: \(userId)")
+            }
+        }
+    }
+    
     /// Saves the collected onboarding survey data to the user's document in Firestore.
     func saveOnboardingData(_ data: OnboardingData, for userId: String, completion: @escaping (Error?) -> Void) {
         let userRef = db.collection("users").document(userId)

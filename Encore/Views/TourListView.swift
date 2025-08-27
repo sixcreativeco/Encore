@@ -7,6 +7,8 @@ struct TourListView: View {
     @EnvironmentObject var appState: AppState
     
     var onTourSelected: ((Tour) -> Void)? = nil
+    
+    @State private var isShowingTutorial = false
 
     private var upcomingTours: [Tour] {
         let today = Calendar.current.startOfDay(for: Date())
@@ -34,7 +36,6 @@ struct TourListView: View {
             .ignoresSafeArea()
             #endif
 
-            // --- NEW: Conditional view ---
             if appState.tours.isEmpty {
                 emptyStateView
             } else {
@@ -44,10 +45,25 @@ struct TourListView: View {
         .onAppear {
             appState.loadTours()
             preloadPosterImages(for: appState.tours)
+            
+            if appState.shouldShowTourCreationTutorial {
+                isShowingTutorial = true
+            }
+        }
+        .sheet(isPresented: $isShowingTutorial) {
+            // --- FIX IS HERE ---
+            // The closure now accepts the 'shouldPersist' boolean parameter.
+            FeatureTutorialView { shouldPersist in
+                isShowingTutorial = false
+                appState.shouldShowTourCreationTutorial = false
+                
+                if let userID = appState.userID, shouldPersist {
+                    FirebaseUserService.shared.markTourCreationTutorialAsCompleted(for: userID)
+                }
+            }
         }
     }
     
-    // --- NEW: View for when no tours exist ---
     private var emptyStateView: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -81,11 +97,9 @@ struct TourListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // --- EXISTING: The main list of tours ---
     private var tourScrollView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
-                // Top right "Add Tour" button for macOS
                 #if os(macOS)
                 HStack {
                     Text("Tours")
@@ -169,9 +183,6 @@ struct TourListView: View {
     }
 }
 
-
-// Subviews like CurrentTourCard and TourCard remain unchanged and are not shown for brevity.
-// Make sure they are still present in your file.
 fileprivate struct CurrentTourCard: View {
     let tour: Tour
     var onTourSelected: ((Tour) -> Void)?
@@ -223,7 +234,7 @@ fileprivate struct CurrentTourCard: View {
                     Label("\(showCount) Shows", systemImage: "music.mic")
                         .foregroundColor(.secondary)
                         .font(.caption)
-
+                    
                     Label("\(crewCount) Crew Members", systemImage: "person.3.fill")
                         .foregroundColor(.secondary)
                         .font(.caption)

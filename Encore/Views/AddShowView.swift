@@ -27,19 +27,17 @@ struct AddShowView: View {
     @State private var contactName = ""
     @State private var contactEmail = ""
     @State private var contactPhone = ""
-    
     @State private var showDate = Date()
-    @State private var venueAccess = defaultTime(hour: 12)
-    @State private var loadIn = defaultTime(hour: 15)
-    @State private var soundCheck = defaultTime(hour: 17)
-    @State private var doorsOpen = defaultTime(hour: 19)
-    @State private var headlinerSetTime = defaultTime(hour: 20)
-    @State private var packOut = defaultTime(hour: 23)
-    @State private var packOutNextDay = false
     
-    @State private var supportActs: [SupportActInput] = [SupportActInput()]
+    @State private var venueAccess: Date? = defaultTime(hour: 12)
+    @State private var loadIn: Date? = defaultTime(hour: 15)
+    @State private var soundCheck: Date? = defaultTime(hour: 17)
+    @State private var doorsOpen: Date? = defaultTime(hour: 19)
+    @State private var headline: Date? = defaultTime(hour: 20)
+    @State private var packOut: Date? = defaultTime(hour: 23)
+    
+    @State private var supportActs: [SupportActInput] = []
     @State private var allSupportActs: [String] = []
-    
     @State private var headlinerSetDurationMinutes = 60
 
     // View State
@@ -51,21 +49,21 @@ struct AddShowView: View {
         var id = UUID().uuidString
         var name = ""
         var type = "Touring"
-        var soundCheck = defaultTime(hour: 16)
-        var setTime = defaultTime(hour: 18)
+        var soundCheck: Date? = defaultTime(hour: 16)
+        var setTime: Date? = defaultTime(hour: 18)
         var changeoverMinutes = 15
         var suggestion = ""
     }
-
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
                 header
                 showDetailsSection
                 timingSection
-                supportActSection
-                headlinerSection
+                headlinerDetailsSection
                 packOutSection
+                supportActSection
                 saveButton
             }
             .padding()
@@ -79,7 +77,7 @@ struct AddShowView: View {
                 Text(alertMessage)
             }
         }
-        .frame(minWidth: 600, maxWidth: .infinity)
+        .frame(minWidth: 700, maxWidth: .infinity)
     }
 
     private var header: some View {
@@ -98,48 +96,36 @@ struct AddShowView: View {
     private var showDetailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Date").font(.headline)
-            StyledDateField(date: $showDate)
-                 .frame(maxWidth: .infinity, alignment: .leading)
-            
+            StyledDateField(date: $showDate).frame(maxWidth: .infinity, alignment: .leading)
             Text("Venue").font(.headline)
-            VStack(alignment: .leading, spacing: 8) {
-                StyledInputField(placeholder: "Search for Venue...", text: $venueQuery)
-                    .onChange(of: venueQuery) { _, newValue in
-                        if newValue != selectedVenue?.name {
-                            self.selectedVenue = nil
-                            showVenueSuggestions = !newValue.isEmpty
-                            if syncManager.isOnline {
-                                venueSearch.searchVenues(query: newValue)
-                            }
-                        }
+            StyledInputField(placeholder: "Search for Venue...", text: $venueQuery)
+                .onChange(of: venueQuery) { _, newValue in
+                    if newValue != selectedVenue?.name {
+                        self.selectedVenue = nil
+                        showVenueSuggestions = !newValue.isEmpty
+                        if syncManager.isOnline { venueSearch.searchVenues(query: newValue) }
                     }
-                
-                if showVenueSuggestions && !venueSearch.results.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(venueSearch.results) { result in
-                            Button(action: { selectVenue(result) }) {
-                                VStack(alignment: .leading) {
-                                    Text(result.name).font(.body)
-                                    Text(result.address).font(.caption).foregroundColor(.gray)
-                                }
-                            }
-                            .padding(8)
-                        }
-                    }
-                    .background(Color.gray.opacity(0.1)).cornerRadius(8)
                 }
+            if showVenueSuggestions && !venueSearch.results.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(venueSearch.results.prefix(5)) { result in
+                        Button(action: { selectVenue(result) }) {
+                            VStack(alignment: .leading) {
+                                Text(result.name).font(.body)
+                                Text(result.address).font(.caption).foregroundColor(.gray)
+                            }.padding(8)
+                        }.buttonStyle(.plain)
+                    }
+                }.background(Color(NSColor.controlBackgroundColor)).cornerRadius(8)
             }
-            
             HStack(spacing: 16) {
                 StyledInputField(placeholder: "Address", text: $address)
                 timezonePicker.frame(width: 200)
             }
-            
             HStack(spacing: 16) {
                 StyledInputField(placeholder: "City", text: $city)
                 StyledInputField(placeholder: "Country (optional)", text: $country)
             }
-            
             HStack(spacing: 16) {
                 StyledInputField(placeholder: "Venue Contact Name", text: $contactName)
                 StyledInputField(placeholder: "Email", text: $contactEmail)
@@ -153,9 +139,7 @@ struct AddShowView: View {
             ForEach(TimezoneHelper.regions) { region in
                 Section(header: Text(region.name)) {
                     ForEach(region.timezones) { timezone in
-                        Button(timezone.name) {
-                            self.selectedTimezoneIdentifier = timezone.identifier
-                        }
+                        Button(timezone.name) { self.selectedTimezoneIdentifier = timezone.identifier }
                     }
                 }
             }
@@ -165,9 +149,7 @@ struct AddShowView: View {
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down")
             }
-            .padding(10)
-            .background(Color.black.opacity(0.15))
-            .cornerRadius(8)
+            .padding(10).background(Color.black.opacity(0.15)).cornerRadius(8)
         }
         .buttonStyle(.plain)
     }
@@ -175,55 +157,125 @@ struct AddShowView: View {
     private var timingSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Timings").font(.headline)
-            HStack(spacing: 16) {
-                StyledTimePicker(label: "Venue Access", time: $venueAccess)
-                StyledTimePicker(label: "Load In", time: $loadIn)
-                StyledTimePicker(label: "Soundcheck", time: $soundCheck)
-                StyledTimePicker(label: "Doors", time: $doorsOpen)
+            HStack(spacing: 8) {
+                timingCell(label: "Venue Access", selection: $venueAccess)
+                timingCell(label: "Load In", selection: $loadIn)
+                timingCell(label: "Soundcheck", selection: $soundCheck)
+                timingCell(label: "Doors Open", selection: $doorsOpen)
+                Spacer()
             }
+        }
+    }
+
+    private var headlinerDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Headliner: \(artistName)").font(.headline)
+            HStack(alignment: .top, spacing: 0) { // ← Adjust this spacing to control the gap between Headliner Set and Set Duration
+                timingCell(label: "Headliner Set", selection: $headline)
+                    .frame(width: 100)
+
+                durationCell(label: "Set Duration", minutes: $headlinerSetDurationMinutes)
+                    .frame(width: 100)
+            }
+        }
+    }
+    
+    private var packOutSection: some View {
+        HStack {
+            timingCell(label: "Pack Out", selection: $packOut)
+            Spacer()
+        }
+    }
+    
+    @ViewBuilder
+    private func timingCell(label: String, selection: Binding<Date?>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(.subheadline.bold())
+                    .foregroundColor(.gray)
+                if selection.wrappedValue != nil {
+                    Button(action: {
+                        withAnimation { selection.wrappedValue = nil }
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.caption.bold())
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            .frame(height: 16)
+
+            if let dateBinding = Binding(selection) {
+                DatePicker("", selection: dateBinding, displayedComponents: .hourAndMinute)
+                    .labelsHidden().datePickerStyle(.compact)
+                    .padding(.horizontal, 8).padding(.vertical, 7)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(10).frame(height: 44)
+            } else {
+                Button(action: {
+                    withAnimation {
+                        selection.wrappedValue = Self.defaultTime(hour: 12)
+                    }
+                }) {
+                    Image(systemName: "plus")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [6]))
+                        .foregroundColor(Color.gray.opacity(0.3))
+                )
+            }
+        }
+        // --- FIX: The expanding frame modifier has been removed ---
+    }
+
+    @ViewBuilder
+    private func durationCell(label: String, minutes: Binding<Int>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.subheadline.bold())
+                .foregroundColor(.gray)
+                .frame(height: 16)
+            Stepper("\(minutes.wrappedValue) min", value: minutes, in: 0...300, step: 5)
+                .padding(.leading, 8)
+                .padding(.vertical, 7)
+                .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(10)
+                .frame(height: 44)
         }
     }
     
     private var supportActSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Support Acts").font(.headline)
-            
             ForEach($supportActs) { $sa in
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 16) {
-                        VStack(alignment: .leading) {
-                            ZStack(alignment: .leading) {
-                                TextField("Name", text: $sa.name)
-                                    .textFieldStyle(PlainTextFieldStyle()).padding(12)
-                                    .background(Color.gray.opacity(0.06)).cornerRadius(10)
-                                    .font(.body)
-                                    .onChange(of: sa.name) { _, newValue in
-                                        if let match = allSupportActs.first(where: { $0.lowercased().hasPrefix(newValue.lowercased()) }) {
-                                            sa.suggestion = match
-                                        } else {
-                                            sa.suggestion = ""
-                                        }
-                                    }
-                                    .onSubmit {
-                                        if !sa.suggestion.isEmpty { sa.name = sa.suggestion }
-                                    }
-                                if !sa.suggestion.isEmpty && sa.suggestion.lowercased().hasPrefix(sa.name.lowercased()) && sa.name != sa.suggestion {
-                                    let remaining = String(sa.suggestion.dropFirst(sa.name.count))
-                                    HStack(spacing: 0) {
-                                        Text(sa.name)
-                                        Text(remaining).foregroundColor(.gray.opacity(0.5))
-                                    }
-                                    .padding(12).allowsHitTesting(false)
-                                }
-                            }
-                        }
+                        StyledInputField(placeholder: "Name", text: $sa.name)
                         StyledDropdown(label: "Type", selection: $sa.type, options: ["Touring", "Local"])
                             .frame(width: 160)
                     }
                     HStack(spacing: 16) {
-                        StyledTimePicker(label: "Soundcheck", time: $sa.soundCheck)
-                        StyledTimePicker(label: "Set Time", time: $sa.setTime)
-                        Stepper("Changeover: \(sa.changeoverMinutes) min", value: $sa.changeoverMinutes, in: 0...60, step: 5)
+                        timingCell(label: "Soundcheck", selection: $sa.soundCheck)
+                        timingCell(label: "Set Time", selection: $sa.setTime)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Changeover")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.gray)
+                                .frame(height: 16)
+                            Stepper("\(sa.changeoverMinutes) min", value: $sa.changeoverMinutes, in: 0...60, step: 5)
+                                .padding(.leading, 8).padding(.vertical, 7)
+                                .background(Color(NSColor.controlBackgroundColor))
+                                .cornerRadius(10).frame(height: 44)
+                        }
                     }
                 }
                 Divider()
@@ -232,94 +284,42 @@ struct AddShowView: View {
         }
     }
 
-    private var headlinerSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Headliner: \(artistName)").font(.headline)
-            HStack(spacing: 16) {
-                StyledTimePicker(label: "Set Time", time: $headlinerSetTime)
-                Stepper("Set Duration: \(headlinerSetDurationMinutes) min", value: $headlinerSetDurationMinutes, in: 0...300, step: 5)
-            }
-        }
-    }
-
-    private var packOutSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Pack Out").font(.headline)
-            HStack(spacing: 16) {
-                StyledTimePicker(label: "Time", time: $packOut)
-                Toggle(isOn: $packOutNextDay) { Text("Next Day") }
-                #if os(macOS)
-                .toggleStyle(.checkbox)
-                #else
-                .toggleStyle(.switch)
-                #endif
-            }
-        }
-    }
-
     private var saveButton: some View {
         Button(action: { Task { await saveShow() } }) {
             HStack {
                 Spacer()
-                if isSaving {
-                    ProgressView().colorInvert()
-                } else {
-                    Text("Save Show").fontWeight(.semibold)
-                }
+                if isSaving { ProgressView().colorInvert() } else { Text("Save Show").fontWeight(.semibold) }
                 Spacer()
             }
-            .padding()
-            .background(isSaving ? Color.gray : Color.accentColor)
-            .foregroundColor(.white)
-            .cornerRadius(12)
+            .padding().background(isSaving ? Color.gray : Color.accentColor).foregroundColor(.white).cornerRadius(12)
         }
-        .buttonStyle(.plain)
-        .disabled(isSaving)
+        .buttonStyle(.plain).disabled(isSaving)
     }
-
+    
     private func selectVenue(_ result: VenueResult) {
-        self.selectedVenue = result
-        self.venueName = result.name
-        self.address = result.address
-        self.city = result.city
-        self.country = result.country
-        self.venueQuery = result.name
-        self.showVenueSuggestions = false
-        if let timezone = result.timeZone {
-            self.selectedTimezoneIdentifier = timezone.identifier
-        }
+        self.selectedVenue = result; self.venueName = result.name; self.address = result.address; self.city = result.city; self.country = result.country; self.venueQuery = result.name; self.showVenueSuggestions = false
+        if let timezone = result.timeZone { self.selectedTimezoneIdentifier = timezone.identifier }
     }
 
     private func saveShow() async {
         isSaving = true
-        
         let eventTimeZone = TimeZone(identifier: selectedTimezoneIdentifier) ?? .current
-        
-        func createTimestampInEventZone(for time: Date, on day: Date, in timezone: TimeZone) -> Timestamp {
+        func createOptionalTimestamp(for time: Date?, on day: Date, in timezone: TimeZone) -> Timestamp? {
+            guard let time = time else { return nil }
             let localCalendar = Calendar.current
             let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: day)
             let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
-            
-            var eventCalendar = Calendar(identifier: .gregorian)
-            eventCalendar.timeZone = timezone
-
-            var finalComponents = DateComponents()
-            finalComponents.year = dateComponents.year
-            finalComponents.month = dateComponents.month
-            finalComponents.day = dateComponents.day
-            finalComponents.hour = timeComponents.hour
-            finalComponents.minute = timeComponents.minute
+            var eventCalendar = Calendar(identifier: .gregorian); eventCalendar.timeZone = timezone
+            var finalComponents = DateComponents();
+            finalComponents.year = dateComponents.year; finalComponents.month = dateComponents.month; finalComponents.day = dateComponents.day; finalComponents.hour = timeComponents.hour; finalComponents.minute = timeComponents.minute;
             finalComponents.timeZone = timezone
-            
-            let finalDate = eventCalendar.date(from: finalComponents) ?? Date()
+            guard let finalDate = eventCalendar.date(from: finalComponents) else { return nil }
             return Timestamp(date: finalDate)
         }
-        
         do {
             let db = Firestore.firestore()
             let batch = db.batch()
             var supportActIDsToSave: [String] = []
-
             for sa in supportActs.filter({ !$0.name.isEmpty }) {
                 let actRef = db.collection("supportActs").document()
                 let newSupportAct = SupportAct(tourId: self.tourID, name: sa.name.trimmingCharacters(in: .whitespacesAndNewlines), type: SupportAct.ActType(rawValue: sa.type) ?? .Touring, contactEmail: nil)
@@ -327,105 +327,26 @@ struct AddShowView: View {
                 supportActIDsToSave.append(actRef.documentID)
             }
             
-            var packOutDate = createTimestampInEventZone(for: packOut, on: showDate, in: eventTimeZone).dateValue()
-            if packOutNextDay {
-                packOutDate = Calendar.current.date(byAdding: .day, value: 1, to: packOutDate) ?? packOutDate
-            }
-
-            var newShow = Show(
-                tourId: self.tourID,
-                date: createTimestampInEventZone(for: showDate, on: showDate, in: eventTimeZone),
-                city: city, country: country.isEmpty ? nil : country,
-                venueName: venueName, venueAddress: address,
-                timezone: eventTimeZone.identifier,
-                contactName: contactName.isEmpty ? nil : contactName,
-                contactEmail: contactEmail.isEmpty ? nil : contactEmail,
-                contactPhone: contactPhone.isEmpty ? nil : contactPhone,
-                venueAccess: createTimestampInEventZone(for: venueAccess, on: showDate, in: eventTimeZone),
-                loadIn: createTimestampInEventZone(for: loadIn, on: showDate, in: eventTimeZone),
-                soundCheck: createTimestampInEventZone(for: soundCheck, on: showDate, in: eventTimeZone),
-                doorsOpen: createTimestampInEventZone(for: doorsOpen, on: showDate, in: eventTimeZone),
-                headlinerSetTime: createTimestampInEventZone(for: headlinerSetTime, on: showDate, in: eventTimeZone),
-                headlinerSetDurationMinutes: headlinerSetDurationMinutes,
-                packOut: Timestamp(date: packOutDate),
-                packOutNextDay: packOutNextDay,
-                supportActIds: supportActIDsToSave.isEmpty ? nil : supportActIDsToSave
-            )
+            let newShow = Show(tourId: self.tourID, date: createOptionalTimestamp(for: showDate, on: showDate, in: eventTimeZone)!, city: city, country: country.isEmpty ? nil : country, venueName: venueName, venueAddress: address, timezone: eventTimeZone.identifier, contactName: contactName.isEmpty ? nil : contactName, contactEmail: contactEmail.isEmpty ? nil : contactEmail, contactPhone: contactPhone.isEmpty ? nil : contactPhone, venueAccess: createOptionalTimestamp(for: venueAccess, on: showDate, in: eventTimeZone), loadIn: createOptionalTimestamp(for: loadIn, on: showDate, in: eventTimeZone), soundCheck: createOptionalTimestamp(for: soundCheck, on: showDate, in: eventTimeZone), doorsOpen: createOptionalTimestamp(for: doorsOpen, on: showDate, in: eventTimeZone), headlinerSetTime: createOptionalTimestamp(for: headline, on: showDate, in: eventTimeZone), headlinerSetDurationMinutes: headlinerSetDurationMinutes, packOut: createOptionalTimestamp(for: packOut, on: showDate, in: eventTimeZone), supportActIds: supportActIDsToSave.isEmpty ? nil : supportActIDsToSave)
             
             let showRef = db.collection("shows").document()
             try batch.setData(from: newShow, forDocument: showRef)
-            newShow.id = showRef.documentID
             
-            createItineraryItems(for: newShow, batch: batch, eventTimeZone: eventTimeZone)
+            let allTimings: [ItineraryItemType: Date?] = [.venueAccess: venueAccess, .loadIn: loadIn, .soundcheck: soundCheck, .doors: doorsOpen, .headline: headline, .packOut: packOut]
+            for (type, time) in allTimings {
+                guard let date = time, let timestamp = createOptionalTimestamp(for: date, on: self.showDate, in: eventTimeZone) else { continue }
+                let item = ItineraryItem(ownerId: self.userID, tourId: self.tourID, showId: showRef.documentID, title: type.displayName, type: type.rawValue, timeUTC: timestamp, isShowTiming: true)
+                let itemRef = db.collection("itineraryItems").document()
+                try batch.setData(from: item, forDocument: itemRef)
+            }
             
             try await batch.commit()
-            
-            await MainActor.run {
-                self.onSave()
-                self.dismiss()
-            }
-        
+            await MainActor.run { self.onSave(); self.dismiss() }
         } catch {
-            await MainActor.run {
-                self.alertMessage = error.localizedDescription
-                self.showingAlert = true
-                self.isSaving = false
-            }
+            await MainActor.run { self.alertMessage = error.localizedDescription; self.showingAlert = true; self.isSaving = false }
         }
     }
   
-    private func createItineraryItems(for show: Show, batch: WriteBatch, eventTimeZone: TimeZone) {
-        guard let showId = show.id else { return }
-        
-        func createItineraryItem(forDate date: Timestamp?, type: ItineraryItemType, title: String) {
-            guard let date = date else { return }
-            let item = ItineraryItem(
-                ownerId: self.userID,
-                tourId: self.tourID,
-                showId: showId,
-                title: title,
-                type: type.rawValue,
-                timeUTC: date,
-                subtitle: nil,
-                notes: nil,
-                timezone: eventTimeZone.identifier,
-                isShowTiming: true, // Set to true for default show timings
-                visibility: "Everyone",
-                visibleTo: nil
-            )
-            let itemRef = Firestore.firestore().collection("itineraryItems").document()
-            try? batch.setData(from: item, forDocument: itemRef)
-        }
-        
-        createItineraryItem(forDate: show.venueAccess, type: .custom, title: "Venue Access")
-        createItineraryItem(forDate: show.loadIn, type: .loadIn, title: "Load In")
-        createItineraryItem(forDate: show.soundCheck, type: .soundcheck, title: "Soundcheck")
-        createItineraryItem(forDate: show.doorsOpen, type: .doors, title: "Doors Open")
-        createItineraryItem(forDate: show.headlinerSetTime, type: .headline, title: "\(self.artistName) Set")
-        createItineraryItem(forDate: show.packOut, type: .packOut, title: "Pack Out")
-
-        for sa in supportActs.filter({ !$0.name.isEmpty }) {
-            var calendar = Calendar.current
-            calendar.timeZone = eventTimeZone
-            let showDayComponents = calendar.dateComponents([.year, .month, .day], from: show.date.dateValue())
-
-            var soundcheckComponents = calendar.dateComponents([.hour, .minute], from: sa.soundCheck)
-            soundcheckComponents.year = showDayComponents.year
-            soundcheckComponents.month = showDayComponents.month
-            soundcheckComponents.day = showDayComponents.day
-            let soundcheckDate = calendar.date(from: soundcheckComponents) ?? Date()
-
-            var setTimeComponents = calendar.dateComponents([.hour, .minute], from: sa.setTime)
-            setTimeComponents.year = showDayComponents.year
-            setTimeComponents.month = showDayComponents.month
-            setTimeComponents.day = showDayComponents.day
-            let setTimeDate = calendar.date(from: setTimeComponents) ?? Date()
-
-            createItineraryItem(forDate: Timestamp(date: soundcheckDate), type: .soundcheck, title: "\(sa.name) Soundcheck")
-            createItineraryItem(forDate: Timestamp(date: setTimeDate), type: .custom, title: "\(sa.name) Set")
-        }
-    }
-
     private func loadSupportActs() {
         let db = Firestore.firestore()
         db.collection("supportActs").whereField("tourId", isEqualTo: tourID)
@@ -445,8 +366,7 @@ struct AddShowView: View {
 
     private static func defaultTime(hour: Int) -> Date {
         var components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
-        components.hour = hour
-        components.minute = 0
+        components.hour = hour; components.minute = 0
         return Calendar.current.date(from: components) ?? Date()
     }
 }
