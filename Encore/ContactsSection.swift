@@ -196,4 +196,4 @@ struct ContactsSection: View {
             }
         }
     }
-} 
+}

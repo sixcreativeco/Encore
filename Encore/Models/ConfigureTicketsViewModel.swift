@@ -1,9 +1,11 @@
 import SwiftUI
 import FirebaseFirestore
 import FirebaseStorage
+import AppKit
 
 @MainActor
 class ConfigureTicketsViewModel: ObservableObject {
+    
     @Published var tour: Tour
     @Published var shows: [Show] = []
     @Published var eventMap: [String: TicketedEvent] = [:]
@@ -26,7 +28,7 @@ class ConfigureTicketsViewModel: ObservableObject {
         self.isLoading = true
         guard let tourId = tour.id else {
             print("Error: Tour is missing ID")
-            self.isLoading = false
+             self.isLoading = false
             return
         }
         let ownerId = tour.ownerId
@@ -42,15 +44,15 @@ class ConfigureTicketsViewModel: ObservableObject {
             for show in self.shows {
                 guard let showId = show.id else { continue }
                 if let existingEvent = existingEvents.first(where: { $0.showId == showId }) {
-                    tempMap[showId] = existingEvent
+                     tempMap[showId] = existingEvent
                 } else {
                     tempMap[showId] = TicketedEvent(
                         ownerId: ownerId, tourId: tourId, showId: showId, status: .draft,
-                        importantInfo: nil, complimentaryTickets: nil, externalTicketsUrl: nil,
+                         description: nil, importantInfo: nil, complimentaryTickets: nil, externalTicketsUrl: nil,
                         ticketTypes: [TicketType(name: "General Admission", allocation: 100, price: 0.0, currency: "NZD", availability: .init(type: .always))]
                     )
                 }
-            }
+             }
             self.eventMap = tempMap
             self.isLoading = false
         } catch {
@@ -63,6 +65,7 @@ class ConfigureTicketsViewModel: ObservableObject {
         guard let sourceEvent = eventMap[sourceShowId] else { return }
         var destinationEvent = eventMap[destinationShowId]
         destinationEvent?.ticketTypes = sourceEvent.ticketTypes
+        destinationEvent?.description = sourceEvent.description
         destinationEvent?.importantInfo = sourceEvent.importantInfo
         destinationEvent?.complimentaryTickets = sourceEvent.complimentaryTickets
         eventMap[destinationShowId] = destinationEvent
@@ -80,7 +83,7 @@ class ConfigureTicketsViewModel: ObservableObject {
     
     private func publishTicketsToWeb(for event: TicketedEvent) {
         guard let eventId = event.id else {
-            showAlert(title: "Save Required", message: "Please save all configurations before publishing.")
+             showAlert(title: "Save Required", message: "Please save all configurations before publishing.")
             return
         }
         isPublishing[eventId] = true
@@ -88,11 +91,11 @@ class ConfigureTicketsViewModel: ObservableObject {
         TicketingAPI.shared.publishTickets(ticketedEventId: eventId) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isPublishing[eventId] = false
-                switch result {
+                 switch result {
                 case .success:
                     self?.showAlert(title: "Tickets Published", message: "The ticket sales page is now live.")
                 case .failure(let error):
-                    self?.showAlert(title: "Publish Failed", message: error.localizedDescription)
+                     self?.showAlert(title: "Publish Failed", message: error.localizedDescription)
                 }
             }
         }
@@ -102,12 +105,12 @@ class ConfigureTicketsViewModel: ObservableObject {
         guard let eventId = event.id else { return }
         isPublishing[eventId] = true
         db.collection("ticketedEvents").document(eventId).updateData(["status": TicketedEvent.Status.unpublished.rawValue]) { [weak self] error in
-            DispatchQueue.main.async {
+             DispatchQueue.main.async {
                 self?.isPublishing[eventId] = false
                 if let error = error {
                     self?.showAlert(title: "Error", message: "Could not unpublish tickets: \(error.localizedDescription)")
                 }
-            }
+             }
         }
     }
     
@@ -120,17 +123,17 @@ class ConfigureTicketsViewModel: ObservableObject {
     func saveAllChanges() async {
         isSaving = true
         let batch = db.batch()
-        
+         
         for (_, var event) in eventMap {
             do {
                 if let eventId = event.id {
                     let docRef = db.collection("ticketedEvents").document(eventId)
                     try batch.setData(from: event, forDocument: docRef, merge: true)
-                } else {
+                 } else {
                     let docRef = db.collection("ticketedEvents").document()
                     event.id = docRef.documentID // Assign the new ID back
                     try batch.setData(from: event, forDocument: docRef)
-                }
+                 }
             } catch {
                 print("Error encoding event for save: \(error.localizedDescription)")
             }
@@ -138,7 +141,7 @@ class ConfigureTicketsViewModel: ObservableObject {
         
         do {
             try await batch.commit()
-            print("✅ All ticket configurations saved.")
+             print("✅ All ticket configurations saved.")
         } catch {
             print("❌ Error committing ticket configuration batch: \(error.localizedDescription)")
         }
