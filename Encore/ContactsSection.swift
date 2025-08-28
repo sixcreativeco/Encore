@@ -10,7 +10,10 @@ struct ContactsSection: View {
 
     @State private var unifiedContacts: [UnifiedContact] = []
     @State private var isLoading: Bool = true
-    @State private var contactToEdit: Contact?
+    
+    // Listeners are now managed correctly
+    @State private var listeners: [ListenerRegistration] = []
+    
     @EnvironmentObject var appState: AppState
 
     var body: some View {
@@ -23,17 +26,18 @@ struct ContactsSection: View {
                     sortField: $sortField,
                     sortAscending: $sortAscending,
                     onContactSelected: { unifiedContact in
-                        if unifiedContact.source == "Contacts" {
-                            fetchFullContact(id: unifiedContact.id)
+                        if unifiedContact.source == "Contacts" || unifiedContact.source == "Tour Crew" {
+                            fetchFullContactAndShowPanel(id: unifiedContact.id)
                         }
                     }
                 )
             }
         }
-        .onAppear(perform: fetchAndMergeContacts)
-        .sheet(item: $contactToEdit) { contact in
-            ContactEditView(contact: contact)
-                .environmentObject(appState)
+        .task {
+            await setupListeners()
+        }
+        .onDisappear {
+            listeners.forEach { $0.remove() }
         }
     }
 
@@ -75,7 +79,7 @@ struct ContactsSection: View {
         }
     }
     
-    private func fetchFullContact(id: String) {
+    private func fetchFullContactAndShowPanel(id: String) {
         let db = Firestore.firestore()
         db.collection("contacts").document(id).getDocument { document, error in
             guard let document = document, document.exists else {
@@ -86,7 +90,9 @@ struct ContactsSection: View {
             do {
                 let fullContact = try document.data(as: Contact.self)
                 DispatchQueue.main.async {
-                    self.contactToEdit = fullContact
+                    withAnimation {
+                        self.appState.contactToEdit = fullContact
+                    }
                 }
             } catch {
                 print("Error decoding full contact: \(error)")
@@ -94,62 +100,59 @@ struct ContactsSection: View {
         }
     }
     
-    private func fetchAndMergeContacts() {
-        self.isLoading = true
-        
+    private func setupListeners() async {
         let db = Firestore.firestore()
+        
+        listeners.forEach { $0.remove() }
+        listeners.removeAll()
+        
+        var combinedContacts: [String: UnifiedContact] = [:]
         let group = DispatchGroup()
-        var allContacts: [UnifiedContact] = []
-        var seenEmails = Set<String>()
 
-        // 1. Fetch from main 'contacts' collection
         group.enter()
-        db.collection("contacts").whereField("ownerId", isEqualTo: userID).getDocuments { snapshot, _ in
+        let contactsListener = db.collection("contacts").whereField("ownerId", isEqualTo: userID).addSnapshotListener { snapshot, _ in
             let contacts = snapshot?.documents.compactMap { try? $0.data(as: Contact.self) } ?? []
-            for contact in contacts {
-                if let email = contact.email, !email.isEmpty, seenEmails.contains(email) { continue }
-                allContacts.append(UnifiedContact(id: contact.id ?? UUID().uuidString, name: contact.name, email: contact.email, phone: contact.phone, roles: contact.roles, source: "Contacts"))
-                if let email = contact.email, !email.isEmpty { seenEmails.insert(email) }
+            for contact in contacts where contact.id != nil {
+                combinedContacts[contact.id!] = UnifiedContact(id: contact.id!, name: contact.name, email: contact.email, phone: contact.phone, roles: contact.roles, source: "Contacts")
             }
-            group.leave()
+            self.unifiedContacts = Array(combinedContacts.values)
+            if self.isLoading { group.leave() }
         }
+        listeners.append(contactsListener)
 
-        // 2. Fetch from 'venues' collection
+        group.enter()
+        let crewListener = db.collection("tourCrew").whereField("invitedBy", isEqualTo: userID).addSnapshotListener { snapshot, _ in
+            let crew = snapshot?.documents.compactMap { try? $0.data(as: TourCrew.self) } ?? []
+            for member in crew {
+                if let contactId = member.contactId {
+                    combinedContacts[contactId] = UnifiedContact(id: contactId, name: member.name, email: member.email, phone: member.phone, roles: member.roles, source: "Tour Crew")
+                }
+            }
+            self.unifiedContacts = Array(combinedContacts.values)
+            if self.isLoading { group.leave() }
+        }
+        listeners.append(crewListener)
+        
         group.enter()
         db.collection("venues").whereField("ownerId", isEqualTo: userID).getDocuments { snapshot, _ in
             let venues = snapshot?.documents.compactMap { try? $0.data(as: Venue.self) } ?? []
             for venue in venues {
-                guard let name = venue.contactName, !name.isEmpty else { continue }
-                if let email = venue.contactEmail, !email.isEmpty, seenEmails.contains(email) { continue }
-                allContacts.append(UnifiedContact(id: venue.id ?? UUID().uuidString, name: name, email: venue.contactEmail, phone: venue.contactPhone, roles: ["Venue Contact"], source: "Venues"))
-                if let email = venue.contactEmail, !email.isEmpty { seenEmails.insert(email) }
-            }
-            group.leave()
-        }
-
-        // 3. Fetch from 'tourCrew' collection
-        group.enter()
-        db.collection("tourCrew").whereField("invitedBy", isEqualTo: userID).getDocuments { snapshot, _ in
-            let crew = snapshot?.documents.compactMap { try? $0.data(as: TourCrew.self) } ?? []
-            for member in crew {
-                if let email = member.email, !email.isEmpty, seenEmails.contains(email) { continue }
-                allContacts.append(UnifiedContact(id: member.id ?? UUID().uuidString, name: member.name, email: member.email, phone: nil, roles: member.roles, source: "Tour Crew"))
-                if let email = member.email, !email.isEmpty { seenEmails.insert(email) }
+                guard let name = venue.contactName, !name.isEmpty, let venueId = venue.id else { continue }
+                combinedContacts[venueId] = UnifiedContact(id: venueId, name: name, email: venue.contactEmail, phone: venue.contactPhone, roles: ["Venue Contact"], source: "Venues")
             }
             group.leave()
         }
         
-        // 4. Fetch Guests
         group.enter()
         fetchGuests { guests in
             for guest in guests {
-                allContacts.append(guest)
+                combinedContacts[guest.id] = guest
             }
             group.leave()
         }
 
         group.notify(queue: .main) {
-            self.unifiedContacts = allContacts
+            self.unifiedContacts = Array(combinedContacts.values)
             self.isLoading = false
         }
     }
@@ -174,10 +177,9 @@ struct ContactsSection: View {
                 let group = DispatchGroup()
                 
                 for showDoc in showDocs {
-                    guard let tourId = showDoc["tourId"] as? String else { continue }
+                    let showId = showDoc.documentID
                     group.enter()
-                    db.collection("users").document(self.userID).collection("tours").document(tourId).collection("shows").document(showDoc.documentID).collection("guestlist").getDocuments { guestSnapshot, error in
-                        
+                    db.collection("shows").document(showId).collection("guestlist").getDocuments { guestSnapshot, error in
                         let guests = guestSnapshot?.documents.compactMap { GuestListItemModel(from: $0) } ?? []
                         for guest in guests {
                             let roles = ["Guest"]
@@ -194,4 +196,4 @@ struct ContactsSection: View {
             }
         }
     }
-}
+} 

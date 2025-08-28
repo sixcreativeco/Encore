@@ -1,21 +1,16 @@
 import SwiftUI
 import FirebaseFirestore
+import Kingfisher
 
 struct ContactFormBody: View {
-    // FIX: The view now accepts a binding to our new, top-level 'Contact' model.
     @Binding var contact: Contact
     var isDisabled: Bool
 
     // MARK: - State
-    @State private var isTravelDetailsExpanded: Bool = true
-    @State private var isEmergencyDetailsExpanded: Bool = true
     @State private var roleInput: String = ""
+    @State private var newLoyaltyAirline: String = ""
+    @State private var newLoyaltyNumber: String = ""
     
-    // These local state variables are fine as they don't interact with the main model directly.
-    @State private var homeAirport: String = ""
-    @State private var loyaltyAirline: String = ""
-    @State private var loyaltyMembership: String = ""
-
     private let roleOptions: [String] = [
         "Lead Artist", "Support Artist", "DJ", "Dancer", "Guest Performer", "Musician",
         "Content", "Tour Manager", "Artist Manager", "Road Manager", "Assistant Manager",
@@ -40,126 +35,180 @@ struct ContactFormBody: View {
         VStack(alignment: .leading, spacing: 24) {
             headerSection
             rolesInputView
-
-            HStack(alignment: .lastTextBaseline, spacing: 16) {
-                // FIX: This binding helper now works with the new Timestamp property.
-                CustomDateInputView(label: "Date of Birth", date: timestampBinding(for: $contact.dateOfBirth))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Country of Birth").font(.subheadline).foregroundColor(.gray)
-                    StyledInputField(placeholder: "Country of Birth", text: optionalStringBinding(for: $contact.countryOfBirth))
-                }
-            }
-
-            CollapsibleSection(isExpanded: $isTravelDetailsExpanded, title: "Travel Details") {
-                VStack(alignment: .leading, spacing: 16) {
-                    // FIX: All passport bindings now correctly handle the optional PassportInfo struct.
-                    StyledInputField(placeholder: "Passport Number", text: passportStringBinding(for: \.passportNumber))
-                    HStack(spacing: 16) {
-                        CustomDateInputView(label: "Issued Date", date: passportTimestampBinding(for: \.issuedDate))
-                        CustomDateInputView(label: "Expiry Date", date: passportTimestampBinding(for: \.expiryDate))
-                    }
-                    StyledInputField(placeholder: "Issuing Country", text: passportStringBinding(for: \.issuingCountry))
-                    StyledInputField(placeholder: "Home Airport", text: $homeAirport)
-
-                    Text("Loyalty Program").font(.headline).padding(.top)
-                    HStack(spacing: 16) {
-                        StyledInputField(placeholder: "Type Airline", text: $loyaltyAirline)
-                        StyledInputField(placeholder: "Enter Membership", text: $loyaltyMembership)
-                    }
-                    
-                    Text("Documents").font(.headline).padding(.top)
-                    Text("No documents uploaded.")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
-                }
-            }
-
-            CollapsibleSection(isExpanded: $isEmergencyDetailsExpanded, title: "Emergency Details") {
-                VStack(spacing: 12) {
-                    HStack(spacing: 16) {
-                        StyledInputField(placeholder: "Emergency Contact", text: emergencyBinding(for: \.name))
-                        StyledInputField(placeholder: "Phone Number", text: emergencyBinding(for: \.phone))
-                    }
-                    StyledInputField(placeholder: "Allergies", text: optionalStringBinding(for: $contact.allergies))
-                    StyledInputField(placeholder: "Medications", text: optionalStringBinding(for: $contact.medications))
-                }
-            }
-            .padding(.bottom)
+            personalDetailsSection
+            travelDetailsSection
+            loyaltyProgramSection
+            documentsSection
+            emergencyDetailsSection
         }
         .disabled(isDisabled)
     }
     
+    // MARK: - Subviews
     private var headerSection: some View {
         HStack(alignment: .top, spacing: 24) {
-            VStack(spacing: 12) {
-                StyledInputField(placeholder: "Full Name*", text: $contact.name)
-                StyledInputField(placeholder: "Location (e.g. Auckland, NZ)", text: optionalStringBinding(for: $contact.location))
+            VStack(alignment: .leading, spacing: 12) {
+                if let location = contact.location, !location.isEmpty {
+                    Label(location, systemImage: "location.fill")
+                        .foregroundColor(.secondary)
+                } else {
+                    StyledInputField(placeholder: "Location (e.g. Auckland, NZ)", text: optionalStringBinding(for: $contact.location))
+                }
+                
                 StyledInputField(placeholder: "Email", text: optionalStringBinding(for: $contact.email))
                 StyledInputField(placeholder: "Phone Number", text: optionalStringBinding(for: $contact.phone))
             }
             
-            Image(systemName: "person.crop.rectangle.fill")
-                .font(.system(size: 100))
-                .foregroundColor(.gray.opacity(0.5))
-                .frame(width: 150)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(16)
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+
+                KFImage(URL(string: contact.profileImageURL ?? ""))
+                    .placeholder {
+                        Image(systemName: "person.crop.rectangle.fill")
+                            .font(.system(size: 80))
+                            .foregroundColor(.gray.opacity(0.5))
+                    }
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            }
+            .frame(width: 120, height: 150) // 4:5 aspect ratio
+            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
     }
     
+    // --- FIX IS HERE ---
+    // The layout has been corrected to ensure pills and the input field do not overlap.
     private var rolesInputView: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Roles*").font(.subheadline).foregroundColor(.gray)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(contact.roles, id: \.self) { role in
-                        HStack(spacing: 6) {
-                            Text(role).font(.subheadline)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Roles").font(.subheadline).foregroundColor(.gray)
+            
+            // This VStack now properly contains the wrapping pills and the input field separately.
+            VStack(alignment: .leading, spacing: 45) {
+                if !contact.roles.isEmpty {
+                    WrapView(items: contact.roles) { role in
+                        HStack(spacing: 4) {
+                            Text(role)
                             Button(action: { contact.roles.removeAll { $0 == role } }) {
-                                Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).foregroundColor(.gray)
-                            }.buttonStyle(.plain)
+                                Image(systemName: "xmark")
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .padding(.horizontal, 8).padding(.vertical, 4).background(Color.gray.opacity(0.2)).cornerRadius(6)
+                        .font(.caption.bold())
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.accentColor.opacity(0.2))
+                        .clipShape(Capsule())
                     }
-                    
-                    TextField("Add Role", text: $roleInput)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .frame(minWidth: 150)
-                        .onSubmit(addCustomRole)
                 }
-                .padding(8)
+                
+                StyledInputField(placeholder: "Add Role...", text: $roleInput)
+                    .onSubmit(addCustomRole)
             }
-            .frame(height: 44).background(Color(nsColor: .controlBackgroundColor)).cornerRadius(8)
 
             if !filteredRoles.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(filteredRoles.prefix(5).enumerated()), id: \.element) { index, suggestion in
-                        Button(action: {
-                            contact.roles.append(suggestion)
-                            roleInput = ""
-                        }) {
-                            Text(suggestion)
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-
-                        if index < filteredRoles.prefix(5).count - 1 {
-                            Divider()
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack {
+                        ForEach(filteredRoles.prefix(5), id: \.self) { suggestion in
+                            Button(action: {
+                                contact.roles.append(suggestion)
+                                roleInput = ""
+                            }) {
+                                Text(suggestion)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8).padding(.vertical, 4).background(Color.gray.opacity(0.2)).cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
-                .background(Color(nsColor: .windowBackgroundColor))
-                .cornerRadius(8)
-                .shadow(radius: 2)
+            }
+        }
+    }
+    // --- END OF FIX ---
+    
+    private var personalDetailsSection: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 16) {
+            CustomDateInputView(label: "Date of Birth", date: timestampBinding(for: $contact.dateOfBirth))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Country of Birth").font(.subheadline).foregroundColor(.gray)
+                StyledInputField(placeholder: "Country", text: optionalStringBinding(for: $contact.countryOfBirth))
+            }
+        }
+    }
+
+    private var travelDetailsSection: some View {
+        CollapsibleSection(title: "Travel Details", icon: "airplane") {
+            VStack(alignment: .leading, spacing: 16) {
+                StyledInputField(placeholder: "Passport Number", text: passportStringBinding(for: \.passportNumber))
+                HStack(spacing: 16) {
+                    CustomDateInputView(label: "Issued Date", date: passportTimestampBinding(for: \.issuedDate))
+                    CustomDateInputView(label: "Expiry Date", date: passportTimestampBinding(for: \.expiryDate))
+                }
+                StyledInputField(placeholder: "Issuing Country", text: passportStringBinding(for: \.issuingCountry))
+                StyledInputField(placeholder: "Home Airport (e.g. AKL)", text: optionalStringBinding(for: $contact.notes)) // Using notes field for now
             }
         }
     }
     
+    private var loyaltyProgramSection: some View {
+        CollapsibleSection(title: "Loyalty Program", icon: "star.fill") {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach($contact.loyaltyPrograms.withDefault([])) { $program in
+                    HStack {
+                        Text(program.airline).fontWeight(.bold)
+                        Text(program.accountNumber).foregroundColor(.secondary)
+                        Spacer()
+                        Button(action: { contact.loyaltyPrograms?.removeAll { $0.id == program.id }}) {
+                            Image(systemName: "xmark.circle.fill")
+                        }.buttonStyle(.plain)
+                    }
+                }
+                
+                HStack {
+                    StyledInputField(placeholder: "Type Airline", text: $newLoyaltyAirline)
+                    StyledInputField(placeholder: "Enter Membership", text: $newLoyaltyNumber)
+                    Button("Add Membership") {
+                        let trimmedAirline = newLoyaltyAirline.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let trimmedNumber = newLoyaltyNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmedAirline.isEmpty, !trimmedNumber.isEmpty else { return }
+                        let newProgram = LoyaltyProgram(airline: trimmedAirline, accountNumber: trimmedNumber)
+                        contact.loyaltyPrograms = (contact.loyaltyPrograms ?? []) + [newProgram]
+                        newLoyaltyAirline = ""
+                        newLoyaltyNumber = ""
+                    }
+                }
+            }
+        }
+    }
+    
+    private var documentsSection: some View {
+        CollapsibleSection(title: "Documents", icon: "doc.text.fill") {
+            VStack(alignment: .leading) {
+                Text("Document uploads coming soon.")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+            }
+        }
+    }
+
+    private var emergencyDetailsSection: some View {
+        CollapsibleSection(title: "Emergency Details", icon: "staroflife.fill") {
+            VStack(spacing: 12) {
+                HStack(spacing: 16) {
+                    StyledInputField(placeholder: "Emergency Contact", text: emergencyBinding(for: \.name))
+                    StyledInputField(placeholder: "Phone Number", text: emergencyBinding(for: \.phone))
+                }
+                StyledInputField(placeholder: "Allergies", text: optionalStringBinding(for: $contact.allergies))
+                StyledInputField(placeholder: "Medications", text: optionalStringBinding(for: $contact.medications))
+            }
+        }
+    }
+
     private func addCustomRole() {
         let trimmedRole = roleInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedRole.isEmpty, !contact.roles.contains(trimmedRole) else {
@@ -224,20 +273,42 @@ struct ContactFormBody: View {
     }
 }
 
+extension Binding {
+    func withDefault<T>(_ defaultValue: T) -> Binding<T> where Value == T? {
+        Binding<T>(
+            get: { self.wrappedValue ?? defaultValue },
+            set: { self.wrappedValue = $0 }
+        )
+    }
+}
+
 private struct CollapsibleSection<Content: View>: View {
-    @Binding var isExpanded: Bool
     let title: String
+    let icon: String
+    @State private var isExpanded: Bool
     let content: () -> Content
+    
+    init(title: String, icon: String, isInitiallyExpanded: Bool = true, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.icon = icon
+        self._isExpanded = State(initialValue: isInitiallyExpanded)
+        self.content = content
+    }
+    
     var body: some View {
         VStack(alignment: .leading) {
             Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() } }) {
                 HStack {
+                    Image(systemName: icon).foregroundColor(.accentColor)
                     Text(title).font(.headline)
                     Spacer()
                     Image(systemName: "chevron.right").rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }.foregroundColor(.primary)
             }.buttonStyle(.plain)
-            if isExpanded { content().padding(.top, 8) }
+            
+            if isExpanded {
+                content().padding(.top, 8)
+            }
         }
     }
 }

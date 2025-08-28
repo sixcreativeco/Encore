@@ -83,6 +83,7 @@ struct AddShowView: View {
     private var header: some View {
         HStack {
             Text("Add Show").font(.largeTitle.bold())
+            
             Spacer()
             Button(action: { dismiss() }) {
                 Image(systemName: "xmark")
@@ -170,7 +171,7 @@ struct AddShowView: View {
     private var headlinerDetailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Headliner: \(artistName)").font(.headline)
-            HStack(alignment: .top, spacing: 0) { // ← Adjust this spacing to control the gap between Headliner Set and Set Duration
+            HStack(alignment: .top, spacing: 0) {
                 timingCell(label: "Headliner Set", selection: $headline)
                     .frame(width: 100)
 
@@ -187,6 +188,8 @@ struct AddShowView: View {
         }
     }
     
+    // --- FIX IS HERE ---
+    // The logic inside this component has been rewritten to be more robust and avoid the crash.
     @ViewBuilder
     private func timingCell(label: String, selection: Binding<Date?>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -208,7 +211,13 @@ struct AddShowView: View {
             }
             .frame(height: 16)
 
-            if let dateBinding = Binding(selection) {
+            if selection.wrappedValue != nil {
+                // This binding is now guaranteed to be non-nil, preventing the crash.
+                let dateBinding = Binding<Date>(
+                    get: { selection.wrappedValue ?? Date() },
+                    set: { selection.wrappedValue = $0 }
+                )
+                
                 DatePicker("", selection: dateBinding, displayedComponents: .hourAndMinute)
                     .labelsHidden().datePickerStyle(.compact)
                     .padding(.horizontal, 8).padding(.vertical, 7)
@@ -234,8 +243,8 @@ struct AddShowView: View {
                 )
             }
         }
-        // --- FIX: The expanding frame modifier has been removed ---
     }
+    // --- END OF FIX ---
 
     @ViewBuilder
     private func durationCell(label: String, minutes: Binding<Int>) -> some View {
@@ -310,9 +319,7 @@ struct AddShowView: View {
             let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: day)
             let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
             var eventCalendar = Calendar(identifier: .gregorian); eventCalendar.timeZone = timezone
-            var finalComponents = DateComponents();
-            finalComponents.year = dateComponents.year; finalComponents.month = dateComponents.month; finalComponents.day = dateComponents.day; finalComponents.hour = timeComponents.hour; finalComponents.minute = timeComponents.minute;
-            finalComponents.timeZone = timezone
+            var finalComponents = DateComponents(); finalComponents.year = dateComponents.year; finalComponents.month = dateComponents.month; finalComponents.day = dateComponents.day; finalComponents.hour = timeComponents.hour; finalComponents.minute = timeComponents.minute; finalComponents.timeZone = timezone
             guard let finalDate = eventCalendar.date(from: finalComponents) else { return nil }
             return Timestamp(date: finalDate)
         }

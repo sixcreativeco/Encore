@@ -22,14 +22,15 @@ struct TourEditView: View {
 
     init(tour: Tour) {
         _editableTour = State(initialValue: tour)
-        // Initialize local Date state from the tour's Timestamps
         _startDate = State(initialValue: tour.startDate.dateValue())
         _endDate = State(initialValue: tour.endDate.dateValue())
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
+            // Header
             HStack {
+                Text("Edit Tour").font(.system(size: 28, weight: .bold))
                 Spacer()
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     Image(systemName: "xmark")
@@ -39,30 +40,53 @@ struct TourEditView: View {
                 .buttonStyle(.plain)
             }
 
+            // Main two-column content
             HStack(alignment: .top, spacing: 32) {
+                // Left Column: Form Fields & Buttons
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Edit Tour").font(.system(size: 28, weight: .bold))
-                    
                     CustomTextField(placeholder: "Tour Name", text: $editableTour.tourName)
                     CustomTextField(placeholder: "Artist Name", text: $editableTour.artist)
                     
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Start Date").font(.subheadline).foregroundColor(.gray)
-                            // Bind directly to the local Date state
                             CustomDateField(date: $startDate)
                         }
                         VStack(alignment: .leading, spacing: 4) {
                             Text("End Date").font(.subheadline).foregroundColor(.gray)
-                            // Bind directly to the local Date state
                             CustomDateField(date: $endDate)
                         }
                     }
+                    
+                    Spacer()
+                    
+                    HStack(alignment: .center, spacing: 24) {
+                        Button(action: { Task { await saveEdits() } }) {
+                            Text(isSaving ? "Saving..." : "Save")
+                                .fontWeight(.semibold)
+                                .frame(width: 200, height: 48)
+                                .background(Color.white)
+                                .foregroundColor(.black)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .disabled(editableTour.tourName.isEmpty || editableTour.artist.isEmpty || isSaving)
+                        
+                        Button(action: { Task { await deleteTour() } }) {
+                            Text("Delete Tour")
+                                .font(.subheadline)
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
+                        Spacer()
+                    }
                 }
 
+                // Right Column: Poster
                 VStack {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 10).fill(Color.clear).frame(width: 220, height: 280)
+                        RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.15)).frame(width: 220, height: 280)
                         if let img = posterImage {
                             Image(nsImage: img).resizable().scaledToFill().frame(width: 220, height: 280).clipped().cornerRadius(10)
                         } else if isLoadingImage {
@@ -76,33 +100,28 @@ struct TourEditView: View {
                     }
                     .onTapGesture { selectPoster() }
                 }
-                .padding(.top, 20)
             }
-
-            Button(action: { Task { await saveEdits() } }) {
-                Text(isSaving ? "Saving..." : "Save Changes")
-                    .fontWeight(.semibold).frame(maxWidth: .infinity).frame(height: 48)
-                    .background(Color.white).foregroundColor(.black).cornerRadius(8)
-            }
-            .disabled(editableTour.tourName.isEmpty || editableTour.artist.isEmpty || isSaving)
-
-            HStack(spacing: 16) {
-                Button(action: { /* cancel logic */ }) {
-                    Text("Cancel Tour").font(.subheadline).foregroundColor(.orange).frame(maxWidth: .infinity)
-                }.buttonStyle(PlainButtonStyle()).background(Color.clear)
-
-                Button(action: { Task { await deleteTour() } }) {
-                    Text("Delete Tour").font(.subheadline).foregroundColor(.red).frame(maxWidth: .infinity)
-                }.buttonStyle(PlainButtonStyle()).background(Color.clear)
-            }
-            Spacer()
+            .padding(.bottom)
         }
         .padding(30)
-        .frame(minWidth: 750, minHeight: 720)
+        .frame(width: 750)
+        // --- CHANGE IS HERE ---
+        .background(.regularMaterial)
         .onAppear {
+            setupTransparentWindow()
             Task { await loadPosterAsync() }
         }
+        // --- END OF CHANGE ---
     }
+
+    // --- NEW FUNCTION ---
+    private func setupTransparentWindow() {
+        if let window = getHostingWindow() {
+            window.isOpaque = false
+            window.backgroundColor = .clear
+        }
+    }
+    // --- END OF NEW FUNCTION ---
 
     private func loadPosterAsync() async {
         guard let urlStr = editableTour.posterURL, let url = URL(string: urlStr) else { return }
@@ -128,7 +147,6 @@ struct TourEditView: View {
     private func saveEdits() async {
         isSaving = true
         
-        // Update the tour object's timestamps from our local Date state before saving
         editableTour.startDate = Timestamp(date: startDate)
         editableTour.endDate = Timestamp(date: endDate)
         

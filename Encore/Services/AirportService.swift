@@ -22,7 +22,7 @@ class AirportService {
                 iata: $0.iata,
                 city: $0.city,
                 country: $0.country,
-                tz: $0.tz // Ensure the timezone identifier is loaded
+                tz: $0.tz
             )
         }.sorted { $0.name < $1.name }
     }

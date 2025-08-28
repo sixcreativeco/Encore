@@ -8,7 +8,7 @@ struct ShowDaySheetPDF: View {
     let crew: [TourCrew]
     let config: ExportConfiguration
     let posterImage: NSImage?
-
+    
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "dd/MM"
@@ -82,11 +82,11 @@ struct ShowDaySheetPDF: View {
                         }
                     }
                 }
-                .frame(width: 130, height: 195) // 2:3 Aspect Ratio
+                .frame(width: 130, height: 195)
                 .clipped()
                 .cornerRadius(8)
             }
-            .frame(height: 195) // This sets the boundary for the container
+            .frame(height: 195)
             .padding(20)
             .background(Color.white)
             .cornerRadius(16)
@@ -94,18 +94,27 @@ struct ShowDaySheetPDF: View {
 
             // Lower Section
             HStack(alignment: .top, spacing: 16) {
-                // Timings
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Timings").font(.system(size: 14, weight: .bold))
-                    timingRow(label: "Load In", time: show.loadIn)
-                    timingRow(label: "Soundcheck", time: show.soundCheck)
-                    timingRow(label: "Doors", time: show.doorsOpen)
-                    timingRow(label: "Set Time", time: show.headlinerSetTime)
-                    timingRow(label: "Pack Out", time: show.packOut)
+                    
+                    if let time = show.loadIn {
+                        timingRow(label: "Load In", time: time)
+                    }
+                    if let time = show.soundCheck {
+                        timingRow(label: "Soundcheck", time: time)
+                    }
+                    if let time = show.doorsOpen {
+                        timingRow(label: "Doors", time: time)
+                    }
+                    if let time = show.headlinerSetTime {
+                        timingRow(label: "Set Time", time: time)
+                    }
+                    if let time = show.packOut {
+                        timingRow(label: "Pack Out", time: time)
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 16) {
-                    // Notes
                     if config.includeNotesSection {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Notes").font(.system(size: 14, weight: .bold))
@@ -116,8 +125,7 @@ struct ShowDaySheetPDF: View {
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.5), lineWidth: 1))
                         }
                     }
-                    
-                    // Crew
+                  
                     if config.includeCrew {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Crew").font(.system(size: 14, weight: .bold))
@@ -147,14 +155,14 @@ struct ShowDaySheetPDF: View {
         .foregroundColor(.black)
     }
 
-    private func timingRow(label: String, time: Timestamp?) -> some View {
+    private func timingRow(label: String, time: Timestamp) -> some View {
         HStack {
             Text(label)
             Spacer()
-            Text(time != nil ? timeFormatter.string(from: time!.dateValue()).lowercased() : "TBC")
+            Text(timeFormatter.string(from: time.dateValue()).lowercased())
                 .fontWeight(.semibold)
         }
-        .font(.system(size: 10)) // Reduced font size by ~15%
+        .font(.system(size: 10))
         .padding(8)
         .background(Color.white)
         .cornerRadius(6)
@@ -170,7 +178,7 @@ struct ShowDaySheetPDF: View {
             .font(.system(size: 10))
             .foregroundColor(.secondary)
             .padding(.horizontal, 12)
-            .padding(.top, 8) // Added top padding
+            .padding(.top, 8)
             
             ForEach(crew) { member in
                 HStack(alignment: .top) {
@@ -182,8 +190,17 @@ struct ShowDaySheetPDF: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    Text(member.email ?? "")
-                        .frame(width: 120, alignment: .leading)
+                    // --- THIS IS THE CHANGE ---
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let email = member.email, !email.isEmpty {
+                            Text(email)
+                        }
+                        if let phone = member.phone, !phone.isEmpty {
+                            Text(phone)
+                        }
+                    }
+                    .frame(width: 120, alignment: .leading)
+                    // --- END OF CHANGE ---
                 }
                 .font(.system(size: 10))
                 .padding(.vertical, 4)

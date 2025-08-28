@@ -1,6 +1,6 @@
 import SwiftUI
-import FirebaseFirestore
 import Combine
+import FirebaseFirestore
 
 fileprivate struct GuestInputView: View {
     @Binding var tourCrew: [TourCrew]
@@ -71,7 +71,7 @@ fileprivate struct GuestInputView: View {
                    }
                }.background(Color.gray.opacity(0.1)).cornerRadius(8).frame(maxHeight: 150)
            }
-       }
+        }
     }
         
     private func addPassenger() {
@@ -95,39 +95,42 @@ struct AddFlightView: View {
     
     @State private var entryMode: EntryMode = .autoSearch
     
-    // State properties
+    // Auto-Search State
     @State private var autoFlightNumber = ""
     @State private var autoFlightDate = Date()
     @State private var autoSelectedAirport: AirportEntry? = nil
     @State private var autoAirportSearchText = ""
-    @FocusState private var isAirportSearchFocused: Bool
+    @FocusState private var isAutoAirportSearchFocused: Bool
     @State private var fetchedFlight: Flight? = nil
+
+    // Manual-Entry State
     @State private var manualAirlineName = ""
     @State private var manualAirlineCode = ""
     @State private var manualFlightNumber = ""
     @State private var manualDepartureDate = Date()
     @State private var manualArrivalDate = Date()
-    @State private var manualDepartureAirport = ""
-    @State private var manualArrivalAirport = ""
     @State private var manualDepartureTime = Date()
     @State private var manualArrivalTime = Date()
+    
+    // --- FIX: Replaced simple IATA strings with full AirportEntry models and search text state ---
+    @State private var manualDepartureAirport: AirportEntry?
+    @State private var manualArrivalAirport: AirportEntry?
+    @State private var manualDepartureSearchText: String = ""
+    @State private var manualArrivalSearchText: String = ""
+    
+    // Shared State
     @State private var notes = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var tourCrew: [TourCrew] = []
     @State private var passengerEntries: [Passenger] = []
     
+    // Visa Checker State
+    @State private var destinationForVisaCheck: AirportEntry?
+    @State private var isVisaSectionExpanded: Bool = false
+    
     private let allAirports = AirportService.shared.airports
         
-    private var filteredAirports: [AirportEntry] {
-        if autoAirportSearchText.isEmpty { return [] }
-        return allAirports.filter {
-            $0.name.lowercased().contains(autoAirportSearchText.lowercased()) ||
-            $0.city.lowercased().contains(autoAirportSearchText.lowercased()) ||
-            $0.iata.lowercased().contains(autoAirportSearchText.lowercased())
-        }
-    }
-    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -142,6 +145,13 @@ struct AddFlightView: View {
                     autoSearchView
                 } else {
                     manualEntryView
+                }
+                
+                if let destination = destinationForVisaCheck {
+                    CollapsibleSection(isExpanded: $isVisaSectionExpanded, title: "Travel & Visa Information") {
+                        VisaCheckerView(destinationAirport: destination)
+                    }
+                    .padding(.top)
                 }
                 
                 Spacer()
@@ -174,45 +184,12 @@ struct AddFlightView: View {
                 }
             }
             
-            VStack(alignment: .leading) {
-                Text("Departure Airport").font(.subheadline)
-                if let selectedAirport = autoSelectedAirport {
-                    HStack {
-                        Text(selectedAirport.name).padding(.vertical, 8).padding(.leading, 12)
-                        Spacer()
-                        Button(action: {
-                            self.autoSelectedAirport = nil
-                            self.autoAirportSearchText = ""
-                            self.isAirportSearchFocused = true
-                        }) {
-                            Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain).padding(.trailing, 8)
-                    }
-                    .background(Color.gray.opacity(0.2)).cornerRadius(8)
-                } else {
-                    TextField("Start typing airport or city...", text: $autoAirportSearchText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .focused($isAirportSearchFocused)
-                }
-                
-                if isAirportSearchFocused && !filteredAirports.isEmpty {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(filteredAirports) { airport in
-                                HStack {
-                                    Text(airport.name).padding(8)
-                                    Spacer()
-                                }
-                                .contentShape(Rectangle())
-                                .onTapGesture { selectAirport(airport) }
-                                Divider()
-                            }
-                        }
-                    }
-                    .background(Color.gray.opacity(0.1)).cornerRadius(8).frame(maxHeight: 200)
-                }
-            }
+            // --- FIX: This reusable component replaces the previous hardcoded version ---
+            AirportSearchView(
+                title: "Departure Airport",
+                selection: $autoSelectedAirport,
+                searchText: $autoAirportSearchText
+            )
             
             if fetchedFlight == nil {
                 Button(action: findFlight) {
@@ -283,17 +260,18 @@ struct AddFlightView: View {
                 }
             }
             
+            // --- FIX: Replaced IATA text fields with the flexible search component ---
             HStack(spacing: 16) {
-                StyledInputField(placeholder: "From (IATA)", text: $manualDepartureAirport)
-                    .onChange(of: manualDepartureAirport) { _, v in
-                        manualDepartureAirport = String(v.uppercased().prefix(3))
-                    }
-                StyledInputField(placeholder: "To (IATA)", text: $manualArrivalAirport)
-                    .onChange(of: manualArrivalAirport) { _, v in
-                        manualArrivalAirport = String(v.uppercased().prefix(3))
-                    }
+                AirportSearchView(title: "Departure Airport", selection: $manualDepartureAirport, searchText: $manualDepartureSearchText)
+                AirportSearchView(title: "Arrival Airport", selection: $manualArrivalAirport, searchText: $manualArrivalSearchText)
             }
-            
+            .onChange(of: manualArrivalAirport) { _, newAirport in
+                destinationForVisaCheck = newAirport
+                if newAirport != nil {
+                    isVisaSectionExpanded = true
+                }
+            }
+         
             passengersSection
             
             Button(action: saveManualFlight) {
@@ -339,12 +317,6 @@ struct AddFlightView: View {
         }
     }
         
-    func selectAirport(_ airport: AirportEntry) {
-        self.autoSelectedAirport = airport
-        self.autoAirportSearchText = ""
-        self.isAirportSearchFocused = false
-    }
-        
     func loadCrew() {
         Task {
             do {
@@ -377,7 +349,7 @@ struct AddFlightView: View {
                 case .success(let flights):
                     let airlineCode = String(self.autoFlightNumber.prefix { $0.isLetter })
                     let number = String(self.autoFlightNumber.drop { $0.isLetter })
-                                    
+                                   
                     if let match = flights.first(where: { $0.carrier.fs.uppercased() == airlineCode.uppercased() && $0.carrier.flightNumber == number }) {
                         guard let dep = self.allAirports.first(where: { $0.iata == departureAirport.iata }),
                               let arr = self.allAirports.first(where: { $0.iata == match.airport.fs }),
@@ -386,6 +358,9 @@ struct AddFlightView: View {
                             self.errorMessage = "Could not determine timezone for airports."
                             return
                         }
+                        
+                        self.destinationForVisaCheck = arr
+                        self.isVisaSectionExpanded = true
                         
                         let depDate = self.createDateInTimezone(date: self.autoFlightDate, timeString: match.departureTime?.time24 ?? "00:00", timezone: depTZ)
                         var arrDate = self.createDateInTimezone(date: self.autoFlightDate, timeString: match.arrivalTime?.time24 ?? "00:00", timezone: arrTZ)
@@ -397,11 +372,9 @@ struct AddFlightView: View {
                         let utcDepDate = self.convertToUTC(date: depDate, fromTimezone: depTZ)
                         let utcArrDate = self.convertToUTC(date: arrDate, fromTimezone: arrTZ)
                                        
-                        // --- THIS IS THE FIX ---
-                        // The ownerId is now correctly passed when creating the Flight object.
                         self.fetchedFlight = Flight(
                             tourId: self.tour.id ?? "",
-                            ownerId: self.tour.ownerId, // Added ownerId
+                            ownerId: self.tour.ownerId,
                             airline: match.carrier.name,
                             flightNumber: "\(match.carrier.fs)\(match.carrier.flightNumber)",
                             departureTimeUTC: Timestamp(date: utcDepDate),
@@ -411,7 +384,6 @@ struct AddFlightView: View {
                             notes: self.notes,
                             passengers: []
                         )
-                        // --- END OF FIX ---
                     } else {
                         self.errorMessage = "No matching flight found for this date."
                     }
@@ -423,23 +395,20 @@ struct AddFlightView: View {
     }
         
     func saveManualFlight() {
-        guard let tourID = tour.id, !manualAirlineName.isEmpty, !manualAirlineCode.isEmpty, !manualFlightNumber.isEmpty, !manualDepartureAirport.isEmpty, !manualArrivalAirport.isEmpty else {
-            errorMessage = "Please fill all fields."
+        guard let tourID = tour.id,
+              !manualAirlineName.isEmpty,
+              !manualAirlineCode.isEmpty,
+              !manualFlightNumber.isEmpty,
+              let originAirport = manualDepartureAirport,
+              let destinationAirport = manualArrivalAirport else {
+            errorMessage = "Please fill all required fields, including valid airports."
             return
         }
                 
-        let originAirport = allAirports.first(where: { $0.iata == manualDepartureAirport.uppercased() })
-        let destinationAirport = allAirports.first(where: { $0.iata == manualArrivalAirport.uppercased() })
-                
-        guard let origin = originAirport, let destination = destinationAirport else {
-            errorMessage = "Could not find airport for one of the IATA codes."
-            return
-        }
-        
         let fullFlightNumber = manualAirlineCode.uppercased() + manualFlightNumber
         
-        guard let originTZ = TimeZone(identifier: origin.tz),
-              let destTZ = TimeZone(identifier: destination.tz) else {
+        guard let originTZ = TimeZone(identifier: originAirport.tz),
+              let destTZ = TimeZone(identifier: destinationAirport.tz) else {
             errorMessage = "Could not determine timezone for airports."
             return
         }
@@ -453,23 +422,20 @@ struct AddFlightView: View {
         let depTimestamp = Timestamp(date: utcDepTime)
         let arrTimestamp = Timestamp(date: utcArrTime)
                 
-        // --- THIS IS THE FIX ---
-        // The ownerId is now correctly passed when creating the Flight object.
         let flightToSave = Flight(
             tourId: tourID,
-            ownerId: self.tour.ownerId, // Added ownerId
+            ownerId: self.tour.ownerId,
             airline: manualAirlineName,
             flightNumber: fullFlightNumber,
             departureTimeUTC: depTimestamp,
             arrivalTimeUTC: arrTimestamp,
-            origin: origin.iata,
-            destination: destination.iata,
+            origin: originAirport.iata,
+            destination: destinationAirport.iata,
             notes: notes,
             passengers: passengerEntries
         )
-        // --- END OF FIX ---
                 
-        saveFlight(flightToSave, originAirport: origin, destinationAirport: destination)
+        saveFlight(flightToSave, originAirport: originAirport, destinationAirport: destinationAirport)
     }
     
     func saveFlight(_ flight: Flight?) {
@@ -493,7 +459,7 @@ struct AddFlightView: View {
         isLoading = true
         var flightToSave = flight
         flightToSave.passengers = self.passengerEntries
-                
+             
         FirebaseFlightService.saveFlight(flightToSave, originAirport: originAirport, destinationAirport: destinationAirport) { error, newFlightID in
             self.isLoading = false
             if let error = error {
@@ -508,7 +474,7 @@ struct AddFlightView: View {
     func createDateInTimezone(date: Date, timeString: String, timezone: TimeZone) -> Date {
         var calendar = Calendar.current
         calendar.timeZone = timezone
-                
+               
         let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
         let timeComponents = timeString.split(separator: ":")
         let hour = Int(timeComponents.first ?? "0") ?? 0
@@ -547,5 +513,95 @@ struct AddFlightView: View {
         combined.minute = timeComponents.minute
                 
         return calendar.date(from: combined) ?? Date()
+    }
+    
+    // --- FIX: Reusable airport search component ---
+    private struct AirportSearchView: View {
+        let title: String
+        @Binding var selection: AirportEntry?
+        @Binding var searchText: String
+        @FocusState private var isFocused: Bool
+        
+        private let allAirports = AirportService.shared.airports
+        
+        private var filteredAirports: [AirportEntry] {
+            if searchText.isEmpty { return [] }
+            return allAirports.filter {
+                $0.name.lowercased().contains(searchText.lowercased()) ||
+                $0.city.lowercased().contains(searchText.lowercased()) ||
+                $0.iata.lowercased().contains(searchText.lowercased())
+            }
+        }
+        
+        var body: some View {
+            VStack(alignment: .leading) {
+                Text(title).font(.subheadline)
+                if let selected = selection {
+                    HStack {
+                        Text(selected.name).padding(.vertical, 8).padding(.leading, 12)
+                        Spacer()
+                        Button(action: {
+                            self.selection = nil
+                            self.searchText = ""
+                            self.isFocused = true
+                        }) {
+                            Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain).padding(.trailing, 8)
+                    }
+                    .background(Color.gray.opacity(0.2)).cornerRadius(8)
+                } else {
+                    TextField("Start typing airport or city...", text: $searchText)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .focused($isFocused)
+                }
+                
+                if isFocused && !filteredAirports.isEmpty {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(filteredAirports) { airport in
+                                HStack {
+                                    Text(airport.name).padding(8)
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    self.selection = airport
+                                    self.searchText = ""
+                                    self.isFocused = false
+                                }
+                                Divider()
+                            }
+                        }
+                    }
+                    .background(Color.gray.opacity(0.1)).cornerRadius(8).frame(maxHeight: 200)
+                }
+            }
+        }
+    }
+}
+
+// Reusable Collapsible Section View
+private struct CollapsibleSection<Content: View>: View {
+    @Binding var isExpanded: Bool
+    let title: String
+    let content: () -> Content
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() } }) {
+                HStack {
+                    Text(title).font(.headline)
+                    Spacer()
+                    Image(systemName: "chevron.right").rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }.foregroundColor(.primary)
+            }.buttonStyle(.plain)
+            
+            if isExpanded {
+                content()
+                    .padding(.top, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
     }
 }

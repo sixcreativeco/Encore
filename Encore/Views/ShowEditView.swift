@@ -8,7 +8,6 @@ struct ShowEditView: View {
     
     @Binding var show: Show
 
-    // --- FIX: Reverted to individual optional state variables for stability and consistency ---
     @State private var date: Date
     @State private var venueAccess: Date?
     @State private var loadIn: Date?
@@ -95,7 +94,7 @@ struct ShowEditView: View {
     private var timingSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Timings").font(.headline)
-            HStack(spacing: 8) { // ← Adjust this spacing to control gaps between Venue Access / Load In / Soundcheck / Doors Open
+            HStack(spacing: 8) {
                 timingCell(label: "Venue Access", selection: $venueAccess)
                 timingCell(label: "Load In", selection: $loadIn)
                 timingCell(label: "Soundcheck", selection: $soundCheck)
@@ -108,7 +107,7 @@ struct ShowEditView: View {
     private var headlinerDetailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Headliner: \(tour.artist)").font(.headline)
-            HStack(alignment: .top, spacing: 0) { // ← Adjust this spacing to control the gap between Headliner Set and Set Duration
+            HStack(alignment: .top, spacing: 0) {
                 timingCell(label: "Headliner Set", selection: $headline)
                     .frame(width: 100)
                 durationCell(label: "Set Duration",
@@ -125,6 +124,8 @@ struct ShowEditView: View {
         }
     }
     
+    // --- FIX IS HERE ---
+    // The logic inside this component has been rewritten to be more robust and avoid the crash.
     @ViewBuilder
     private func timingCell(label: String, selection: Binding<Date?>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -146,7 +147,13 @@ struct ShowEditView: View {
             }
             .frame(height: 16)
 
-            if let dateBinding = Binding(selection) {
+            if selection.wrappedValue != nil {
+                // This binding is now guaranteed to be non-nil, preventing the crash.
+                let dateBinding = Binding<Date>(
+                    get: { selection.wrappedValue ?? Date() },
+                    set: { selection.wrappedValue = $0 }
+                )
+                
                 DatePicker("", selection: dateBinding, displayedComponents: .hourAndMinute)
                     .labelsHidden().datePickerStyle(.compact)
                     .padding(.horizontal, 8).padding(.vertical, 7)
@@ -173,6 +180,7 @@ struct ShowEditView: View {
             }
         }
     }
+    // --- END OF FIX ---
 
     @ViewBuilder
     private func durationCell(label: String, minutes: Binding<Int>) -> some View {
@@ -207,7 +215,7 @@ struct ShowEditView: View {
     }
     
     private func optionalIntBinding(for binding: Binding<Int?>, defaultValue: Int) -> Binding<Int> {
-        Binding<Int>(get: { binding.wrappedValue ?? defaultValue }, set: { $0 })
+        Binding<Int>(get: { binding.wrappedValue ?? defaultValue }, set: { binding.wrappedValue = $0 })
     }
     
     private func saveChanges() {

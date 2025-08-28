@@ -4,12 +4,12 @@ struct CustomDateInputView: View {
     let label: String
     @Binding var date: Date
 
-    @State private var dateString: String = ""
     @State private var isPopoverPresented: Bool = false
 
+    // A formatter to display the date to the user.
     private static let formatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "dd/MM/yyyy"
+        formatter.dateFormat = "dd MMM yyyy" // e.g., 28 Aug 2025
         return formatter
     }()
 
@@ -19,45 +19,31 @@ struct CustomDateInputView: View {
                 .font(.subheadline)
                 .foregroundColor(.gray)
 
-            HStack(spacing: 0) {
-                TextField(Self.formatter.dateFormat, text: $dateString)
-                    .padding(12)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .onChange(of: dateString) { newValue in
-                        // Attempt to parse the typed string into a date
-                        if let newDate = Self.formatter.date(from: newValue) {
-                            self.date = newDate
-                        }
-                    }
-                
-                Button(action: { isPopoverPresented = true }) {
+            // --- FIX: Replaced TextField with a Button to prevent invalid input and state loops ---
+            Button(action: { isPopoverPresented = true }) {
+                HStack {
+                    Text(Self.formatter.string(from: date))
+                        .foregroundColor(.primary)
+                    Spacer()
                     Image(systemName: "calendar")
                         .foregroundColor(.gray)
-                        .padding(.horizontal, 12)
                 }
-                .buttonStyle(.plain)
-                .popover(isPresented: $isPopoverPresented) {
-                    DatePicker("", selection: $date, displayedComponents: .date)
-                        .datePickerStyle(.graphical)
-                        .labelsHidden()
-                        .onChange(of: date) { newDate in
-                            // Update text field when popover date changes
-                            self.dateString = Self.formatter.string(from: newDate)
-                            isPopoverPresented = false
-                        }
-                }
+                .padding(12)
             }
-            .background(Color.gray.opacity(0.06))
+            .buttonStyle(.plain)
+            .background(Color(nsColor: .controlBackgroundColor))
             .cornerRadius(10)
-            .onAppear {
-                // Initialize the text field with the current date value
-                self.dateString = Self.formatter.string(from: date)
-            }
-            .onChange(of: date) { newDate in
-                // Keep text field in sync if the binding is changed externally
-                let newDateString = Self.formatter.string(from: newDate)
-                if newDateString != dateString {
-                    dateString = newDateString
+            .popover(isPresented: $isPopoverPresented) {
+                DatePicker(
+                    "",
+                    selection: $date,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .labelsHidden()
+                .onChange(of: date) { _ in
+                    // Dismiss the popover when a new date is selected
+                    isPopoverPresented = false
                 }
             }
         }

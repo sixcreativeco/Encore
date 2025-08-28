@@ -22,6 +22,10 @@ class AppState: ObservableObject {
     
     @Published var notifications: [TourInvitationNotification] = []
     
+    @Published var contactToEdit: Contact? = nil
+    // --- THIS IS THE ADDITION ---
+    @Published var isContactPanelManuallyDismissed: Bool = false
+    
     // MARK: - Private Properties
     private var db = Firestore.firestore()
     private var notificationListener: ListenerRegistration?
@@ -41,7 +45,6 @@ class AppState: ObservableObject {
 
     // MARK: - Auth State
     
-    /// Public function to allow views to trigger a manual refresh of the user's status.
     func recheckAccountStatus() {
         guard let userID = userID else { return }
         print("🔵 [AppState DEBUG] Re-checking account status for \(userID)...")

@@ -3,66 +3,71 @@ import FirebaseFirestore
 
 struct ContactEditView: View {
     @EnvironmentObject var appState: AppState
-    @Environment(\.presentationMode) var presentationMode
-
-    // FIX: The state now uses our new, top-level 'Contact' model.
-    @State private var editableContact: Contact
+    
+    // This view now correctly takes a Binding to the optional contact in AppState.
+    @Binding var contact: Contact?
 
     @State private var isSaving = false
 
-    // Initializer now accepts the new 'Contact' model.
-    init(contact: Contact) {
-        self._editableContact = State(initialValue: contact)
-    }
-    
     private var isFormValid: Bool {
-        !editableContact.name.trimmingCharacters(in: .whitespaces).isEmpty && !editableContact.roles.isEmpty
+        if let contact = contact {
+            return !contact.name.trimmingCharacters(in: .whitespaces).isEmpty && !contact.roles.isEmpty
+        }
+        return false
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Edit Contact")
-                    .font(.largeTitle.bold())
-                Spacer()
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.gray)
+        // This guard safely unwraps the contact. The view's content is only built if a contact exists.
+        if var unwrappedContact = contact {
+            // This creates a non-optional binding for the form body to use.
+            let contactBinding = Binding(
+                get: { unwrappedContact },
+                set: { updatedContact in
+                    // When the form changes the contact, update the state here.
+                    self.contact = updatedContact
+                    unwrappedContact = updatedContact
                 }
-                .buttonStyle(.plain)
-            }
-            .padding(32)
+            )
 
-            // Scrollable Form Content
-            ScrollView {
-                // This will cause an error next, which is expected,
-                // as ContactFormBody needs to be updated.
-                ContactFormBody(contact: $editableContact, isDisabled: false)
-                    .padding(.horizontal, 32)
-            }
-
-            // Footer with Save Button
             VStack(spacing: 0) {
-                Divider()
+                // Header
                 HStack {
-                    Button(action: {
-                        updateContact()
-                    }) {
+                    StyledInputField(placeholder: "Full Name", text: contactBinding.name)
+                        .font(.largeTitle.bold())
+
+                    Spacer()
+                    Button(action: dismiss) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.gray)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding([.horizontal, .top], 32)
+                .padding(.bottom, 16)
+
+                // Scrollable Form Content
+                ScrollView {
+                    ContactFormBody(contact: contactBinding, isDisabled: false)
+                        .padding(.horizontal, 32)
+                }
+
+                // Footer with Save Button
+                HStack {
+                    Button(action: { updateContact(contactToSave: unwrappedContact) }) {
                         HStack {
                             Spacer()
                             if isSaving {
-                                ProgressView()
+                                ProgressView().colorInvert()
                             } else {
-                                Text("Update Contact")
+                                Text("Save")
                             }
                             Spacer()
                         }
                         .fontWeight(.bold)
                         .padding()
-                        .background(isFormValid ? Color.accentColor : Color.gray)
-                        .foregroundColor(.white)
+                        .background(isFormValid ? Color.white : Color.gray)
+                        .foregroundColor(.black)
                         .cornerRadius(12)
                     }
                     .buttonStyle(.plain)
@@ -70,34 +75,35 @@ struct ContactEditView: View {
                 }
                 .padding(.horizontal, 32)
                 .padding(.vertical, 16)
+                .background(.ultraThinMaterial)
             }
-            .background(Material.bar)
+            .background(.regularMaterial)
         }
-        .frame(width: 680, height: 750)
     }
     
-    // --- FIX IS HERE ---
-    private func updateContact() {
-        guard let contactID = editableContact.id else {
-            print("Error: Contact ID is nil. Cannot update contact.")
-            return
+    private func dismiss() {
+        withAnimation {
+            appState.contactToEdit = nil
+            appState.isContactPanelManuallyDismissed = true
         }
+    }
+    
+    private func updateContact(contactToSave: Contact) {
+        guard let contactID = contactToSave.id else { return }
         guard isFormValid else { return }
         
         isSaving = true
-        
         let db = Firestore.firestore()
         let documentRef = db.collection("contacts").document(contactID)
         
         do {
-            // Use Codable to save the entire object directly to the top-level /contacts collection.
-            try documentRef.setData(from: editableContact, merge: true) { error in
+            try documentRef.setData(from: contactToSave, merge: true) { error in
                 self.isSaving = false
                 if let error = error {
                     print("Error updating contact: \(error.localizedDescription)")
                 } else {
                     print("✅ Contact updated successfully.")
-                    self.presentationMode.wrappedValue.dismiss()
+                    dismiss()
                 }
             }
         } catch {

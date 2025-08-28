@@ -23,7 +23,7 @@ struct DatabaseView: View {
     @State private var activeSheet: ActiveSheet?
     @State private var contactsKey = UUID()
     @State private var hideGuests: Bool = false
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             headerAndActions
@@ -103,16 +103,12 @@ struct DatabaseView: View {
             ContactsSection(userID: userID, searchText: searchText, hideGuests: hideGuests, sortField: $sortField, sortAscending: $sortAscending)
                 .id(contactsKey)
         case .venues:
-            // The following sections do not need the hideGuests parameter
-            let dummyBool = Binding.constant(false)
             let dummyString = Binding.constant("All")
              VenuesSection(userID: userID, searchText: searchText, selectedFilter: dummyString.wrappedValue, sortField: $sortField, sortAscending: $sortAscending)
         case .hotels:
-            let dummyBool = Binding.constant(false)
             let dummyString = Binding.constant("All")
             HotelsSection(userID: userID, searchText: searchText, selectedFilter: dummyString.wrappedValue, sortField: $sortField, sortAscending: $sortAscending)
         case .customers:
-             let dummyBool = Binding.constant(false)
             let dummyString = Binding.constant("All")
             CustomersSection(userID: userID, searchText: searchText, selectedFilter: dummyString.wrappedValue, sortField: $sortField, sortAscending: $sortAscending)
         }

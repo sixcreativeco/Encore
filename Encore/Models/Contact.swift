@@ -1,7 +1,15 @@
 import Foundation
 import FirebaseFirestore
 
-struct Contact: Codable, Identifiable {
+// A model for storing airline loyalty program information.
+struct LoyaltyProgram: Codable, Hashable, Identifiable {
+    var id = UUID().uuidString
+    var airline: String
+    var accountNumber: String
+}
+
+// The Contact model now conforms to Hashable and includes loyalty programs.
+struct Contact: Codable, Identifiable, Hashable {
     @DocumentID var id: String?
     let ownerId: String
     var name: String
@@ -18,8 +26,19 @@ struct Contact: Codable, Identifiable {
     var emergencyContact: EmergencyContact?
     var allergies: String?
     var medications: String?
+    var loyaltyPrograms: [LoyaltyProgram]? // --- THIS IS THE ADDITION ---
     var linkedUserId: String?
     @ServerTimestamp var createdAt: Timestamp?
+
+    // Conformance to Hashable for NavigationLink value types.
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    // Explicitly define Equatable conformance.
+    static func == (lhs: Contact, rhs: Contact) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 struct PassportInfo: Codable, Hashable {

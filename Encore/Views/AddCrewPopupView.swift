@@ -11,6 +11,7 @@ struct AddCrewPopupView: View {
 
     @State private var newCrewName: String = ""
     @State private var newCrewEmail: String = ""
+    @State private var newCrewPhone: String = ""
     @State private var roleInput: String = ""
     @State private var selectedRoles: [String] = []
     @State private var showRoleSuggestions: Bool = false
@@ -83,7 +84,7 @@ struct AddCrewPopupView: View {
             if inviteSentSuccessfully {
                 resetForm()
             } else {
-                saveCrewMember()
+                Task { await saveCrewMember() }
             }
         }) {
             Text(isSaving ? "Saving..." : (inviteSentSuccessfully ? "Add More Crew" : "Send Invite"))
@@ -113,6 +114,7 @@ struct AddCrewPopupView: View {
         .padding(.top)
     }
     
+    
     private func invitationCodeView(code: String) -> some View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading) {
@@ -141,10 +143,11 @@ struct AddCrewPopupView: View {
 
     private var inputFields: some View {
         VStack(spacing: 16) {
+            CustomTextField(placeholder: "Name*", text: $newCrewName)
+            
             HStack(spacing: 16) {
-                CustomTextField(placeholder: "Name", text: $newCrewName)
                 HStack(spacing: 8) {
-                    CustomTextField(placeholder: "Email", text: $newCrewEmail)
+                    CustomTextField(placeholder: "Email*", text: $newCrewEmail)
                     switch emailValidationState {
                     case .checking: ProgressView().scaleEffect(0.5)
                     case .valid: Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
@@ -153,6 +156,7 @@ struct AddCrewPopupView: View {
                     case .none: EmptyView().frame(width: 20)
                     }
                 }
+                CustomTextField(placeholder: "Phone (Optional)", text: $newCrewPhone)
             }
             .onChange(of: newCrewEmail) { _, newValue in
                 checkEmailWithDebounce(email: newValue)
@@ -173,7 +177,7 @@ struct AddCrewPopupView: View {
                             .padding(.horizontal, 8).padding(.vertical, 4)
                             .background(Color.black.opacity(0.2)).cornerRadius(6)
                         }
-                        TextField("Type a role", text: $roleInput)
+                        TextField("Type a role*", text: $roleInput)
                             .textFieldStyle(PlainTextFieldStyle()).frame(minWidth: 100)
                             .onChange(of: roleInput) { _, value in
                                 showRoleSuggestions = !value.isEmpty
@@ -267,7 +271,8 @@ struct AddCrewPopupView: View {
         pasteboard.setString(inviteString, forType: .string)
     }
 
-    private func saveCrewMember() {
+    // --- FIX: This function now creates a Contact and links it to the TourCrew document ---
+    private func saveCrewMember() async {
         guard !newCrewName.isEmpty, !selectedRoles.isEmpty, !newCrewEmail.isEmpty,
               let ownerId = appState.userID,
               let currentTour = appState.tours.first(where: { $0.id == tourID })
@@ -275,66 +280,89 @@ struct AddCrewPopupView: View {
         
         isSaving = true
         let db = Firestore.firestore()
+        let trimmedEmail = newCrewEmail.trimmingCharacters(in: .whitespaces).lowercased()
 
-        let newCrewMember = TourCrew(
-            tourId: self.tourID,
-            userId: self.foundUserId,
-            contactId: nil,
-            name: newCrewName.trimmingCharacters(in: .whitespaces),
-            email: newCrewEmail.trimmingCharacters(in: .whitespaces).lowercased(),
-            roles: selectedRoles,
-            visibility: selectedVisibility,
-            status: foundUserId != nil ? .pending : .invited,
-            invitationCode: nil,
-            startDate: selectedVisibility == .temporary ? Timestamp(date: startDate) : nil,
-            endDate: selectedVisibility == .temporary ? Timestamp(date: endDate) : nil,
-            invitedBy: ownerId
-        )
-
-        var ref: DocumentReference? = nil
         do {
-            ref = try db.collection("tourCrew").addDocument(from: newCrewMember) { error in
-                if let error = error {
-                    print("❌ Error saving new crew member: \(error.localizedDescription)")
-                    self.isSaving = false
-                    return
-                }
-                
-                guard let crewDocId = ref?.documentID else {
-                    self.isSaving = false
-                    return
-                }
-
-                if let recipientId = self.foundUserId {
-                    FirebaseUserService.shared.createInvitationNotification(
-                        for: currentTour,
-                        recipientId: recipientId,
-                        inviterId: ownerId,
-                        inviterName: Auth.auth().currentUser?.displayName ?? "An Encore User",
-                        crewDocId: crewDocId,
-                        roles: self.selectedRoles
-                    )
-                    self.inviteSentSuccessfully = true
-                } else {
-                    FirebaseUserService.shared.createInvitation(for: crewDocId, tourId: self.tourID, inviterId: ownerId) { code in
-                        if let code = code {
-                            db.collection("tourCrew").document(crewDocId).updateData(["invitationCode": code])
-                            self.generatedCode = code
-                        }
-                        self.inviteSentSuccessfully = true
-                    }
-                }
-                self.isSaving = false
+            // Find or create a master contact record for this person
+            let contactsRef = db.collection("contacts")
+            let existingContactQuery = contactsRef
+                .whereField("ownerId", isEqualTo: ownerId)
+                .whereField("email", isEqualTo: trimmedEmail)
+            
+            let querySnapshot = try await existingContactQuery.getDocuments()
+            let contactRef: DocumentReference
+            
+            if let existingDoc = querySnapshot.documents.first {
+                // Use existing contact
+                contactRef = existingDoc.reference
+            } else {
+                // Create a new contact
+                contactRef = contactsRef.document()
+                let newContact = Contact(
+                    ownerId: ownerId,
+                    name: newCrewName.trimmingCharacters(in: .whitespaces),
+                    roles: selectedRoles,
+                    email: trimmedEmail,
+                    phone: newCrewPhone.isEmpty ? nil : newCrewPhone.trimmingCharacters(in: .whitespaces)
+                )
+                try contactRef.setData(from: newContact)
             }
+            
+            // Create the TourCrew document and link it to the contact
+            let crewRef = db.collection("tourCrew").document()
+            let newCrewMember = TourCrew(
+                tourId: self.tourID,
+                userId: self.foundUserId,
+                contactId: contactRef.documentID, // Link to the master contact
+                name: newCrewName.trimmingCharacters(in: .whitespaces),
+                email: trimmedEmail,
+                phone: newCrewPhone.isEmpty ? nil : newCrewPhone.trimmingCharacters(in: .whitespaces),
+                roles: selectedRoles,
+                visibility: selectedVisibility,
+                status: foundUserId != nil ? .pending : .invited,
+                invitationCode: nil,
+                startDate: selectedVisibility == .temporary ? Timestamp(date: startDate) : nil,
+                endDate: selectedVisibility == .temporary ? Timestamp(date: endDate) : nil,
+                invitedBy: ownerId
+            )
+            try crewRef.setData(from: newCrewMember)
+            
+            // Handle invitation flow
+            if let recipientId = self.foundUserId {
+                FirebaseUserService.shared.createInvitationNotification(
+                    for: currentTour,
+                    recipientId: recipientId,
+                    inviterId: ownerId,
+                    inviterName: Auth.auth().currentUser?.displayName ?? "An Encore User",
+                    crewDocId: crewRef.documentID,
+                    roles: self.selectedRoles
+                )
+                self.inviteSentSuccessfully = true
+            } else {
+                let code = try await InvitationAPI.createInvitation(
+                    crewDocId: crewRef.documentID,
+                    tourId: self.tourID,
+                    inviterId: ownerId
+                )
+                if let code = code {
+                    try await crewRef.updateData(["invitationCode": code])
+                    self.generatedCode = code
+                }
+                self.inviteSentSuccessfully = true
+            }
+            
+            self.isSaving = false
+            
         } catch {
-            print("❌ Error adding document: \(error.localizedDescription)")
-            isSaving = false
+            print("❌ Error saving new crew member: \(error.localizedDescription)")
+            self.isSaving = false
         }
     }
     
     private func resetForm() {
         newCrewName = ""
         newCrewEmail = ""
+        newCrewPhone = ""
         roleInput = ""
         selectedRoles.removeAll()
         showRoleSuggestions = false

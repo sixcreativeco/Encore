@@ -33,6 +33,14 @@ struct MyAccountView: View {
                     stripeSection
                     supportSection
 
+                    // --- THIS IS THE ADDITION ---
+                    // This is a temporary tool. You can remove this VStack after running it.
+                    VStack {
+                        Divider().padding(.vertical)
+                        AdminContactLinkerView()
+                    }
+                    // --- END OF ADDITION ---
+                    
                     Spacer()
                 }
                 .padding()

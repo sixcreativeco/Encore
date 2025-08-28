@@ -8,7 +8,6 @@ struct CrewEditView: View {
     // This view will have its own dedicated listener for crew members
     @State private var crewMembers: [TourCrew] = []
     @State private var listener: ListenerRegistration?
-    
     // State for confirmation alerts
     @State private var crewMemberToDelete: TourCrew?
     @State private var isShowingDeleteAlert = false
@@ -29,11 +28,8 @@ struct CrewEditView: View {
             // Main Content
             ScrollView {
                 VStack(alignment: .leading, spacing: 30) {
-                    // --- THIS IS THE FIX: Part 1 ---
-                    // We tell AddCrewSectionView NOT to show its internal list.
                     AddCrewSectionView(tour: tour, showCrewList: false)
 
-                    // This section is now the single source for displaying the crew list.
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Current Crew")
                             .font(.headline)
@@ -45,7 +41,6 @@ struct CrewEditView: View {
                                 .frame(maxWidth: .infinity, alignment: .center)
                         } else {
                             ForEach(crewMembers) { crew in
-                                // The card now includes the delete button and other actions.
                                 existingCrewMemberCard(crew)
                             }
                         }
@@ -73,9 +68,22 @@ struct CrewEditView: View {
     @ViewBuilder
     private func existingCrewMemberCard(_ crew: TourCrew) -> some View {
         HStack {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 4) { // Added spacing
                 Text(crew.name).fontWeight(.bold)
                 Text(crew.roles.joined(separator: ", ")).font(.subheadline).foregroundColor(.secondary)
+                
+                // --- THIS IS THE ADDITION ---
+                if let phone = crew.phone, !phone.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "phone.fill")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(phone)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                // --- END OF ADDITION ---
             }
             
             Spacer()
@@ -97,8 +105,6 @@ struct CrewEditView: View {
                 }
             }
             
-            // --- THIS IS THE FIX: Part 2 ---
-            // The delete button is now part of this single, unified crew card.
             Button(role: .destructive, action: {
                 crewMemberToDelete = crew
                 isShowingDeleteAlert = true

@@ -10,8 +10,10 @@ class ExportViewModel: ObservableObject {
     @Published var selectedTourID: String? {
         didSet {
             previewTask?.cancel()
-            if let tourID = selectedTourID {
-                fetchDataForTour(tourID: tourID)
+            posterDownloadTask?.cancel()
+            
+            if let tourID = selectedTourID, let tour = tours.first(where: { $0.id == tourID }) {
+                fetchDataForTour(tour: tour)
             } else {
                 clearTourData()
             }
@@ -30,7 +32,10 @@ class ExportViewModel: ObservableObject {
     @Published var flightsForSelectedTour: [Flight] = []
     @Published var hotelsForSelectedTour: [Hotel] = []
     @Published var guestLists: [String: [GuestListItemModel]] = [:]
-
+    
+    @Published var posterImage: NSImage?
+    private var posterDownloadTask: Task<Void, Never>?
+    
     // Configuration & Preview
     @Published var config = ExportConfiguration()
     @Published var previewImages: [NSImage] = []
@@ -66,22 +71,24 @@ class ExportViewModel: ObservableObject {
                 self.isLoadingTours = false
             }
     }
-
-    private func fetchDataForTour(tourID: String) {
-        self.selectedTourData = tours.first { $0.id == tourID }
+    
+    private func fetchDataForTour(tour: Tour) {
+        self.selectedTourData = tour
         self.config = ExportConfiguration()
+        
+        fetchPosterImage(for: tour)
         
         Task {
             isLoadingDetails = true
             do {
-                let shows = try await FirebaseTourService.fetchShows(forTour: tourID)
+                let shows = try await FirebaseTourService.fetchShows(forTour: tour.id ?? "")
                 self.showsForSelectedTour = shows
                 self.config.selectedShowID = shows.first?.id
                 
-                async let crewTask: Void = fetchCrew(for: tourID)
-                async let itineraryTask: Void = fetchItinerary(for: tourID)
-                async let flightsTask: Void = fetchFlights(for: tourID)
-                async let hotelsTask: Void = fetchHotels(for: tourID)
+                async let crewTask: Void = fetchCrew(for: tour.id ?? "")
+                async let itineraryTask: Void = fetchItinerary(for: tour.id ?? "")
+                async let flightsTask: Void = fetchFlights(for: tour.id ?? "")
+                async let hotelsTask: Void = fetchHotels(for: tour.id ?? "")
                 async let guestListTask: Void = fetchAllGuestLists(for: shows)
 
                 _ = await [crewTask, itineraryTask, flightsTask, hotelsTask, guestListTask]
@@ -95,6 +102,32 @@ class ExportViewModel: ObservableObject {
         }
     }
 
+    private func fetchPosterImage(for tour: Tour) {
+        posterDownloadTask?.cancel()
+        self.posterImage = nil
+        
+        guard let posterURLString = tour.posterURL, let url = URL(string: posterURLString) else {
+            return
+        }
+        
+        posterDownloadTask = Task {
+            do {
+                print("🟢 [ExportViewModel] Starting poster download...")
+                let resource = try await KingfisherManager.shared.downloader.downloadImage(with: url)
+                if !Task.isCancelled {
+                    self.posterImage = resource.image
+                    print("✅ [ExportViewModel] Poster download complete.")
+                    // --- FIX: Trigger a preview refresh now that the image is available ---
+                    self.schedulePreviewGeneration()
+                }
+            } catch {
+                if !(error is KingfisherError && (error as! KingfisherError).isTaskCancelled) {
+                    print("❌ [ExportViewModel] Could not download poster for PDF: \(error)")
+                }
+            }
+        }
+    }
+
     private func clearTourData() {
         selectedTourData = nil
         showsForSelectedTour = []
@@ -104,6 +137,7 @@ class ExportViewModel: ObservableObject {
         hotelsForSelectedTour = []
         guestLists = [:]
         previewImages = []
+        posterImage = nil
     }
     
     private func fetchCrew(for tourID: String) async {
@@ -135,21 +169,13 @@ class ExportViewModel: ObservableObject {
         self.guestLists = allGuests
     }
     
-    private func generateConfiguredPDFView() async -> (view: AnyView?, suggestedName: String) {
+    private func generateConfiguredPDFView() -> (view: AnyView?, suggestedName: String) {
         guard let tour = selectedTourData else { return (nil, "") }
         
         var viewToRender: AnyView?
         var suggestedName = "\(tour.artist) - \(tour.tourName) Export.pdf"
         
-        var poster: NSImage? = nil
-        if let posterURLString = tour.posterURL, let url = URL(string: posterURLString) {
-            do {
-                let resource = try await KingfisherManager.shared.downloader.downloadImage(with: url)
-                poster = resource.image
-            } catch {
-                print("❌ Could not download poster for PDF: \(error)")
-            }
-        }
+        let poster = self.posterImage
         
         switch config.selectedPreset {
         case .show:
@@ -184,9 +210,12 @@ class ExportViewModel: ObservableObject {
         isGeneratingPreview = true
         
         previewTask = Task {
-            let result = await generateConfiguredPDFView()
+            let result = generateConfiguredPDFView()
             
-            if Task.isCancelled { return }
+            if Task.isCancelled {
+                DispatchQueue.main.async { self.isGeneratingPreview = false }
+                return
+            }
             
             guard let view = result.view else {
                 self.previewImages = []
@@ -219,7 +248,7 @@ class ExportViewModel: ObservableObject {
                     }
                 }
             }
-
+    
             self.previewImages = images
             self.currentPreviewPage = 0
             self.isGeneratingPreview = false
@@ -228,7 +257,7 @@ class ExportViewModel: ObservableObject {
     
     func initiateSavePDF() async {
         isGeneratingPDF = true
-        let result = await generateConfiguredPDFView()
+        let result = generateConfiguredPDFView()
         if let view = result.view {
             await PDFGenerator.generateAndSave(view: view, suggestedName: result.suggestedName)
         }

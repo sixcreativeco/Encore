@@ -15,12 +15,13 @@ struct Airport: Codable {
 
 typealias AirportDictionary = [String: Airport]
 
-struct AirportEntry: Identifiable {
+// This is now the single, authoritative definition for an airport entry.
+// It now conforms to Equatable to resolve the compiler error.
+struct AirportEntry: Identifiable, Equatable {
     let id = UUID()
     let name: String
     let iata: String
     let city: String
     let country: String
-    // ADDED: The timezone identifier property that was missing.
     let tz: String
 }

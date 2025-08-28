@@ -12,18 +12,12 @@ struct SidebarContainerView: View {
         TutorialOverlayView(
             isShowingTutorial: $appState.isShowingFirstRunTutorial,
             onFinish: { shouldPersist in
-                // This closure now correctly handles the logic.
                 guard let userID = appState.userID else { return }
-                
-                appState.isShowingFirstRunTutorial = false // Always hide the current tutorial
-                
+                appState.isShowingFirstRunTutorial = false
                 if shouldPersist {
                     print("🔵 [SidebarContainerView DEBUG] Persisting sidebar tutorial completion.")
                     FirebaseUserService.shared.markFirstRunTutorialAsCompleted(for: userID)
                 }
-                
-                // Ask AppState to re-evaluate what to do next.
-                // It will now see the updated user status and decide if the video tutorial should be shown.
                 appState.recheckAccountStatus()
             }
         ) {
@@ -33,7 +27,14 @@ struct SidebarContainerView: View {
                     
                     VStack(spacing: 0) {
                         HStack {
-                            Button(action: { withAnimation { isSidebarVisible.toggle() } }) {
+                            Button(action: {
+                                withAnimation {
+                                    isSidebarVisible.toggle()
+                                    if appState.contactToEdit != nil {
+                                        appState.isContactPanelManuallyDismissed = true
+                                    }
+                                }
+                            }) {
                                 Image(systemName: isSidebarVisible ? "sidebar.left" : "sidebar.right")
                                     .font(.title2)
                                     .foregroundColor(.white.opacity(0.8))
@@ -43,7 +44,7 @@ struct SidebarContainerView: View {
                             
                             Spacer()
                             
-                            Button(action: { withAnimation { isNotificationsPanelVisible.toggle() } }) {
+                            Button(action: { withAnimation { isNotificationsPanelVisible.toggle(); appState.contactToEdit = nil } }) {
                                 Image(systemName: "bell.fill")
                                     .font(.title2)
                                     .foregroundColor(.white.opacity(0.8))
@@ -70,8 +71,14 @@ struct SidebarContainerView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .environment(\.colorScheme, .dark)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     
-                    if isNotificationsPanelVisible {
+                    if appState.contactToEdit != nil {
+                        // --- FIX: Now correctly passes the binding '$appState.contactToEdit' ---
+                        ContactEditView(contact: $appState.contactToEdit)
+                            .frame(width: 680)
+                            .transition(.move(edge: .trailing))
+                    } else if isNotificationsPanelVisible {
                         NotificationsView(isPresented: $isNotificationsPanelVisible)
                             .frame(width: 320)
                             .transition(.move(edge: .trailing))
@@ -81,8 +88,18 @@ struct SidebarContainerView: View {
         }
         .onChange(of: appState.isShowingFirstRunTutorial) { _, isShowing in
             if isShowing {
-                withAnimation {
-                    isSidebarVisible = true
+                withAnimation { isSidebarVisible = true }
+            }
+        }
+        .onChange(of: appState.contactToEdit) { _, newValue in
+            withAnimation(.easeInOut) {
+                if newValue != nil {
+                    appState.isContactPanelManuallyDismissed = false
+                    isSidebarVisible = false
+                } else {
+                    if !appState.isContactPanelManuallyDismissed {
+                        isSidebarVisible = true
+                    }
                 }
             }
         }

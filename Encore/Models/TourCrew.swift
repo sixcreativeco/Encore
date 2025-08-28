@@ -2,7 +2,6 @@ import Foundation
 import FirebaseFirestore
 
 // All related models are now consolidated into this single file to serve as the one source of truth.
-
 enum CrewVisibility: String, Codable, CaseIterable {
     case full, limited, temporary
 }
@@ -41,6 +40,7 @@ struct TourCrew: Codable, Identifiable {
     let contactId: String?
     var name: String
     var email: String?
+    var phone: String? // --- THIS IS THE ADDITION ---
     var roles: [String]
     var visibility: CrewVisibility
     var status: InviteStatus

@@ -72,6 +72,7 @@ struct AddCrewSectionView: View {
     @State private var crewMembers: [TourCrew] = []
     @State private var newCrewName: String = ""
     @State private var newCrewEmail: String = ""
+    @State private var newCrewPhone: String = "" // --- THIS IS THE ADDITION ---
     @State private var roleInput: String = ""
     @State private var selectedRoles: [String] = []
     @State private var showRoleSuggestions: Bool = false
@@ -104,22 +105,24 @@ struct AddCrewSectionView: View {
 
             VStack(spacing: 16) {
                 HStack(spacing: 12) {
-                    CustomTextField(placeholder: "Name", text: $newCrewName)
-                    HStack(spacing: 8) {
-                        CustomTextField(placeholder: "Email", text: $newCrewEmail)
-                        switch emailValidationState {
-                        case .checking: ProgressView().scaleEffect(0.5)
-                        case .valid: Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
-                        case .invalid: Image(systemName: "person.badge.plus").foregroundColor(.orange)
-                        case .none: EmptyView().frame(width: 20)
-                        }
+                    CustomTextField(placeholder: "Name*", text: $newCrewName)
+                    CustomTextField(placeholder: "Phone (Optional)", text: $newCrewPhone)
+                }
+                
+                HStack(spacing: 8) {
+                    CustomTextField(placeholder: "Email*", text: $newCrewEmail)
+                    switch emailValidationState {
+                    case .checking: ProgressView().scaleEffect(0.5)
+                    case .valid: Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                    case .invalid: Image(systemName: "person.badge.plus").foregroundColor(.orange)
+                    case .none: EmptyView().frame(width: 20)
                     }
                 }
                 .onChange(of: newCrewEmail) { _, newValue in
                     checkEmailWithDebounce(email: newValue)
                 }
 
-                // Role input section... (unchanged)
+                // Role input section
                 VStack(spacing: 4) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
@@ -133,7 +136,7 @@ struct AddCrewSectionView: View {
                                 .padding(.horizontal, 8).padding(.vertical, 4)
                                 .background(Color.black.opacity(0.2)).cornerRadius(6)
                             }
-                            TextField("Type a role", text: $roleInput)
+                            TextField("Type a role*", text: $roleInput)
                                 .textFieldStyle(PlainTextFieldStyle()).frame(minWidth: 100)
                                 .onChange(of: roleInput) { _, value in showRoleSuggestions = !value.isEmpty }
                                 .onSubmit { addCustomRole() }
@@ -182,7 +185,6 @@ struct AddCrewSectionView: View {
         .onDisappear { listener?.remove() }
     }
     
-    // crewMemberCard and copyInviteDetails... (unchanged)
     @ViewBuilder
     private func crewMemberCard(_ member: TourCrew) -> some View {
         HStack {
@@ -228,15 +230,12 @@ struct AddCrewSectionView: View {
                 try await Task.sleep(nanoseconds: 500_000_000)
                 guard !Task.isCancelled else { return }
                 
-                // --- THIS IS THE FIX ---
-                // Call the new secure API endpoint instead of the old FirebaseUserService
                 let foundID = try await UserAPI.checkUserExists(byEmail: trimmedEmail)
                 
                 await MainActor.run {
                     self.foundUserId = foundID
                     self.emailValidationState = (foundID != nil) ? .valid : .invalid
                 }
-                // --- END OF FIX ---
                 
             } catch {
                 await MainActor.run { self.emailValidationState = .none }
@@ -253,52 +252,78 @@ struct AddCrewSectionView: View {
         showRoleSuggestions = false
     }
 
+    // --- FIX: This function now creates a Contact and links it to the TourCrew document ---
     private func saveCrewMember() async {
-        print("[Debug] 1. saveCrewMember called.")
         guard isFormValid, let ownerId = appState.userID, let tourID = tour.id else {
-            print("[Debug] ❌ saveCrewMember failed validation.")
             return
         }
         
         await MainActor.run { isSaving = true }
-        
-        let crewToSave = TourCrew(
-            tourId: tourID, userId: foundUserId, contactId: nil, name: newCrewName.trimmingCharacters(in: .whitespaces),
-            email: newCrewEmail.trimmingCharacters(in: .whitespaces).lowercased(), roles: selectedRoles, visibility: .full,
-            status: foundUserId != nil ? .pending : .invited, invitationCode: nil, startDate: nil, endDate: nil, invitedBy: ownerId
-        )
+        let db = Firestore.firestore()
+        let trimmedEmail = newCrewEmail.trimmingCharacters(in: .whitespaces).lowercased()
 
         do {
-            let db = Firestore.firestore()
-            let ref = try await db.collection("tourCrew").addDocument(from: crewToSave)
-            print("[Debug] 2. Successfully saved new crew document: \(ref.documentID)")
+            // Find or create a master contact record
+            let contactsRef = db.collection("contacts")
+            let existingContactQuery = contactsRef
+                .whereField("ownerId", isEqualTo: ownerId)
+                .whereField("email", isEqualTo: trimmedEmail)
             
+            let querySnapshot = try await existingContactQuery.getDocuments()
+            let contactRef: DocumentReference
+            
+            if let existingDoc = querySnapshot.documents.first {
+                contactRef = existingDoc.reference
+            } else {
+                contactRef = contactsRef.document()
+                let newContact = Contact(
+                    ownerId: ownerId,
+                    name: newCrewName.trimmingCharacters(in: .whitespaces),
+                    roles: selectedRoles,
+                    email: trimmedEmail,
+                    phone: newCrewPhone.isEmpty ? nil : newCrewPhone.trimmingCharacters(in: .whitespaces)
+                )
+                try contactRef.setData(from: newContact)
+            }
+            
+            // Create the TourCrew document
+            let crewRef = db.collection("tourCrew").document()
+            let newCrewMember = TourCrew(
+                tourId: tourID,
+                userId: foundUserId,
+                contactId: contactRef.documentID, // Link to the master contact
+                name: newCrewName.trimmingCharacters(in: .whitespaces),
+                email: trimmedEmail,
+                phone: newCrewPhone.isEmpty ? nil : newCrewPhone.trimmingCharacters(in: .whitespaces),
+                roles: selectedRoles,
+                visibility: .full,
+                status: foundUserId != nil ? .pending : .invited,
+                invitationCode: nil,
+                startDate: nil,
+                endDate: nil,
+                invitedBy: ownerId
+            )
+            try crewRef.setData(from: newCrewMember)
+            
+            // Handle invitation flow
             if let recipientId = foundUserId {
-                print("[Debug] 3a. User exists. Sending notification to \(recipientId).")
                 let tourRef = db.collection("tours").document(tourID)
                 try await tourRef.setData(["members": [recipientId: "crew"]], merge: true)
                 
                 FirebaseUserService.shared.createInvitationNotification(
                     for: tour, recipientId: recipientId, inviterId: ownerId,
-                    inviterName: Auth.auth().currentUser?.displayName ?? "An Encore User", crewDocId: ref.documentID, roles: selectedRoles
+                    inviterName: Auth.auth().currentUser?.displayName ?? "An Encore User", crewDocId: crewRef.documentID, roles: selectedRoles
                 )
             } else {
-                print("[Debug] 3b. New user. Requesting invitation code from server.")
                 let code = try await InvitationAPI.createInvitation(
-                    crewDocId: ref.documentID, tourId: tour.id ?? "", inviterId: ownerId
+                    crewDocId: crewRef.documentID, tourId: tour.id ?? "", inviterId: ownerId
                 )
-                
                 if let code = code {
-                    print("[Debug] 4. Received code '\(code)' from server. Updating document.")
-                    try await ref.updateData(["invitationCode": code])
-                    print("[Debug] 5. Document updated successfully.")
-                } else {
-                    print("[Debug] ❌ Failed to get an invitation code from the server.")
+                    try await crewRef.updateData(["invitationCode": code])
                 }
             }
             
             await MainActor.run {
-                print("[Debug] 6. Operation complete. Resetting form.")
                 resetForm()
             }
             
@@ -310,6 +335,7 @@ struct AddCrewSectionView: View {
     
     private func resetForm() {
         newCrewName = ""; newCrewEmail = ""; roleInput = ""
+        newCrewPhone = ""
         selectedRoles.removeAll(); showRoleSuggestions = false; foundUserId = nil
         emailValidationState = .none; emailCheckTask?.cancel(); isSaving = false
     }
