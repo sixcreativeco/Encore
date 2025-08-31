@@ -23,8 +23,58 @@ class TicketingAPI {
         let eventId: String
     }
     
+    // --- THIS IS THE NEW FUNCTION ---
+    func issueCompTickets(showId: String, name: String, email: String, quantity: Int, note: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(possibleBaseURLs[0])/api/create-comp-tickets") else {
+            completion(.failure(APIError.invalidURL))
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Note: For enhanced security, an authentication token should be added to this request in a future update.
+
+        let body: [String: Any] = [
+            "showId": showId,
+            "name": name,
+            "email": email,
+            "quantity": quantity,
+            "note": note
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                    if let data = data,
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let message = json["error"] as? String {
+                        completion(.failure(APIError.serverError(message)))
+                    } else {
+                        completion(.failure(APIError.invalidResponse))
+                    }
+                    return
+                }
+                
+                completion(.success(()))
+            }
+        }.resume()
+    }
+    // --- END OF NEW FUNCTION ---
+
     func publishTickets(ticketedEventId: String, completion: @escaping (Result<PublishResponse, Error>) -> Void) {
-        // Try each URL until one works
         tryPublishWithURLs(ticketedEventId: ticketedEventId, urls: possibleBaseURLs, completion: completion)
     }
     
@@ -118,7 +168,7 @@ class TicketingAPI {
                         print("🎉 Success! Ticket URL: \(ticketSaleUrl)")
                         
                         DispatchQueue.main.async {
-                            completion(.success(response))
+                             completion(.success(response))
                         }
                     } else if let errorMessage = json["error"] as? String {
                         print("❌ Server error from \(currentURL): \(errorMessage)")
@@ -196,7 +246,6 @@ class TicketingAPI {
             return
         }
         
-        // FIX: Use platform-specific code to open URL
         #if os(macOS)
         NSWorkspace.shared.open(url)
         #elseif os(iOS)
@@ -205,7 +254,6 @@ class TicketingAPI {
     }
     
     func copyToClipboard(_ text: String) {
-        // FIX: Use platform-specific code for clipboard
         #if os(macOS)
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()

@@ -16,6 +16,10 @@ struct NewTourFlowView: View {
     @State private var newTour: Tour? = nil
     @State private var isSaving = false
     
+    // State for the Show Grid View
+    @State private var isSelectionModeActive = false
+    @State private var selectedShowIDs = Set<String>()
+    
     @State private var isShowingTutorial = false
 
     var body: some View {
@@ -26,61 +30,62 @@ struct NewTourFlowView: View {
                         Text("Create New Tour").font(.system(size: 24, weight: .bold))
                         CustomTextField(placeholder: "Tour Name", text: $tourName)
                         CustomTextField(placeholder: "Artist Name", text: $artistName)
-                        HStack(spacing: 12) {
+                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Start Date").font(.subheadline).foregroundColor(.secondary)
-                                CustomDateField(date: $startDate)
+                                 CustomDateField(date: $startDate)
                             }
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("End Date").font(.subheadline).foregroundColor(.secondary)
+                                 Text("End Date").font(.subheadline).foregroundColor(.secondary)
                                 CustomDateField(date: $endDate)
                             }
                         }
-                        Text("Including Travel/Extra Days").font(.footnote).foregroundColor(.secondary)
+                         Text("Including Travel/Extra Days").font(.footnote).foregroundColor(.secondary)
                         
                         if newTour == nil {
                             Button(action: { Task { await saveTour() } }) {
                                 Text(isSaving ? "Saving..." : "Continue")
                                     .fontWeight(.semibold)
                                     .frame(width: 200, height: 44)
-                                    .foregroundColor(.black)
+                                     .foregroundColor(.black)
                             }
                             .buttonStyle(PlainButtonStyle())
                             .background(Color.white)
-                            .cornerRadius(8)
+                             .cornerRadius(8)
                             .disabled(tourName.isEmpty || artistName.isEmpty || isSaving)
                             .padding(.top, 8)
-                        }
+                         }
                     }
 
                     VStack {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 10)
+                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color.black.opacity(0.15))
                                 .frame(width: 200, height: 240)
                             
+ 
                             if let img = posterImage {
                                 Image(nsImage: img)
-                                    .resizable().scaledToFill().frame(width: 200, height: 240)
+                                     .resizable().scaledToFill().frame(width: 200, height: 240)
                                     .clipped().cornerRadius(10)
                             } else {
-                                VStack(spacing: 8) {
+                                 VStack(spacing: 8) {
                                     Image(systemName: "photo.on.rectangle.angled")
                                         .font(.system(size: 28)).foregroundColor(.gray)
-                                    Text("Upload Tour Poster")
+                                     Text("Upload Tour Poster")
                                         .foregroundColor(.gray).font(.subheadline)
                                 }
-                            }
+                             }
                         }
                         .onTapGesture { selectPoster() }
                     }
-                    .padding(.top, 40)
+                     .padding(.top, 40)
                 }
 
                 if let tour = newTour {
                     AddCrewSectionView(tour: tour)
                     Divider()
-                    VStack(alignment: .leading, spacing: 16) {
+                     VStack(alignment: .leading, spacing: 16) {
                         Text("Add Shows").font(.headline)
                         ShowGridView(
                             tourID: tour.id ?? "",
@@ -88,22 +93,23 @@ struct NewTourFlowView: View {
                             artistName: tour.artist,
                             onShowSelected: { selectedShow in
                                 appState.selectedShow = selectedShow
-                            }
+                            },
+                            // --- THIS IS THE FIX ---
+                            isSelectionModeActive: $isSelectionModeActive,
+                            selectedShowIDs: $selectedShowIDs
                         )
                         Spacer()
-                    }
+                     }
                 }
             }
             .padding(30)
         }
         .onAppear {
             if appState.shouldShowTourCreationTutorial {
-                isShowingTutorial = true
+                 isShowingTutorial = true
             }
         }
         .sheet(isPresented: $isShowingTutorial) {
-            // --- FIX IS HERE ---
-            // The closure now accepts the 'shouldPersist' boolean parameter.
             FeatureTutorialView { shouldPersist in
                 isShowingTutorial = false
                 appState.shouldShowTourCreationTutorial = false
@@ -117,10 +123,10 @@ struct NewTourFlowView: View {
     private func selectPoster() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.png, .jpeg]
-        panel.canChooseFiles = true
+         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url, let img = NSImage(contentsOf: url) {
-            posterImage = img
+             posterImage = img
             posterFileURL = url
         }
     }
@@ -135,7 +141,7 @@ struct NewTourFlowView: View {
                 let storageRef = Storage.storage().reference().child("posters/\(UUID().uuidString).jpg")
                 _ = try await storageRef.putFileAsync(from: fileURL, metadata: nil)
                 let downloadURL = try await storageRef.downloadURL()
-                posterURLString = downloadURL.absoluteString
+                 posterURLString = downloadURL.absoluteString
             } catch {
                 print("❌ Error uploading poster: \(error.localizedDescription)")
             }
@@ -143,7 +149,7 @@ struct NewTourFlowView: View {
         
         var newTourData = Tour(
             ownerId: userID,
-            tourName: tourName,
+             tourName: tourName,
             artist: artistName,
             startDate: Timestamp(date: startDate),
             endDate: Timestamp(date: endDate),
@@ -152,7 +158,7 @@ struct NewTourFlowView: View {
 
         do {
             let ref = try Firestore.firestore().collection("tours").addDocument(from: newTourData)
-            newTourData.id = ref.documentID
+             newTourData.id = ref.documentID
             
             appState.tours.append(newTourData)
             
@@ -160,7 +166,7 @@ struct NewTourFlowView: View {
         } catch {
             print("❌ Error saving tour: \(error.localizedDescription)")
         }
-        
+         
         isSaving = false
     }
 }

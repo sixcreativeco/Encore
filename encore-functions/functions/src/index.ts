@@ -1,5 +1,6 @@
 import {onRequest} from "firebase-functions/v2/https";
 import {onDocumentUpdated, onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
@@ -62,7 +63,7 @@ async function sendFcmMessages(tokens: string[], notification: {title: string, b
 }
 
 
-// --- Firestore Triggered Function (UPDATED) ---
+// --- Firestore Triggered Function (Itinerary Updates) ---
 
 export const onItineraryUpdate = onDocumentUpdated("itineraryItems/{itemId}", async (event) => {
   if (!event.data) return;
@@ -99,7 +100,7 @@ export const onItineraryUpdate = onDocumentUpdated("itineraryItems/{itemId}", as
 });
 
 
-// --- NEW TICKET AVAILABILITY FUNCTION ---
+// --- Firestore Triggered Function (Ticket Availability) ---
 
 interface TicketType {
   name: string;
@@ -186,7 +187,7 @@ export const onTicketSaleCreateCheckAvailability = onDocumentCreated("ticketSale
 });
 
 
-// --- HTTP Callable Function ---
+// --- HTTP Callable Function (Broadcast) ---
 
 export const sendBroadcastNotification = onRequest(async (req, res) => {
   corsHandler(req, res, async () => {
@@ -222,4 +223,104 @@ export const sendBroadcastNotification = onRequest(async (req, res) => {
       return res.status(500).send({error: "An internal error occurred."});
     }
   });
+});
+
+
+// --- Scheduled Function (Ticket Publishing) ---
+
+export const checkScheduledTicketEvents = onSchedule("every 5 minutes", async (event) => {
+  logger.log("Running scheduled job to check for ticket events to publish...");
+
+  const now = admin.firestore.Timestamp.now();
+
+  const query = db.collection("ticketedEvents")
+    .where("status", "==", "Scheduled")
+    .where("onSaleDate", "<=", now);
+
+  try {
+    const snapshot = await query.get();
+
+    if (snapshot.empty) {
+      logger.log("No scheduled events to publish at this time.");
+      return;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => {
+      logger.log(`Publishing event: ${doc.id}`);
+      const eventRef = db.collection("ticketedEvents").doc(doc.id);
+      batch.update(eventRef, {
+        status: "Published",
+        lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    await batch.commit();
+
+    logger.log(`Successfully published ${snapshot.size} ticketed event(s).`);
+    return;
+  } catch (error) {
+    logger.error("Error publishing scheduled ticket events:", error);
+    return;
+  }
+});
+
+// --- THIS IS THE NEW FUNCTION ---
+export const onShowCreate = onDocumentCreated("shows/{showId}", async (event) => {
+    const showSnap = event.data;
+    if (!showSnap) {
+        logger.log("No data associated with the event, exiting.");
+        return;
+    }
+
+    const showData = showSnap.data();
+    const tourId = showData.tourId;
+    const showId = showSnap.id;
+    const ownerId = showData.ownerId;
+
+    if (!tourId || !ownerId) {
+        logger.error("Show is missing tourId or ownerId.", { showId });
+        return;
+    }
+
+    const db = admin.firestore();
+
+    try {
+        logger.log(`New show created (${showId}). Creating draft TicketedEvent.`);
+
+        const existingEventQuery = db.collection("ticketedEvents").where("showId", "==", showId).limit(1);
+        const existingEventSnapshot = await existingEventQuery.get();
+        if (!existingEventSnapshot.empty) {
+            logger.warn(`TicketedEvent already exists for show ${showId}. Aborting.`);
+            return;
+        }
+
+        const tourDoc = await db.collection("tours").doc(tourId).get();
+        const tourData = tourDoc.data();
+
+        const newEventData = {
+            ownerId: ownerId,
+            tourId: tourId,
+            showId: showId,
+            status: "Draft",
+            description: tourData?.defaultEventDescription || `Get ready for an incredible night with ${tourData?.artist || 'the artist'} in ${showData.city}!`,
+            importantInfo: tourData?.defaultImportantInfo || null,
+            ticketTypes: tourData?.defaultTicketTypes || [{
+                id: admin.firestore.FieldValue.serverTimestamp().toString(),
+                name: "General Admission",
+                allocation: 100,
+                price: 0.00,
+                currency: "NZD",
+                availability: { type: "Always Available" }
+            }],
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        await db.collection("ticketedEvents").add(newEventData);
+        logger.log(`✅ Successfully created draft TicketedEvent for show ${showId}.`);
+
+    } catch (error) {
+        logger.error(`Error creating TicketedEvent for show ${showId}:`, error);
+    }
 });

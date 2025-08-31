@@ -1,5 +1,7 @@
 import SwiftUI
 import Kingfisher
+import FirebaseFirestore
+import FirebaseAuth
 
 struct SelectTourForTicketingView: View {
     @StateObject private var viewModel = SelectTourViewModel()
@@ -45,7 +47,7 @@ struct SelectTourForTicketingView: View {
                 .font(.largeTitle.bold())
             Spacer()
             Button(action: { dismiss() }) {
-                Image(systemName: "xmark.circle.fill")
+                 Image(systemName: "xmark.circle.fill")
                     .font(.title2)
                     .foregroundColor(.gray)
             }

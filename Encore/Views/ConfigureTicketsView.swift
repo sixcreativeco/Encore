@@ -1,8 +1,5 @@
 import SwiftUI
 import FirebaseFirestore
-import FirebaseStorage
-import AppKit
-import UniformTypeIdentifiers
 import Kingfisher
 
 struct ConfigureTicketsView: View {
@@ -10,53 +7,22 @@ struct ConfigureTicketsView: View {
     @Environment(\.dismiss) var dismiss
     
     @State private var showLandingPageConfig = false
+    @State private var expandedShowID: String?
 
-    init(tour: Tour) {
-        _viewModel = StateObject(wrappedValue: ConfigureTicketsViewModel(tour: tour))
+    init(tour: Tour, show: Show? = nil) {
+        _viewModel = StateObject(wrappedValue: ConfigureTicketsViewModel(tour: tour, showToExpand: show))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-
-             if viewModel.isLoading {
-                ProgressView("Loading Show Information...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        ForEach(viewModel.shows.indices, id: \.self) { index in
-                            let show = viewModel.shows[index]
-                            if let showId = show.id {
-                                 ShowConfigurationCard(
-                                    show: show,
-                                     tour: viewModel.tour,
-                                    event: Binding(
-                                        get: { viewModel.eventMap[showId] ?? placeholderEvent(for: showId) },
-                                        set: { viewModel.eventMap[showId] = $0 }
-                                    ),
-                                     onCopy: {
-                                        if index > 0, let sourceShowId = viewModel.shows[index-1].id {
-                                            viewModel.copySettings(from: sourceShowId, to: showId)
-                                        }
-                                    },
-                                     onTogglePublish: {
-                                        viewModel.handlePublishToggle(for: showId)
-                                     },
-                                    isPublishing: viewModel.isPublishing[show.id ?? ""] ?? false,
-                                    isFirst: index == 0
-                                )
-                             }
-                        }
-                    }
-                    .padding(.horizontal, 30)
-                    .padding(.bottom, 30)
-                 }
-            }
-            
+            contentView
             footer
         }
         .frame(minWidth: 800, minHeight: 800)
+        .onAppear {
+            self.expandedShowID = viewModel.showToExpandId
+        }
         .task {
             await viewModel.fetchData()
         }
@@ -82,25 +48,83 @@ struct ConfigureTicketsView: View {
                 .buttonStyle(.plain)
             }
 
-            Text("Set up ticket types, pricing, and availability for each show on the tour. You can also provide a link to an external ticketing provider.")
+            Text("Set up ticket types, pricing, and availability for each show on the tour.")
                 .foregroundColor(.secondary)
         }
         .padding(30)
+    }
+
+    @ViewBuilder
+    private var contentView: some View {
+        if viewModel.isLoading {
+           ProgressView("Loading Show Information...")
+               .frame(maxWidth: .infinity, maxHeight: .infinity)
+       } else {
+           ScrollView {
+               showList
+           }
+       }
+    }
+    
+    private var showList: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            TourDefaultsSection(tour: $viewModel.tour)
+
+            ForEach(Array(viewModel.shows.enumerated()), id: \.element.id) { index, show in
+                 if let showId = show.id {
+                     ShowConfigurationCard(
+                        show: show,
+                        tour: viewModel.tour,
+                        event: Binding(
+                            get: { viewModel.eventMap[showId] ?? placeholderEvent(for: showId) },
+                            set: { viewModel.eventMap[showId] = $0 }
+                        ),
+                        isExpanded: Binding(
+                            get: { expandedShowID == showId },
+                            set: { isExpanded in
+                                withAnimation(.easeInOut) {
+                                    expandedShowID = isExpanded ? showId : nil
+                                }
+                            }
+                        ),
+                        onCopy: {
+                            if index > 0 {
+                                let previousShowID = viewModel.shows[index - 1].id!
+                                viewModel.copySettings(from: previousShowID, to: showId)
+                            }
+                        },
+                        onTogglePublish: {
+                            viewModel.handlePublishToggle(for: showId)
+                        },
+                        getTicketsSold: {
+                            viewModel.getTicketsSold(for: viewModel.eventMap[showId]?.id ?? "")
+                        },
+                        isPublishing: viewModel.isPublishing[showId] ?? false,
+                        isFirstShow: index == 0
+                    )
+                 }
+            }
+        }
+        .padding(.horizontal, 30)
+        .padding(.bottom, 30)
     }
 
     private var footer: some View {
         HStack {
             Button("Landing Page") {
                 showLandingPageConfig = true
-             }
+            }
             .buttonStyle(SecondaryButtonStyle())
 
             Spacer()
 
             Button(action: {
-                Task { await viewModel.saveAllChanges() }
+                Task {
+                    await viewModel.saveAllChanges()
+                    dismiss()
+                }
             }) {
-                Text(viewModel.isSaving ? "Saving..." : "Save All Configurations")
+                Text(viewModel.isSaving ? "Saving..." : "Save & Close")
             }
             .buttonStyle(PrimaryButtonStyle(color: .blue, isLoading: viewModel.isSaving))
             .disabled(viewModel.isSaving)
@@ -115,22 +139,76 @@ struct ConfigureTicketsView: View {
             tourId: viewModel.tour.id ?? "",
             showId: showId,
             status: .draft,
+            onSaleDate: nil,
             ticketTypes: []
         )
     }
 }
 
+// MARK: - Tour Defaults Section
+
+fileprivate struct TourDefaultsSection: View {
+    @Binding var tour: Tour
+    @State private var isCollapsed = true
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                Text("Tour Ticketing Defaults").font(.title2.bold())
+                Spacer()
+                 Image(systemName: "chevron.right")
+                    .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { withAnimation { isCollapsed.toggle() } }
+            
+            if !isCollapsed {
+                VStack(alignment: .leading, spacing: 24) {
+                    Divider()
+                    Text("These settings can be used as a template for all shows on this tour. Your server will automatically apply them to any new show you create.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Default Description").font(.headline)
+                        CustomTextEditor(placeholder: "Default 'About This Event' info...", text: Binding(
+                            get: { tour.defaultEventDescription ?? "" },
+                            set: { tour.defaultEventDescription = $0.isEmpty ? nil : $0 }
+                        ))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Default Important Info").font(.headline)
+                        CustomTextEditor(placeholder: "Default policies (e.g., Age restrictions)...", text: Binding(
+                            get: { tour.defaultImportantInfo ?? "" },
+                            set: { tour.defaultImportantInfo = $0.isEmpty ? nil : $0 }
+                        ))
+                    }
+                }
+                .padding(.top)
+            }
+        }
+        .padding()
+        .background(Color.accentColor.opacity(0.1))
+        .cornerRadius(12)
+    }
+}
+
+
+// MARK: - Show Configuration Card
+
 fileprivate struct ShowConfigurationCard: View {
     let show: Show
     let tour: Tour
     @Binding var event: TicketedEvent
-     let onCopy: () -> Void
-    let onTogglePublish: () -> Void
-    let isPublishing: Bool
-    let isFirst: Bool
+    @Binding var isExpanded: Bool
     
-    @State private var isCollapsed = true
-
+    let onCopy: () -> Void
+    let onTogglePublish: () -> Void
+    let getTicketsSold: () -> Int
+    let isPublishing: Bool
+    let isFirstShow: Bool
+    
     var body: some View {
         VStack(alignment: .leading) {
             HStack {
@@ -141,17 +219,18 @@ fileprivate struct ShowConfigurationCard: View {
                 }
                 Spacer()
                  Image(systemName: "chevron.right")
-                    .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                withAnimation { isCollapsed.toggle() }
+                isExpanded.toggle()
             }
 
-            if !isCollapsed {
+            if isExpanded {
                 VStack(alignment: .leading, spacing: 24) {
                     Divider()
-
+                    salesAndURLSection
+                    
                     HStack(alignment: .top, spacing: 16) {
                         KFImage(URL(string: show.showSpecificPosterUrl ?? tour.posterURL ?? ""))
                              .placeholder {
@@ -163,10 +242,6 @@ fileprivate struct ShowConfigurationCard: View {
                              }
                             .resizable().aspectRatio(contentMode: .fill)
                             .frame(width: 80, height: 120).cornerRadius(6)
-                            
- .onTapGesture {
-                                // Add file selection logic here
-                            }
 
                         VStack(alignment: .leading, spacing: 12) {
                              StyledInputField(placeholder: "External Ticket URL (optional)", text: Binding(
@@ -176,65 +251,113 @@ fileprivate struct ShowConfigurationCard: View {
 
                             Button(action: onCopy) {
                                 Label("Copy settings from previous show", systemImage: "doc.on.doc")
-                             }
+                            }
                             .buttonStyle(SecondaryButtonStyle())
-                            .disabled(isFirst)
-                         }
+                            .disabled(isFirstShow)
+                        }
                     }
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Ticket Types").font(.headline)
-                        
- ForEach($event.ticketTypes) { $ticketType in
-                            ticketTypeRow(ticketType: $ticketType)
-                            Divider().padding(.vertical, 4)
-                        }
-                         Button(action: { event.ticketTypes.append(TicketType(name: "", allocation: 0, price: 0.0, currency: "NZD", availability: .init(type: .always))) }) {
-                            Label("Add Ticket Type", systemImage: "plus")
-                        }
-                         .buttonStyle(SecondaryButtonStyle())
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Description (About This Event)").font(.headline)
-                        CustomTextEditor(placeholder: "Enter details about the event for the ticket page...", text: Binding(
-                            get: { event.description ?? "" },
-                            set: { event.description = $0.isEmpty ? nil : $0 }
-                        ))
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Important Info").font(.headline)
-                         CustomTextEditor(placeholder: "e.g., Age restrictions, what to bring...", text: Binding(
-                            get: { event.importantInfo ?? "" },
-                            set: { event.importantInfo = $0.isEmpty ? nil : $0 }
-                        ))
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                         Text("Complimentary Tickets").font(.headline)
-                        StyledInputField(placeholder: "Number of comps", text: Binding(
-                            get: { event.complimentaryTickets.map(String.init) ?? "" },
-                             set: { event.complimentaryTickets = Int($0) }
-                        ))
-                    }
+                    ticketTypesSection
+                    descriptionSection
+                    importantInfoSection
+                    complimentaryTicketsSection
                     
                     Button(action: onTogglePublish) {
-                         Text(event.status == .published ? "Unpublish Tickets" : "Publish Tickets")
+                        Text(event.status == .published ? "Unpublish Tickets" : "Publish Tickets")
                     }
                     .buttonStyle(PrimaryButtonStyle(
                         color: event.status == .published ? .red.opacity(0.8) : .green.opacity(0.8),
                         isLoading: isPublishing
                     ))
                     .disabled(isPublishing)
-                    
-                 }
+                }
                 .padding(.top)
             }
         }
         .padding()
         .background(Material.regular)
         .cornerRadius(12)
+    }
+    
+    @ViewBuilder
+    private var salesAndURLSection: some View {
+        let ticketsSold = getTicketsSold()
+        let totalAllocation = event.ticketTypes.reduce(0) { $0 + $1.allocation } + ticketsSold
+
+        VStack(alignment: .leading, spacing: 12) {
+            if totalAllocation > 0 {
+                VStack(alignment: .leading, spacing: 4) {
+                    GradientProgressView(value: Double(ticketsSold), total: Double(totalAllocation))
+                    Text("\(ticketsSold) of \(totalAllocation) tickets sold")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+            }
+
+            if event.status == .published, let eventId = event.id {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("TICKET LINK").font(.caption).foregroundColor(.secondary)
+                    HStack {
+                        let urlString = "https://en-co.re/event/\(eventId)"
+                        Link(urlString, destination: URL(string: urlString)!)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(urlString, forType: .string)
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var ticketTypesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Ticket Types").font(.headline)
+            ForEach($event.ticketTypes) { $ticketType in
+                ticketTypeRow(ticketType: $ticketType)
+                Divider().padding(.vertical, 4)
+            }
+            Button(action: { event.ticketTypes.append(TicketType(name: "", allocation: 0, price: 0.0, currency: "NZD", availability: .init(type: .always))) }) {
+                Label("Add Ticket Type", systemImage: "plus")
+            }.buttonStyle(SecondaryButtonStyle())
+        }
+    }
+    
+    private var descriptionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Description (About This Event)").font(.headline)
+            CustomTextEditor(placeholder: "Enter details about the event for the ticket page...", text: Binding(
+                get: { event.description ?? "" },
+                set: { event.description = $0.isEmpty ? nil : $0 }
+            ))
+        }
+    }
+    
+    private var importantInfoSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Important Info").font(.headline)
+             CustomTextEditor(placeholder: "e.g., Age restrictions, what to bring...", text: Binding(
+                get: { event.importantInfo ?? "" },
+                set: { event.importantInfo = $0.isEmpty ? nil : $0 }
+            ))
+        }
+    }
+    
+    private var complimentaryTicketsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+             Text("Complimentary Tickets").font(.headline)
+            StyledInputField(placeholder: "Number of comps", text: Binding(
+                get: { event.complimentaryTickets.map(String.init) ?? "" },
+                 set: { event.complimentaryTickets = Int($0) }
+            ))
+        }
     }
     
     private func ticketTypeRow(ticketType: Binding<TicketType>) -> some View {

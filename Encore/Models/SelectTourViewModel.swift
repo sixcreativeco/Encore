@@ -1,6 +1,6 @@
-import Foundation
+import SwiftUI
 import FirebaseFirestore
-import Combine
+import FirebaseAuth
 
 @MainActor
 class SelectTourViewModel: ObservableObject {

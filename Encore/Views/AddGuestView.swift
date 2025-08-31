@@ -10,90 +10,112 @@ struct AddGuestView: View {
 
     @Environment(\.dismiss) var dismiss
     @State private var name = ""
-    @State private var additionalGuests = ""
+    @State private var email = ""
+    @State private var numberOfTickets = "1"
     @State private var note = ""
+    
+    @State private var isSaving = false
+    @State private var errorMessage: String?
 
     let windowWidth: CGFloat = 450
+
+    private var isFormValid: Bool {
+        !name.isEmpty && !email.isEmpty && (Int(numberOfTickets) ?? 0) > 0
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
-                Text("Add Guest").font(.largeTitle.bold())
+                Text("Issue Comp Tickets").font(.largeTitle.bold())
                 Spacer()
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
+                         .font(.title2)
                         .foregroundColor(.gray)
                 }
                 .buttonStyle(.plain)
             }
 
-            // Form fields for guest details
             VStack(alignment: .leading, spacing: 16) {
-                Text("Guest").font(.headline)
-                HStack(spacing: 12) {
-                    CustomInputField(placeholder: "Name", text: $name)
-                    Text("+").font(.title2.bold())
-                    CustomInputField(placeholder: "0", text: $additionalGuests)
-                }
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Note").font(.headline)
-                    CustomInputField(placeholder: "Optional note", text: $note)
-                }
+                Text("Guest Details").font(.headline)
+                CustomInputField(placeholder: "Full Name*", text: $name)
+                CustomInputField(placeholder: "Email Address*", text: $email)
+
+                Text("Tickets").font(.headline)
+                CustomInputField(placeholder: "Number of Tickets*", text: $numberOfTickets)
+                
+                Text("Note").font(.headline)
+                CustomInputField(placeholder: "Optional note (e.g., for box office)", text: $note)
             }
 
-            // Save button
-            Button(action: { saveGuest() }) {
-                Text("Save Guest")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(name.isEmpty ? Color.gray.opacity(0.5) : Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
+            if let error = errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+
+            Spacer()
+
+            Button(action: issueCompTickets) {
+                HStack {
+                    Spacer()
+                    if isSaving {
+                        ProgressView().colorInvert()
+                    } else {
+                        Text("Issue Complimentary Tickets")
+                    }
+                    Spacer()
+                }
+                .font(.headline)
+                .fontWeight(.semibold)
+                .padding(.vertical, 12)
+                .background(isFormValid ? Color.accentColor : Color.gray.opacity(0.5))
+                .foregroundColor(.white)
+                .cornerRadius(10)
             }
             .buttonStyle(.plain)
-            .disabled(name.isEmpty)
-            
-            Spacer()
+            .disabled(!isFormValid || isSaving)
         }
         .padding(30)
-        .frame(width: windowWidth) // Chained modifier
-        .frame(minHeight: 350)     // Chained modifier
+        .frame(width: windowWidth)
+        .frame(minHeight: 450)
     }
 
-    private func saveGuest() {
-        let db = Firestore.firestore()
+    private func issueCompTickets() {
+        isSaving = true
+        errorMessage = nil
         
-        let guestlistRef = db.collection("shows").document(showID).collection("guestlist")
-        
-        let data: [String: Any] = [
-            "name": name,
-            "additionalGuests": additionalGuests,
-            "note": note,
-            "showId": showID,
-            "tourId": tourID,
-            "ownerId": userID,
-            "isCheckedIn": false,
-            "createdAt": Timestamp(date: Date())
-        ]
-        
-        print("INFO: Attempting to save guest '\(name)' to showId: \(showID)...")
+        guard let quantity = Int(numberOfTickets), quantity > 0 else {
+            errorMessage = "Please enter a valid number of tickets."
+            isSaving = false
+            return
+        }
 
-        guestlistRef.addDocument(data: data) { error in
-            if let error = error {
-                print("❌ Error saving guest: \(error.localizedDescription)")
-            } else {
-                print("✅ Guest '\(name)' saved successfully.")
+        // In the next step, we will create this TicketingAPI function.
+        // For now, this prepares the view for that change.
+        TicketingAPI.shared.issueCompTickets(
+            showId: showID,
+            name: name,
+            email: email,
+            quantity: quantity,
+            note: note
+        ) { result in
+            isSaving = false
+            switch result {
+            case .success:
+                print("✅ Comp tickets issued successfully via API.")
                 onSave()
                 dismiss()
+            case .failure(let error):
+                print("❌ Error issuing comp tickets: \(error.localizedDescription)")
+                self.errorMessage = "Failed to issue tickets: \(error.localizedDescription)"
             }
         }
     }
 }
 
-// MARK: - Reusable Input Field
-struct CustomInputField: View {
+// MARK: - Reusable Input Field (Assuming this is in its own file or accessible)
+fileprivate struct CustomInputField: View {
     var placeholder: String
     @Binding var text: String
     @Environment(\.colorScheme) var colorScheme
