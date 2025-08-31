@@ -15,6 +15,8 @@ struct ShowDaySheetPDF: View {
         return formatter
     }
 
+    // This general time formatter is no longer used for timings,
+    // as we will create a specific one inside timingRow.
     private var timeFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mma"
@@ -125,7 +127,7 @@ struct ShowDaySheetPDF: View {
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.5), lineWidth: 1))
                         }
                     }
-                  
+                    
                     if config.includeCrew {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Crew").font(.system(size: 14, weight: .bold))
@@ -155,11 +157,24 @@ struct ShowDaySheetPDF: View {
         .foregroundColor(.black)
     }
 
+    // --- THIS IS THE FIX ---
+    // The formatter is now created locally for each row and uses the show's timezone.
     private func timingRow(label: String, time: Timestamp) -> some View {
-        HStack {
+        let localTimeFormatter: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mma"
+            formatter.amSymbol = "am"
+            formatter.pmSymbol = "pm"
+            if let tzIdentifier = show.timezone {
+                formatter.timeZone = TimeZone(identifier: tzIdentifier)
+            }
+            return formatter
+        }()
+        
+        return HStack {
             Text(label)
             Spacer()
-            Text(timeFormatter.string(from: time.dateValue()).lowercased())
+            Text(localTimeFormatter.string(from: time.dateValue()).lowercased())
                 .fontWeight(.semibold)
         }
         .font(.system(size: 10))
@@ -168,6 +183,7 @@ struct ShowDaySheetPDF: View {
         .cornerRadius(6)
         .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
     }
+    // --- END OF FIX ---
 
     private var crewTable: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -190,7 +206,6 @@ struct ShowDaySheetPDF: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    // --- THIS IS THE CHANGE ---
                     VStack(alignment: .leading, spacing: 2) {
                         if let email = member.email, !email.isEmpty {
                             Text(email)
@@ -200,7 +215,6 @@ struct ShowDaySheetPDF: View {
                         }
                     }
                     .frame(width: 120, alignment: .leading)
-                    // --- END OF CHANGE ---
                 }
                 .font(.system(size: 10))
                 .padding(.vertical, 4)

@@ -5,18 +5,27 @@ struct FlightPDFCard: View {
     let flight: Flight
     let crew: [TourCrew]
     
-    private var dateFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter
+    // This helper function now correctly formats the time based on the timezone
+    // of the departure or arrival airport.
+    private func formattedDateTime(for timestamp: Timestamp, airportCode: String) -> (date: String, time: String) {
+        let date = timestamp.dateValue()
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMM d"
+        
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "h:mma"
+        
+        // Find the airport in our data source to get its timezone identifier.
+        if let airport = AirportService.shared.airports.first(where: { $0.iata == airportCode }),
+           let tz = TimeZone(identifier: airport.tz) {
+            dateFormatter.timeZone = tz
+            timeFormatter.timeZone = tz
+        }
+        
+        return (dateFormatter.string(from: date), timeFormatter.string(from: date).lowercased())
     }
 
-    private var timeFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mma"
-        return formatter
-    }
-    
     private func passengerName(for crewId: String) -> String {
         crew.first { $0.id == crewId }?.name ?? "Unknown"
     }
@@ -27,7 +36,17 @@ struct FlightPDFCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let departure = formattedDateTime(for: flight.departureTimeUTC, airportCode: flight.origin)
+        let arrival = formattedDateTime(for: flight.arrivalTimeUTC, airportCode: flight.destination)
+        
+        // --- THIS IS THE FIX ---
+        // Detect if the timezones are different between origin and destination.
+        let departureTZ = TimeZone(identifier: AirportService.shared.airports.first { $0.iata == flight.origin }?.tz ?? "UTC")
+        let arrivalTZ = TimeZone(identifier: AirportService.shared.airports.first { $0.iata == flight.destination }?.tz ?? "UTC")
+        let timezoneDidChange = departureTZ != arrivalTZ
+        // --- END OF FIX ---
+        
+        return VStack(alignment: .leading, spacing: 10) {
             // Header
             HStack {
                 Image("\(airlineCode(from: flight.flightNumber))_icon")
@@ -47,9 +66,9 @@ struct FlightPDFCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Departure")
                         .font(.system(size: 9, weight: .bold)).foregroundColor(.secondary)
-                    Text(dateFormatter.string(from: flight.departureTimeUTC.dateValue()))
+                    Text(departure.date)
                         .font(.system(size: 10, weight: .semibold))
-                    Text(timeFormatter.string(from: flight.departureTimeUTC.dateValue()))
+                    Text(departure.time)
                         .font(.system(size: 12, weight: .bold))
                 }
                 .frame(width: 100)
@@ -57,9 +76,9 @@ struct FlightPDFCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Arrival")
                         .font(.system(size: 9, weight: .bold)).foregroundColor(.secondary)
-                    Text(dateFormatter.string(from: flight.arrivalTimeUTC.dateValue()))
+                    Text(arrival.date)
                         .font(.system(size: 10, weight: .semibold))
-                    Text(timeFormatter.string(from: flight.arrivalTimeUTC.dateValue()))
+                    Text(arrival.time)
                         .font(.system(size: 12, weight: .bold))
                 }
                 .frame(width: 100)
@@ -73,6 +92,14 @@ struct FlightPDFCard: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            
+            // Add the note if timezones are different
+            if timezoneDidChange {
+                Divider().padding(.vertical, 2)
+                Text("Note: Times displayed in local timezone for each airport.")
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
             }
         }
         .padding(12)

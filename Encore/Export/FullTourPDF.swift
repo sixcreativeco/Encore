@@ -12,13 +12,50 @@ struct FullTourPDF: View {
     let posterImage: NSImage?
     let config: ExportConfiguration
 
-    private var eventsByDay: [Date: [AnyHashable]] {
-        var dict: [Date: [AnyHashable]] = [:]
-        let calendar = Calendar.current
-        for item in itinerary { dict[calendar.startOfDay(for: item.timeUTC.dateValue()), default: []].append(item) }
-        for flight in flights { dict[calendar.startOfDay(for: flight.departureTimeUTC.dateValue()), default: []].append(flight) }
-        for hotel in hotels { dict[calendar.startOfDay(for: hotel.checkInDate.dateValue()), default: []].append(hotel) }
-        for show in shows { dict[calendar.startOfDay(for: show.date.dateValue()), default: []].append(show) }
+    // --- THIS IS THE FIX ---
+    // The dictionary key is now DateComponents, which correctly groups events by
+    // their calendar date, regardless of timezone.
+    private var eventsByDay: [DateComponents: [AnyHashable]] {
+        var dict: [DateComponents: [AnyHashable]] = [:]
+        
+        var allItems: [AnyHashable] = []
+        allItems.append(contentsOf: itinerary)
+        allItems.append(contentsOf: flights)
+        allItems.append(contentsOf: hotels)
+        allItems.append(contentsOf: shows)
+        
+        for item in allItems {
+            let timestamp: Timestamp?
+            var timezoneIdentifier: String?
+            
+            switch item {
+            case let i as ItineraryItem:
+                timestamp = i.timeUTC
+                timezoneIdentifier = i.timezone
+            case let s as Show:
+                timestamp = s.date
+                timezoneIdentifier = s.timezone
+            case let f as Flight:
+                timestamp = f.departureTimeUTC
+                timezoneIdentifier = AirportService.shared.airports.first { $0.iata == f.origin }?.tz
+            case let h as Hotel:
+                timestamp = h.checkInDate
+                timezoneIdentifier = h.timezone
+            default:
+                timestamp = nil
+                timezoneIdentifier = nil
+            }
+            
+            guard let ts = timestamp else { continue }
+            
+            var eventCalendar = Calendar.current
+            eventCalendar.timeZone = TimeZone(identifier: timezoneIdentifier ?? "UTC") ?? .current
+            
+            // The key is now DateComponents, which is timezone-agnostic.
+            let dayKey = eventCalendar.dateComponents([.year, .month, .day], from: ts.dateValue())
+            
+            dict[dayKey, default: []].append(item)
+        }
         
         for (day, items) in dict {
             dict[day] = items.sorted(by: { item1, item2 in
@@ -30,6 +67,21 @@ struct FullTourPDF: View {
         return dict
     }
 
+    // This helper now sorts the DateComponents keys correctly.
+    private var sortedDayComponents: [DateComponents] {
+        eventsByDay.keys.sorted {
+            let date1 = Calendar.current.date(from: $0) ?? Date.distantPast
+            let date2 = Calendar.current.date(from: $1) ?? Date.distantPast
+            return date1 < date2
+        }
+    }
+    
+    // This helper turns a DateComponent key back into a Date for display purposes.
+    private func date(from components: DateComponents) -> Date {
+        return Calendar.current.date(from: components) ?? Date()
+    }
+    // --- END OF FIX ---
+
     private func getDate(from item: AnyHashable) -> Date {
         switch item {
         case let i as ItineraryItem: return i.timeUTC.dateValue()
@@ -40,25 +92,27 @@ struct FullTourPDF: View {
         }
     }
 
-    private var sortedDays: [Date] {
-        eventsByDay.keys.sorted()
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             if config.includeCoverPage {
                 CoverPage(tour: tour, posterImage: posterImage, theme: config.coverPageTheme)
             }
-            ForEach(sortedDays, id: \.self) { day in
-                if let showForDay = shows.first(where: { Calendar.current.isDate($0.date.dateValue(), inSameDayAs: day) }) {
+            
+            // The main loop now uses the corrected, robust grouping logic.
+            ForEach(sortedDayComponents, id: \.self) { dayComponents in
+                let allItemsForDay = eventsByDay[dayComponents] ?? []
+                let representativeDate = date(from: dayComponents)
+
+                DailyItineraryPage(date: representativeDate, tour: tour, items: allItemsForDay, crew: crew)
+
+                if let showForDay = allItemsForDay.first(where: { $0 is Show }) as? Show {
                     ShowDaySheetPDF(tour: tour, show: showForDay, crew: crew, config: config, posterImage: posterImage)
-                } else {
-                    DailyItineraryPage(date: day, tour: tour, items: eventsByDay[day] ?? [], crew: crew)
                 }
             }
         }
     }
 }
+
 
 // MARK: - PDF Page Subviews
 
@@ -100,6 +154,7 @@ private struct Theme1CoverPage: View {
                     .font(.system(size: 24, weight: .bold))
                     .kerning(4)
                     .foregroundColor(.white.opacity(0.9))
+                
                 Text(tour.tourName)
                     .font(.system(size: 60, weight: .black))
                     .foregroundColor(.white)
@@ -240,6 +295,8 @@ private struct DailyItineraryPage: View {
                     FlightPDFCard(flight: flight, crew: crew)
                 } else if let hotel = item as? Hotel {
                     HotelPDFCard(hotel: hotel)
+                } else if let show = item as? Show {
+                    ShowPDFCard(show: show)
                 }
             }
             Spacer()
@@ -254,15 +311,18 @@ private struct DailyItineraryPage: View {
 private struct ItineraryRow: View {
     let item: ItineraryItem
     
-    private var timeFormatter: DateFormatter {
+    private func formattedLocalTime(for item: ItineraryItem) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
-        return formatter
+        if let timezoneIdentifier = item.timezone {
+            formatter.timeZone = TimeZone(identifier: timezoneIdentifier)
+        }
+        return formatter.string(from: item.timeUTC.dateValue())
     }
     
     var body: some View {
         HStack(alignment: .top) {
-            Text(timeFormatter.string(from: item.timeUTC.dateValue()))
+            Text(formattedLocalTime(for: item))
                 .font(.system(size: 10, weight: .bold))
                 .frame(width: 70)
             
