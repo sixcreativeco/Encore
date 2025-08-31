@@ -14,11 +14,15 @@ class TicketsViewModel: ObservableObject {
     @Published var primaryEvent: TicketedEvent?
     @Published var recentTicketSales: [TicketSale] = []
     @Published var publishedEvents: [TicketedEvent] = []
-    @Published var upcomingEvents: [TicketedEvent] = [] // --- THIS IS THE ADDITION ---
-    @Published var allShows: [Show] = []
-    @Published var tour: Tour?
+    @Published var upcomingEvents: [TicketedEvent] = []
     @Published var ticketedTours: [Tour] = []
     @Published var isLoading = true
+    
+    @Published var allShows: [Show] = []
+    @Published var eventMap: [String: TicketedEvent] = [:]
+    @Published var allUserTours: [Tour] = []
+    
+    var tour: Tour?
     
     // Alert Properties
     @Published var showingAlert = false
@@ -35,8 +39,7 @@ class TicketsViewModel: ObservableObject {
     @Published var isRequestingPayout: Bool = false
     
     // MARK: - Private Properties
-    var allTicketedEvents: [TicketedEvent] = []
-    private var allUserTours: [Tour] = []
+    private var allTicketedEvents: [TicketedEvent] = []
     private var allTicketSales: [TicketSale] = []
     private var listeners: [ListenerRegistration] = []
     private let db = Firestore.firestore()
@@ -59,7 +62,7 @@ class TicketsViewModel: ObservableObject {
         do {
             async let toursTask: [Tour] = self.fetchCollection(collectionName: "tours", field: "ownerId", value: userID)
             let tours = try await toursTask
-            self.allUserTours = tours
+            self.allUserTours = tours.sorted { $0.startDate.dateValue() > $1.startDate.dateValue() }
             
             let tourIDs = self.allUserTours.compactMap { $0.id }
             if !tourIDs.isEmpty {
@@ -122,19 +125,14 @@ class TicketsViewModel: ObservableObject {
 
         let tourIDsWithTickets = Set(self.allTicketedEvents.map { $0.tourId })
         self.ticketedTours = self.allUserTours.filter { tourIDsWithTickets.contains($0.id ?? "") }
+        
+        var tempEventMap: [String: TicketedEvent] = [:]
+        for event in allTicketedEvents {
+            tempEventMap[event.showId] = event
+        }
+        self.eventMap = tempEventMap
 
-        // --- THIS IS THE LOGIC UPDATE ---
-        let upcoming = self.allTicketedEvents.filter { event in
-            guard let show = self.allShows.first(where: { $0.id == event.showId }) else { return false }
-            return show.date.dateValue() >= Date() && (event.status == .published || event.status == .scheduled)
-        }
-        self.upcomingEvents = upcoming.sorted { e1, e2 in
-            let show1 = self.allShows.first(where: { $0.id == e1.showId })
-            let show2 = self.allShows.first(where: { $0.id == e2.showId })
-            return (show1?.date.dateValue() ?? .distantFuture) < (show2?.date.dateValue() ?? .distantFuture)
-        }
-        self.primaryEvent = self.upcomingEvents.first
-        // --- END OF LOGIC UPDATE ---
+        self.primaryEvent = self.findPrimaryEvent()
 
         if let primaryEventTourID = self.primaryEvent?.tourId {
             self.tour = self.allUserTours.first { $0.id == primaryEventTourID }
@@ -145,8 +143,40 @@ class TicketsViewModel: ObservableObject {
         }
     }
     
+    private func findPrimaryEvent() -> TicketedEvent? {
+        let upcoming = self.allTicketedEvents.filter { event in
+            guard let show = self.allShows.first(where: { $0.id == event.showId }) else { return false }
+            return show.date.dateValue() >= Date() && (event.status == .published || event.status == .scheduled)
+        }
+        
+        self.upcomingEvents = upcoming.sorted { e1, e2 in
+            let show1 = self.allShows.first(where: { $0.id == e1.showId })
+            let show2 = self.allShows.first(where: { $0.id == e2.showId })
+            return (show1?.date.dateValue() ?? .distantFuture) < (show2?.date.dateValue() ?? .distantFuture)
+        }
+        
+        if let nextUpcoming = self.upcomingEvents.first {
+            return nextUpcoming
+        }
+        
+        let pastEvents = self.allTicketedEvents.filter { event in
+            guard let show = allShows.first(where: { $0.id == event.showId }) else { return false }
+            return show.date.dateValue() < Date()
+        }
+        
+        return pastEvents.sorted { e1, e2 in
+            let show1 = self.allShows.first(where: { $0.id == e1.showId })
+            let show2 = self.allShows.first(where: { $0.id == e2.showId })
+            return (show1?.date.dateValue() ?? .distantPast) > (show2?.date.dateValue() ?? .distantPast)
+        }.first
+    }
+    
     func getTicketsSoldForEvent(_ eventId: String) -> Int {
-        return allTicketSales.filter { $0.ticketedEventId == eventId }.reduce(0) { $0 + $1.quantity }
+        return allTicketSales.filter { $0.ticketedEventId == eventId && $0.saleType != "comp" }.reduce(0) { $0 + $1.quantity }
+    }
+    
+    func getCompTicketsIssued(for eventId: String) -> Int {
+        return allTicketSales.filter { $0.ticketedEventId == eventId && $0.saleType == "comp" }.reduce(0) { $0 + $1.quantity }
     }
 
     func getRevenueForEvent(_ eventId: String) -> Double {

@@ -10,7 +10,10 @@ struct TicketsDashboardView: View {
     @State private var tourToConfigure: Tour?
     @State private var showingPayoutSheet = false
     @State private var selectedEventForDisplay: TicketedEvent?
-    @State private var isHoveringMainEvent: Bool = false // New state for hover effect
+    @State private var isHoveringMainEvent: Bool = false
+    @State private var eventToManage: TicketedEvent?
+    @State private var showAllLiveEvents = false
+    @State private var selectedTourFilterID: String? = nil
 
     private var eventToDisplay: TicketedEvent? {
         selectedEventForDisplay ?? viewModel.primaryEvent
@@ -38,7 +41,7 @@ struct TicketsDashboardView: View {
                     summaryView
                     stripeBalanceView
                     mainEventDisplayView
-                    publishedEventsGrid
+                    liveEventsGrid
                     recentActivityView
                 }
                 .padding(30)
@@ -51,6 +54,11 @@ struct TicketsDashboardView: View {
         }
         .sheet(item: $tourToConfigure) { tour in
             ConfigureTicketsView(tour: tour)
+        }
+        .sheet(item: $eventToManage) { event in
+            if let tour = viewModel.getTour(for: event.tourId), let show = viewModel.allShows.first(where: { $0.id == event.showId }) {
+                ConfigureTicketsView(tour: tour, show: show)
+            }
         }
         .alert(viewModel.alertTitle, isPresented: $viewModel.showingAlert) {
             if !viewModel.publishedURL.isEmpty {
@@ -112,174 +120,113 @@ struct TicketsDashboardView: View {
     @ViewBuilder
     private var mainEventDisplayView: some View {
         if let event = eventToDisplay,
-           let show = viewModel.allShows.first(where: { $0.id == event.showId }) {
+           let show = viewModel.allShows.first(where: { $0.id == event.showId }),
+           let tour = viewModel.getTour(for: event.tourId) {
             
-            let originalAllocation = getOriginalAllocation(for: event)
-            let ticketsSold = viewModel.getTicketsSoldForEvent(event.id ?? "")
-            let tourForEvent = viewModel.getTour(for: event.tourId)
-            
-            VStack(spacing: 16) {
-                // --- Major changes to this ZStack for layout and cycling buttons ---
-                ZStack(alignment: .leading) { // Align content to leading
-                    HStack(alignment: .top, spacing: 20) {
-                        if let posterURL = tourForEvent?.posterURL, let url = URL(string: posterURL) {
-                             KFImage(url)
-                                .resizable().aspectRatio(contentMode: .fill)
-                                .frame(width: 120, height: 180).cornerRadius(8)
-                        }
+            MainEventCardView(
+                viewModel: viewModel,
+                event: event,
+                show: show,
+                tour: tour,
+                isHovering: $isHoveringMainEvent,
+                onManageTickets: { self.eventToManage = event },
+                onGoToShow: { goToShow(show) },
+                onCycle: { forward in cycleShow(forward: forward) }
+            )
+            .onHover { hovering in isHoveringMainEvent = hovering }
 
-                         VStack(alignment: .leading, spacing: 4) {
-                            Text("\(tourForEvent?.artist ?? "") - \(tourForEvent?.tourName ?? "")")
-                                .font(.caption).foregroundColor(.secondary)
-                             Text(show.city).font(.system(size: 32, weight: .bold))
-                            Text("Date: \(show.date.dateValue().formatted(date: .numeric, time: .omitted))")
-                                .font(.subheadline).foregroundColor(.secondary)
-                            Spacer().frame(height: 10)
-                            Text("Venue: \(show.venueName)").font(.caption).bold()
-                            Text(show.venueAddress).font(.caption).foregroundColor(.secondary)
-                             
-                            if event.status == .published, let eventId = event.id {
-                                VStack(alignment: .leading, spacing: 2) {
-                                     Text("TICKET LINK")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.secondary)
-                                     HStack {
-                                        let urlString = "https://en-co.re/event/\(eventId)"
-                                        Link("View Page", destination: URL(string: urlString)!)
-                                             .font(.caption)
-                                            .foregroundColor(.blue)
-                                         Button(action: {
-                                            NSPasteboard.general.clearContents()
-                                            NSPasteboard.general.setString(urlString, forType: .string)
-                                         }) { Image(systemName: "doc.on.doc") }.buttonStyle(.plain)
-                                    }
-                                }.padding(.top, 8)
-                            }
-                        }
-                         Spacer()
-                    }
-                    
-                    // Cycling Buttons now overlaying, with visibility on hover
-                    if !viewModel.upcomingEvents.isEmpty && viewModel.upcomingEvents.count > 1 {
-                        HStack {
-                            cycleButton(icon: "chevron.left") { cycleShow(forward: false) }
-                            Spacer()
-                            cycleButton(icon: "chevron.right") { cycleShow(forward: true) }
-                        }
-                        .padding(.horizontal, 8) // Adjust padding to fit within the card visually
-                        .opacity(isHoveringMainEvent ? 1 : 0) // Visible only on hover
-                        .animation(.easeInOut(duration: 0.2), value: isHoveringMainEvent)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity) // Ensure buttons span the ZStack
-                    }
-                }
-                .onHover { hovering in
-                    isHoveringMainEvent = hovering
-                }
-                .overlay(alignment: .topTrailing) {
-                    topRightButtons(for: event, show: show)
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    GradientProgressView(value: Double(ticketsSold), total: Double(originalAllocation))
-                    Text("\(ticketsSold) of \(originalAllocation) Tickets Sold")
-                        .font(.caption).foregroundColor(.secondary)
-                }
-            }
-            .padding(20)
-            .background(Material.regular)
-            .cornerRadius(16)
         } else {
             noEventsPlaceholder
         }
     }
     
     private var noEventsPlaceholder: some View {
-        Text("No upcoming ticketed events to feature.")
-            .font(.headline)
-            .foregroundColor(.secondary)
-            .frame(maxWidth: .infinity, minHeight: 220)
-            .background(Material.regular)
-            .cornerRadius(16)
-    }
-
-    private func topRightButtons(for event: TicketedEvent, show: Show) -> some View {
-        VStack(alignment: .trailing, spacing: 12) {
-            Button(action: { goToShow(show) }) {
-                 HStack(spacing: 8) {
-                    Image(systemName: "calendar")
-                    Text("Go To Show")
-                 }
-                .font(.system(size: 14, weight: .medium))
-            }
-            .buttonStyle(SecondaryButtonStyle())
-            
-            let isPublished = event.status == .published
-            Button(action: {
-                if isPublished { viewModel.unpublishTickets(for: event) }
-                else { viewModel.publishTicketsToWeb(for: event) }
-            }) {
-                HStack(spacing: 8) {
-                    if viewModel.isPublishingToWeb && !isPublished {
-                         ProgressView().scaleEffect(0.7).frame(width: 14, height: 14)
-                    } else {
-                        Image(systemName: isPublished ? "eye.slash" : "globe").font(.system(size: 14, weight: .medium))
-                    }
-                    Text(getPublishButtonText(isPublished: isPublished))
-                }
-                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
-            }
-            .buttonStyle(PrimaryButtonStyle(color: isPublished ? Color.red : Color.green))
-            .disabled(viewModel.isPublishingToWeb)
-            .opacity(viewModel.isPublishingToWeb ? 0.7 : 1.0)
-            
-            if event.status == .published, let scanCode = show.scanCode {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("SCAN CODE")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.secondary)
-                     Text(scanCode)
-                        .font(.system(size: 20, weight: .bold, design: .monospaced))
-                        .foregroundColor(.accentColor)
-                 }
-                .padding(.top, 8)
-            }
-        }
-    }
-
-    private func cycleButton(icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.title2.weight(.light))
+        VStack(spacing: 8) {
+            Text("No Ticketed Events")
+                .font(.headline)
+            Text("Once you configure tickets for a show, your next upcoming event will be featured here.")
+                .font(.subheadline)
                 .foregroundColor(.secondary)
-                .padding()
-                .background(Circle().fill(Color.clear)) // Make background clear for hit testing
-                .contentShape(Circle()) // Define tappable area
+                .multilineTextAlignment(.center)
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .background(Material.regular)
+        .cornerRadius(16)
     }
 
-    private var publishedEventsGrid: some View {
+    private var liveEventsGrid: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Live Events")
-                .font(.title2.bold())
+            HStack {
+                tourFilterDropdown
+                Spacer()
+                if filteredShows.count > 6 {
+                    Button(showAllLiveEvents ? "Show Less" : "Show All") {
+                        withAnimation(.easeInOut) {
+                            showAllLiveEvents.toggle()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.subheadline)
+                }
+            }
+            
+            let showsToDisplay = showAllLiveEvents ? filteredShows : Array(filteredShows.prefix(6))
 
-            if viewModel.publishedEvents.isEmpty {
-                Text("No other events are currently on sale.")
+            if showsToDisplay.isEmpty {
+                Text(selectedTourFilterID == nil ? "No shows found for your tours." : "No shows found for this tour.")
                     .foregroundColor(.secondary)
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 16)], spacing: 16) {
-                    ForEach(viewModel.publishedEvents) { event in
-                        Button(action: {
-                            withAnimation { selectedEventForDisplay = event }
-                        }) {
-                            EventSummaryCard(viewModel: viewModel, event: event)
-                        }
-                        .buttonStyle(.plain)
+                    ForEach(showsToDisplay) { show in
+                        LiveEventGridItemView(
+                            viewModel: viewModel,
+                            show: show,
+                            onSelect: { event in
+                                withAnimation { selectedEventForDisplay = event }
+                            },
+                            onManage: {
+                                if let tour = viewModel.getTour(for: show.tourId) {
+                                    let newEvent = TicketedEvent(ownerId: tour.ownerId, tourId: show.tourId, showId: show.id ?? "", status: .draft, ticketTypes: [])
+                                    self.eventToManage = newEvent
+                                }
+                            }
+                        )
                     }
                 }
             }
         }
+    }
+    
+    private var filteredShows: [Show] {
+        let allSortedShows = viewModel.allShows.sorted { $0.date.dateValue() < $1.date.dateValue() }
+        if let tourID = selectedTourFilterID {
+            return allSortedShows.filter { $0.tourId == tourID }
+        }
+        return allSortedShows
+    }
+    
+    private var tourFilterDropdown: some View {
+        Menu {
+            Button("All Shows") {
+                selectedTourFilterID = nil
+            }
+            Divider()
+            ForEach(viewModel.allUserTours) { tour in
+                Button(tour.tourName) {
+                    selectedTourFilterID = tour.id
+                }
+            }
+        } label: {
+            HStack {
+                Text(viewModel.allUserTours.first(where: { $0.id == selectedTourFilterID })?.tourName ?? "All Shows")
+                    .font(.title2.bold())
+                Image(systemName: "chevron.down")
+                    .font(.body)
+            }
+            .foregroundColor(.primary)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 
     private var recentActivityView: some View {
@@ -287,30 +234,30 @@ struct TicketsDashboardView: View {
              Text("Recent Activity").font(.headline)
             
             if viewModel.recentTicketSales.isEmpty {
-                VStack {
-                    Image(systemName: "clock").font(.title2).foregroundColor(.secondary)
-                    Text("No recent ticket sales").font(.subheadline).foregroundColor(.secondary)
-                 }.frame(maxWidth: .infinity, minHeight: 100)
+                VStack(spacing: 8) {
+                    Image(systemName: "clock").font(.title2)
+                    Text("No recent ticket sales").font(.subheadline)
+                 }
+                 .foregroundColor(.secondary)
+                 .frame(maxWidth: .infinity, minHeight: 100)
                  .padding()
                  .background(Material.regular)
                  .cornerRadius(16)
             } else {
                 VStack {
                     ForEach(Array(viewModel.recentTicketSales.prefix(5).enumerated()), id: \.element.id) { index, sale in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(sale.buyerEmail).font(.subheadline).lineLimit(1)
-                                    Text("\(getTourAndCityForSale(sale)) • \(sale.quantity) ticket\(sale.quantity > 1 ? "s" : "")").font(.caption).foregroundColor(.secondary)
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                     Text(currencyFormatter.string(from: NSNumber(value: sale.totalPrice)) ?? "$0.00").font(.subheadline).bold()
-                                    Text(sale.purchaseDate.formatted(.relative(presentation: .named))).font(.caption).foregroundColor(.secondary)
-                                }
-                             }
-                        }.padding(.vertical, 8)
-                        if index < viewModel.recentTicketSales.prefix(5).count - 1 { Divider() }
+                        HStack {
+                             VStack(alignment: .leading, spacing: 2) {
+                                Text(sale.buyerEmail).font(.subheadline).lineLimit(1)
+                                Text("\(getTourAndCityForSale(sale)) • \(sale.quantity) ticket\(sale.quantity > 1 ? "s" : "")").font(.caption).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                 Text(currencyFormatter.string(from: NSNumber(value: sale.totalPrice)) ?? "$0.00").font(.subheadline).bold()
+                                Text(sale.purchaseDate.formatted(.relative(presentation: .named))).font(.caption).foregroundColor(.secondary)
+                            }
+                         }
+                        if index < viewModel.recentTicketSales.prefix(5).count - 1 { Divider().padding(.vertical, 4) }
                     }
                 }
                 .padding()
@@ -321,17 +268,27 @@ struct TicketsDashboardView: View {
     }
 
     private var stripeBalanceView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Stripe Balance & Payouts")
-                    .font(.title2.bold())
-                Spacer()
-                
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+            balanceCard(
+                title: "Pending Balance",
+                amount: viewModel.stripePendingBalance,
+                currency: viewModel.stripeCurrency,
+                icon: "clock",
+                iconColor: .orange
+            )
+            
+            balanceCard(
+                title: "Available Balance",
+                amount: viewModel.stripeBalance,
+                currency: viewModel.stripeCurrency,
+                icon: "creditcard",
+                iconColor: .green
+            ) {
                 if viewModel.hasStripeAccount {
                      Button("Request Payout") {
                         showingPayoutSheet = true
                     }
-                    .buttonStyle(PrimaryButtonStyle(color: .green))
+                    .buttonStyle(PrimaryButtonStyle(color: .white, textColor: .black))
                     .disabled(viewModel.stripeBalance <= 0)
                  } else {
                     Button("Setup Stripe Account") {
@@ -340,22 +297,40 @@ struct TicketsDashboardView: View {
                      .buttonStyle(PrimaryButtonStyle(color: .blue))
                 }
             }
-            
-            HStack(spacing: 16) {
-                summaryCard(title: "Available Balance", value: "\(viewModel.stripeCurrency) \(String(format: "%.2f", viewModel.stripeBalance))")
-                summaryCard(title: "Pending Balance", value: "\(viewModel.stripeCurrency) \(String(format: "%.2f", viewModel.stripePendingBalance))")
-            }
         }
     }
-
-    // MARK: - Helper Functions & Logic
+    
+    @ViewBuilder
+    private func balanceCard<Footer: View>(title: String, amount: Double, currency: String, icon: String, iconColor: Color, @ViewBuilder footer: () -> Footer = { EmptyView() }) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(iconColor)
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            HStack(alignment: .bottom) {
+                Text("\(currency) \(String(format: "%.2f", amount))")
+                    .font(.title.bold())
+                    .foregroundColor(amount > 0 ? iconColor : .primary)
+                Spacer()
+                footer()
+            }
+        }
+        .padding(16)
+        // --- THIS IS THE FIX ---
+        .frame(maxWidth: .infinity, minHeight: 84, alignment: .leading)
+        .background(Material.regular)
+        .cornerRadius(12)
+    }
 
     private func cycleShow(forward: Bool) {
         let upcoming = viewModel.upcomingEvents
         guard !upcoming.isEmpty else { return }
         
-        // Use eventToDisplay to determine the current event for cycling
-        let currentEvent = selectedEventForDisplay ?? viewModel.primaryEvent! // Fallback to primary if none selected
+        let currentEvent = eventToDisplay ?? upcoming.first!
         guard let currentIndex = upcoming.firstIndex(of: currentEvent) else { return }
         
         let newIndex: Int
@@ -382,26 +357,174 @@ struct TicketsDashboardView: View {
         return ticketsSold + currentAllocation
     }
     
-    private func getPublishButtonText(isPublished: Bool) -> String {
-        if viewModel.isPublishingToWeb && !isPublished {
-            return "Publishing..."
-        }
-        return isPublished ? "Unpublish Tickets" : "Publish Tickets"
-    }
-    
     private func goToShow(_ show: Show) {
-        if let tour = viewModel.tour {
+        if let tour = viewModel.getTour(for: show.tourId) {
             appState.selectedTour = tour
             appState.selectedShow = show
         }
     }
 }
 
+// MARK: - Grid Item View
+
+fileprivate struct LiveEventGridItemView: View {
+    @ObservedObject var viewModel: TicketsViewModel
+    let show: Show
+    let onSelect: (TicketedEvent) -> Void
+    let onManage: () -> Void
+    
+    var body: some View {
+        let event = viewModel.eventMap[show.id ?? ""]
+        
+        Button(action: {
+            if let validEvent = event {
+                onSelect(validEvent)
+            } else {
+                onManage()
+            }
+        }) {
+            EventSummaryCard(
+                viewModel: viewModel,
+                show: show,
+                event: event
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+
+// MARK: - MainEventCardView
+
+fileprivate struct MainEventCardView: View {
+    @ObservedObject var viewModel: TicketsViewModel
+    let event: TicketedEvent
+    let show: Show
+    let tour: Tour
+    @Binding var isHovering: Bool
+    
+    let onManageTickets: () -> Void
+    let onGoToShow: () -> Void
+    let onCycle: (Bool) -> Void
+
+    @State private var animatedTicketsSold: Double = 0.0
+
+    private var ticketsSold: Int { viewModel.getTicketsSoldForEvent(event.id ?? "") }
+    private var compsIssued: Int { viewModel.getCompTicketsIssued(for: event.id ?? "") }
+    private var originalAllocation: Int {
+        let sold = viewModel.getTicketsSoldForEvent(event.id ?? "")
+        let allocation = event.ticketTypes.reduce(0) { $0 + $1.allocation }
+        return sold + allocation
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                HStack(alignment: .top, spacing: 20) {
+                    if let posterURL = tour.posterURL, let url = URL(string: posterURL) {
+                         KFImage(url)
+                            .resizable().aspectRatio(contentMode: .fill)
+                            .frame(width: 120, height: 180).cornerRadius(8)
+                    }
+
+                     VStack(alignment: .leading, spacing: 4) {
+                        Text("\(tour.artist) - \(tour.tourName)")
+                            .font(.caption).foregroundColor(.secondary)
+                         Text(show.city).font(.system(size: 32, weight: .bold))
+                        Text("Date: \(show.date.dateValue().formatted(date: .numeric, time: .omitted))")
+                            .font(.subheadline).foregroundColor(.secondary)
+                        Spacer().frame(height: 10)
+                        Text("Venue: \(show.venueName)").font(.caption).bold()
+                        Text(show.venueAddress).font(.caption).foregroundColor(.secondary)
+                     }
+                     Spacer()
+                }
+                
+                if viewModel.upcomingEvents.count > 1 {
+                    HStack {
+                        cycleButton(icon: "chevron.left") { onCycle(false) }
+                        Spacer()
+                        cycleButton(icon: "chevron.right") { onCycle(true) }
+                    }
+                    .opacity(isHovering ? 1.0 : 0.4)
+                    .animation(.easeInOut(duration: 0.2), value: isHovering)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                topRightButtons()
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                GradientProgressView(value: animatedTicketsSold, total: Double(originalAllocation > 0 ? originalAllocation : 1))
+                
+                HStack {
+                    Text("\(ticketsSold) of \(originalAllocation) Tickets Sold")
+                        .font(.caption).foregroundColor(.secondary)
+                    Spacer()
+                    if compsIssued > 0 {
+                        Text("\(compsIssued) Comps Issued")
+                            .font(.caption).foregroundColor(.secondary)
+                    }
+                }
+            }
+            .onAppear {
+                animatedTicketsSold = 0
+                withAnimation(.easeInOut(duration: 1.2)) {
+                    animatedTicketsSold = Double(ticketsSold)
+                }
+            }
+            .onChange(of: ticketsSold) {
+                withAnimation(.easeInOut(duration: 1.2)) {
+                    animatedTicketsSold = Double(ticketsSold)
+                }
+            }
+        }
+        .padding(20).background(Material.regular).cornerRadius(16)
+    }
+
+    private func topRightButtons() -> some View {
+        VStack(alignment: .trailing, spacing: 12) {
+            Button(action: onGoToShow) {
+                 HStack(spacing: 8) {
+                    Image(systemName: "calendar")
+                    Text("Go To Show")
+                 }
+                .frame(width: 150)
+            }
+            .buttonStyle(SecondaryButtonStyle())
+            
+            Button(action: onManageTickets) {
+                HStack(spacing: 8) {
+                    Image(systemName: "ticket")
+                    Text("Manage Tickets")
+                }
+                .frame(width: 150)
+            }
+            .buttonStyle(SecondaryButtonStyle())
+        }
+    }
+
+    private func cycleButton(icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.title2.weight(.bold))
+                .foregroundColor(.primary)
+                .padding()
+                .background(.thinMaterial)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .shadow(radius: 5)
+    }
+}
+
+
 // MARK: - EventSummaryCard
 
 fileprivate struct EventSummaryCard: View {
     @ObservedObject var viewModel: TicketsViewModel
-    let event: TicketedEvent
+    let show: Show
+    let event: TicketedEvent?
 
     private var currencyFormatter: NumberFormatter {
         let formatter = NumberFormatter()
@@ -411,26 +534,30 @@ fileprivate struct EventSummaryCard: View {
     }
 
     var body: some View {
-        // --- Revised layout for EventSummaryCard ---
         VStack(alignment: .leading, spacing: 12) {
-            if let show = viewModel.allShows.first(where: { $0.id == event.showId }) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading) {
-                        Text(show.city).font(.headline.bold()).lineLimit(1)
-                        Text(show.venueName).font(.subheadline).foregroundColor(.secondary).lineLimit(1)
-                    }
-                    Spacer() // Pushes the status badge to the right
-                    Text(event.status.rawValue.uppercased())
-                        .font(.caption.bold())
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(statusColor(for: event.status).opacity(0.2))
-                        .foregroundColor(statusColor(for: event.status))
-                        .cornerRadius(6)
+            HStack(alignment: .top) {
+                VStack(alignment: .leading) {
+                    Text(show.city).font(.headline.bold()).lineLimit(1)
+                    Text(show.venueName).font(.subheadline).foregroundColor(.secondary).lineLimit(1)
                 }
+                Spacer()
+                
+                let status = event?.status ?? .draft
+                Text(status.rawValue.uppercased())
+                    .font(.caption.bold())
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(statusColor(for: status).opacity(0.2))
+                    .foregroundColor(statusColor(for: status))
+                    .cornerRadius(6)
+            }
 
+            Spacer(minLength: 0)
+
+            if let event = event {
                 let ticketsSold = viewModel.getTicketsSoldForEvent(event.id ?? "")
                 let totalAllocation = (event.ticketTypes.reduce(0) { $0 + $1.allocation }) + ticketsSold
-                
+                let revenue = viewModel.getRevenueForEvent(event.id ?? "")
+
                 VStack(alignment: .leading, spacing: 4) {
                     GradientProgressView(value: Double(ticketsSold), total: Double(totalAllocation > 0 ? totalAllocation : 1))
                     Text("\(ticketsSold) of \(totalAllocation) sold")
@@ -440,16 +567,18 @@ fileprivate struct EventSummaryCard: View {
                 HStack {
                     Text("Revenue:")
                         .font(.subheadline).foregroundColor(.secondary)
-                    Text(currencyFormatter.string(from: NSNumber(value: viewModel.getRevenueForEvent(event.id ?? ""))) ?? "$0.00")
+                    Text(currencyFormatter.string(from: NSNumber(value: revenue)) ?? "$0.00")
                         .font(.subheadline).bold()
                     Spacer()
                 }
             } else {
-                Text("Event details not available").foregroundColor(.red)
+                Text("No tickets configured for this show.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()
-        .frame(maxWidth: .infinity, alignment: .leading) // Ensure it fills its grid cell
+        .frame(minHeight: 120)
         .background(Material.regular)
         .cornerRadius(12)
     }
