@@ -2,10 +2,19 @@ import SwiftUI
 import Kingfisher
 import FirebaseAuth
 
+fileprivate enum TicketsTab: String, CaseIterable, Identifiable {
+    case dashboard = "Dashboard"
+    case events = "Events"
+    case payments = "Payments"
+    case marketing = "Marketing"
+    var id: String { self.rawValue }
+}
+
 struct TicketsDashboardView: View {
     @StateObject private var viewModel: TicketsViewModel
     @EnvironmentObject var appState: AppState
 
+    @State private var selectedTab: TicketsTab = .dashboard
     @State private var showingSelectTourSheet = false
     @State private var tourToConfigure: Tour?
     @State private var showingPayoutSheet = false
@@ -14,7 +23,9 @@ struct TicketsDashboardView: View {
     @State private var eventToManage: TicketedEvent?
     @State private var showAllLiveEvents = false
     @State private var selectedTourFilterID: String? = nil
-
+    
+    @State private var tourForNewShow: Tour? = nil
+    
     private var eventToDisplay: TicketedEvent? {
         selectedEventForDisplay ?? viewModel.primaryEvent
     }
@@ -31,26 +42,36 @@ struct TicketsDashboardView: View {
     }
 
     var body: some View {
-        ScrollView {
-             if viewModel.isLoading {
-                ProgressView("Loading Ticket Data...")
-                    .frame(maxWidth: .infinity, minHeight: 500)
-            } else {
-                VStack(alignment: .leading, spacing: 24) {
-                     headerView
-                    summaryView
-                    stripeBalanceView
-                    mainEventDisplayView
-                    liveEventsGrid
-                    recentActivityView
+        VStack(alignment: .leading, spacing: 0) {
+            headerView.padding(.bottom, 20)
+            tabSelectorView
+            Divider()
+
+            // --- THIS IS THE FIX ---
+            // This padding adds the requested space between the divider and the content of each tab.
+            Group {
+                switch selectedTab {
+                case .dashboard:
+                    dashboardContent
+                case .events:
+                    EventsTabView()
+                case .payments:
+                    PaymentsTabView(viewModel: viewModel)
+                case .marketing:
+                    MarketingTabView()
                 }
-                .padding(30)
             }
+            .padding(.top, 30)
+            // --- END OF FIX ---
         }
+        .padding(30)
         .sheet(isPresented: $showingSelectTourSheet) {
             SelectTourForTicketingView { selectedTour in
                 self.tourToConfigure = selectedTour
             }
+        }
+        .sheet(item: $tourForNewShow) { tour in
+            AddShowView(tourID: tour.id ?? "", userID: tour.ownerId, artistName: tour.artist, onSave: {})
         }
         .sheet(item: $tourToConfigure) { tour in
             ConfigureTicketsView(tour: tour)
@@ -80,14 +101,20 @@ struct TicketsDashboardView: View {
         }
     }
 
-    // MARK: - Subviews
-
     private var headerView: some View {
         HStack {
             Text("Tickets")
                 .font(.system(size: 48, weight: .bold))
             Spacer()
-            Button(action: { showingSelectTourSheet = true }) {
+            Button(action: {
+                if selectedTab == .events {
+                    if let firstTour = viewModel.allUserTours.first {
+                        self.tourForNewShow = firstTour
+                    }
+                } else {
+                    showingSelectTourSheet = true
+                }
+            }) {
                 Image(systemName: "plus")
                      .font(.title3.weight(.medium))
                     .foregroundColor(.black)
@@ -95,6 +122,47 @@ struct TicketsDashboardView: View {
             .frame(width: 40, height: 40)
             .background(Circle().fill(Color.white))
             .buttonStyle(.plain)
+        }
+    }
+
+    private var tabSelectorView: some View {
+        HStack(spacing: 28) {
+            ForEach(TicketsTab.allCases) { tab in
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTab = tab
+                    }
+                }) {
+                    VStack(spacing: 12) {
+                        Text(tab.rawValue)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(selectedTab == tab ? .primary : .secondary)
+                        
+                        Rectangle()
+                            .frame(height: 2)
+                            .foregroundColor(selectedTab == tab ? .white : .clear)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var dashboardContent: some View {
+        ScrollView {
+             if viewModel.isLoading {
+                ProgressView("Loading Ticket Data...")
+                    .frame(maxWidth: .infinity, minHeight: 500)
+            } else {
+                VStack(alignment: .leading, spacing: 24) {
+                    summaryView
+                    mainEventDisplayView
+                    liveEventsGrid
+                    recentActivityView
+                }
+            }
         }
     }
     
@@ -254,7 +322,7 @@ struct TicketsDashboardView: View {
                             Spacer()
                             VStack(alignment: .trailing, spacing: 2) {
                                  Text(currencyFormatter.string(from: NSNumber(value: sale.totalPrice)) ?? "$0.00").font(.subheadline).bold()
-                                Text(sale.purchaseDate.formatted(.relative(presentation: .named))).font(.caption).foregroundColor(.secondary)
+                                 Text(sale.purchaseDate.formatted(.relative(presentation: .named))).font(.caption).foregroundColor(.secondary)
                             }
                          }
                         if index < viewModel.recentTicketSales.prefix(5).count - 1 { Divider().padding(.vertical, 4) }
@@ -265,65 +333,6 @@ struct TicketsDashboardView: View {
                 .cornerRadius(16)
             }
         }
-    }
-
-    private var stripeBalanceView: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-            balanceCard(
-                title: "Pending Balance",
-                amount: viewModel.stripePendingBalance,
-                currency: viewModel.stripeCurrency,
-                icon: "clock",
-                iconColor: .orange
-            )
-            
-            balanceCard(
-                title: "Available Balance",
-                amount: viewModel.stripeBalance,
-                currency: viewModel.stripeCurrency,
-                icon: "creditcard",
-                iconColor: .green
-            ) {
-                if viewModel.hasStripeAccount {
-                     Button("Request Payout") {
-                        showingPayoutSheet = true
-                    }
-                    .buttonStyle(PrimaryButtonStyle(color: .white, textColor: .black))
-                    .disabled(viewModel.stripeBalance <= 0)
-                 } else {
-                    Button("Setup Stripe Account") {
-                        viewModel.setupStripeAccount()
-                    }
-                     .buttonStyle(PrimaryButtonStyle(color: .blue))
-                }
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func balanceCard<Footer: View>(title: String, amount: Double, currency: String, icon: String, iconColor: Color, @ViewBuilder footer: () -> Footer = { EmptyView() }) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(iconColor)
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
-            HStack(alignment: .bottom) {
-                Text("\(currency) \(String(format: "%.2f", amount))")
-                    .font(.title.bold())
-                    .foregroundColor(amount > 0 ? iconColor : .primary)
-                Spacer()
-                footer()
-            }
-        }
-        .padding(16)
-        // --- THIS IS THE FIX ---
-        .frame(maxWidth: .infinity, minHeight: 84, alignment: .leading)
-        .background(Material.regular)
-        .cornerRadius(12)
     }
 
     private func cycleShow(forward: Bool) {
@@ -345,7 +354,7 @@ struct TicketsDashboardView: View {
         }
     }
 
-    private func getTourAndCityForSale(_ sale: TicketSale) -> String {
+    private func getTourAndCityForSale(_ sale: TicketsViewModel.TicketSale) -> String {
         guard let show = viewModel.allShows.first(where: { $0.id == sale.showId }) else { return "Unknown Show" }
         let tourName = viewModel.getTour(for: show.tourId)?.tourName ?? "Tour"
         return "\(tourName) - \(show.city)"
@@ -364,8 +373,6 @@ struct TicketsDashboardView: View {
         }
     }
 }
-
-// MARK: - Grid Item View
 
 fileprivate struct LiveEventGridItemView: View {
     @ObservedObject var viewModel: TicketsViewModel
@@ -393,9 +400,6 @@ fileprivate struct LiveEventGridItemView: View {
     }
 }
 
-
-// MARK: - MainEventCardView
-
 fileprivate struct MainEventCardView: View {
     @ObservedObject var viewModel: TicketsViewModel
     let event: TicketedEvent
@@ -419,67 +423,78 @@ fileprivate struct MainEventCardView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            ZStack {
-                HStack(alignment: .top, spacing: 20) {
-                    if let posterURL = tour.posterURL, let url = URL(string: posterURL) {
-                         KFImage(url)
-                            .resizable().aspectRatio(contentMode: .fill)
-                            .frame(width: 120, height: 180).cornerRadius(8)
-                    }
-
-                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(tour.artist) - \(tour.tourName)")
-                            .font(.caption).foregroundColor(.secondary)
-                         Text(show.city).font(.system(size: 32, weight: .bold))
-                        Text("Date: \(show.date.dateValue().formatted(date: .numeric, time: .omitted))")
-                            .font(.subheadline).foregroundColor(.secondary)
-                        Spacer().frame(height: 10)
-                        Text("Venue: \(show.venueName)").font(.caption).bold()
-                        Text(show.venueAddress).font(.caption).foregroundColor(.secondary)
-                     }
-                     Spacer()
-                }
-                
-                if viewModel.upcomingEvents.count > 1 {
-                    HStack {
-                        cycleButton(icon: "chevron.left") { onCycle(false) }
-                        Spacer()
-                        cycleButton(icon: "chevron.right") { onCycle(true) }
-                    }
-                    .opacity(isHovering ? 1.0 : 0.4)
-                    .animation(.easeInOut(duration: 0.2), value: isHovering)
-                }
+            mainInfoSection
+            progressSection
+        }
+        .padding(20)
+        .background(Material.regular)
+        .cornerRadius(16)
+        .onAppear {
+            animatedTicketsSold = 0
+            withAnimation(.easeInOut(duration: 1.2)) {
+                animatedTicketsSold = Double(ticketsSold)
             }
-            .overlay(alignment: .topTrailing) {
-                topRightButtons()
+        }
+        .onChange(of: ticketsSold) {
+            withAnimation(.easeInOut(duration: 1.2)) {
+                animatedTicketsSold = Double(ticketsSold)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mainInfoSection: some View {
+        ZStack {
+            HStack(alignment: .top, spacing: 20) {
+                if let posterURL = tour.posterURL, let url = URL(string: posterURL) {
+                    KFImage(url)
+                        .resizable().aspectRatio(contentMode: .fill)
+                        .frame(width: 120, height: 180).cornerRadius(8)
+                }
+
+                 VStack(alignment: .leading, spacing: 4) {
+                    Text("\(tour.artist) - \(tour.tourName)")
+                        .font(.caption).foregroundColor(.secondary)
+                     Text(show.city).font(.system(size: 32, weight: .bold))
+                    Text("Date: \(show.date.dateValue().formatted(date: .numeric, time: .omitted))")
+                        .font(.subheadline).foregroundColor(.secondary)
+                    Spacer().frame(height: 10)
+                    Text("Venue: \(show.venueName)").font(.caption).bold()
+                    Text(show.venueAddress).font(.caption).foregroundColor(.secondary)
+                 }
+                 Spacer()
             }
             
-            VStack(alignment: .leading, spacing: 8) {
-                GradientProgressView(value: animatedTicketsSold, total: Double(originalAllocation > 0 ? originalAllocation : 1))
-                
+            if viewModel.upcomingEvents.count > 1 {
                 HStack {
-                    Text("\(ticketsSold) of \(originalAllocation) Tickets Sold")
-                        .font(.caption).foregroundColor(.secondary)
+                    cycleButton(icon: "chevron.left") { onCycle(false) }
                     Spacer()
-                    if compsIssued > 0 {
-                        Text("\(compsIssued) Comps Issued")
-                            .font(.caption).foregroundColor(.secondary)
-                    }
+                    cycleButton(icon: "chevron.right") { onCycle(true) }
                 }
+                .opacity(isHovering ? 1.0 : 0.4)
+                .animation(.easeInOut(duration: 0.2), value: isHovering)
             }
-            .onAppear {
-                animatedTicketsSold = 0
-                withAnimation(.easeInOut(duration: 1.2)) {
-                    animatedTicketsSold = Double(ticketsSold)
-                }
-            }
-            .onChange(of: ticketsSold) {
-                withAnimation(.easeInOut(duration: 1.2)) {
-                    animatedTicketsSold = Double(ticketsSold)
+        }
+        .overlay(alignment: .topTrailing) {
+            topRightButtons()
+        }
+    }
+
+    @ViewBuilder
+    private var progressSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            GradientProgressView(value: animatedTicketsSold, total: Double(originalAllocation > 0 ? originalAllocation : 1))
+            
+            HStack {
+                Text("\(ticketsSold) of \(originalAllocation) Tickets Sold")
+                    .font(.caption).foregroundColor(.secondary)
+                Spacer()
+                if compsIssued > 0 {
+                    Text("\(compsIssued) Comps Issued")
+                        .font(.caption).foregroundColor(.secondary)
                 }
             }
         }
-        .padding(20).background(Material.regular).cornerRadius(16)
     }
 
     private func topRightButtons() -> some View {
@@ -517,9 +532,6 @@ fileprivate struct MainEventCardView: View {
         .shadow(radius: 5)
     }
 }
-
-
-// MARK: - EventSummaryCard
 
 fileprivate struct EventSummaryCard: View {
     @ObservedObject var viewModel: TicketsViewModel

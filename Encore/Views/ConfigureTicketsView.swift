@@ -59,7 +59,7 @@ struct ConfigureTicketsView: View {
         if viewModel.isLoading {
            ProgressView("Loading Show Information...")
                .frame(maxWidth: .infinity, maxHeight: .infinity)
-       } else {
+        } else {
            ScrollView {
                showList
            }
@@ -70,10 +70,10 @@ struct ConfigureTicketsView: View {
         VStack(alignment: .leading, spacing: 20) {
             TourDefaultsSection(tour: $viewModel.tour)
 
-            ForEach(Array(viewModel.shows.enumerated()), id: \.element.id) { index, show in
-                 if let showId = show.id {
-                     ShowConfigurationCard(
-                        show: show,
+            ForEach(viewModel.shows) { show in
+                 if let showId = show.id, let showIndex = viewModel.shows.firstIndex(where: { $0.id == showId }) {
+                    ShowConfigurationCard(
+                        show: $viewModel.shows[showIndex],
                         tour: viewModel.tour,
                         event: Binding(
                             get: { viewModel.eventMap[showId] ?? placeholderEvent(for: showId) },
@@ -88,8 +88,8 @@ struct ConfigureTicketsView: View {
                             }
                         ),
                         onCopy: {
-                            if index > 0 {
-                                let previousShowID = viewModel.shows[index - 1].id!
+                            if showIndex > 0 {
+                                let previousShowID = viewModel.shows[showIndex - 1].id!
                                 viewModel.copySettings(from: previousShowID, to: showId)
                             }
                         },
@@ -99,8 +99,8 @@ struct ConfigureTicketsView: View {
                         getTicketsSold: {
                             viewModel.getTicketsSold(for: viewModel.eventMap[showId]?.id ?? "")
                         },
-                        isPublishing: viewModel.isPublishing[showId] ?? false,
-                        isFirstShow: index == 0
+                        isPublishing: viewModel.isPublishing[viewModel.eventMap[showId]?.id ?? ""] ?? false,
+                        isFirstShow: showIndex == 0
                     )
                  }
             }
@@ -198,7 +198,7 @@ fileprivate struct TourDefaultsSection: View {
 // MARK: - Show Configuration Card
 
 fileprivate struct ShowConfigurationCard: View {
-    let show: Show
+    @Binding var show: Show
     let tour: Tour
     @Binding var event: TicketedEvent
     @Binding var isExpanded: Bool
@@ -214,8 +214,12 @@ fileprivate struct ShowConfigurationCard: View {
             HStack {
                 VStack(alignment: .leading) {
                      Text(show.venueName).font(.title2.bold())
-                    Text("\(show.city) - \(show.date.dateValue().formatted(date: .long, time: .omitted))")
-                        .foregroundColor(.secondary)
+                    // --- THIS IS THE FIX (Part 1) ---
+                    // Replaced the default DatePicker with your custom styled one.
+                    CustomDateField(date: Binding(
+                        get: { show.date.dateValue() },
+                        set: { newDate in show.date = Timestamp(date: newDate) }
+                    ))
                 }
                 Spacer()
                  Image(systemName: "chevron.right")
@@ -244,7 +248,7 @@ fileprivate struct ShowConfigurationCard: View {
                             .frame(width: 80, height: 120).cornerRadius(6)
 
                         VStack(alignment: .leading, spacing: 12) {
-                             StyledInputField(placeholder: "External Ticket URL (optional)", text: Binding(
+                            StyledInputField(placeholder: "External Ticket URL (optional)", text: Binding(
                                 get: { event.externalTicketsUrl ?? "" },
                                 set: { event.externalTicketsUrl = $0.isEmpty ? nil : $0 }
                             ))
@@ -260,7 +264,9 @@ fileprivate struct ShowConfigurationCard: View {
                     ticketTypesSection
                     descriptionSection
                     importantInfoSection
-                    complimentaryTicketsSection
+                    
+                    // --- THIS IS THE FIX (Part 2) ---
+                    // The complimentary tickets section has been removed.
                     
                     Button(action: onTogglePublish) {
                         Text(event.status == .published ? "Unpublish Tickets" : "Publish Tickets")
@@ -346,16 +352,6 @@ fileprivate struct ShowConfigurationCard: View {
              CustomTextEditor(placeholder: "e.g., Age restrictions, what to bring...", text: Binding(
                 get: { event.importantInfo ?? "" },
                 set: { event.importantInfo = $0.isEmpty ? nil : $0 }
-            ))
-        }
-    }
-    
-    private var complimentaryTicketsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-             Text("Complimentary Tickets").font(.headline)
-            StyledInputField(placeholder: "Number of comps", text: Binding(
-                get: { event.complimentaryTickets.map(String.init) ?? "" },
-                 set: { event.complimentaryTickets = Int($0) }
             ))
         }
     }

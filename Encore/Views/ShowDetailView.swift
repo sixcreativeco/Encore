@@ -4,8 +4,6 @@ import FirebaseFirestore
 import Kingfisher
 import AppKit
 
-// The `fileprivate struct SummaryStats` that was here has been removed.
-
 struct ShowDetailView: View {
     let tour: Tour
     @State var show: Show
@@ -16,6 +14,7 @@ struct ShowDetailView: View {
     
     // Guest List State
     @State private var guestList: [GuestListItemModel] = []
+    @State private var guestListListener: ListenerRegistration? // For real-time updates
     
     // Timeline State
     @State private var timelineEvents: [ShowTimelineEvent] = []
@@ -92,10 +91,11 @@ struct ShowDetailView: View {
         }
          .onDisappear {
             ticketListeners.forEach { $0.remove() }
+            guestListListener?.remove() // Detach guest list listener
         }
         .sheet(isPresented: $showAddGuest) {
             AddGuestView(userID: tour.ownerId, tourID: tour.id ?? "", showID: show.id ?? "") {
-                loadGuestList()
+                // No longer need to call loadGuestList() here, it's automatic
             }
         }
         .sheet(isPresented: $showEditShow) {
@@ -148,19 +148,19 @@ struct ShowDetailView: View {
                                 Image(systemName: "chevron.left")
                                 Text("Back")
                              }
-                            .font(.system(size: 13, weight: .medium)).foregroundColor(.primary)
+                             .font(.system(size: 13, weight: .medium)).foregroundColor(.primary)
                             .padding(.vertical, 4).padding(.horizontal, 10)
                              .background(Color.black.opacity(0.15)).cornerRadius(6)
                         }
                         .buttonStyle(PlainButtonStyle())
 
                         Text(show.city.uppercased())
-                             .font(.system(size: 55, weight: .bold)).lineLimit(1).minimumScaleFactor(0.5)
+                              .font(.system(size: 55, weight: .bold)).lineLimit(1).minimumScaleFactor(0.5)
                         
                         HStack(alignment: .lastTextBaseline, spacing: 12) {
                             Text(show.venueName)
                                  .font(.system(size: 22, weight: .medium))
-                                .foregroundColor(.white)
+                                 .foregroundColor(.white)
                             
                              Text(formattedShowDate(for: show))
                                 .font(.system(size: 16))
@@ -185,7 +185,7 @@ struct ShowDetailView: View {
                                      .font(.system(size: 13))
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
-                             .background(Color.black.opacity(0.15)).cornerRadius(6)
+                            .background(Color.black.opacity(0.15)).cornerRadius(6)
                         }
                     }
                     Spacer()
@@ -207,13 +207,13 @@ struct ShowDetailView: View {
                         Button(action: openInMaps) {
                             Text(show.venueAddress).font(.system(size: 16))
                         }.buttonStyle(PlainButtonStyle())
-                     }
+                    }
                     HStack(spacing: 10) {
                         Image(systemName: "person.fill").font(.system(size: 18))
                         Text(show.contactName ?? "Venue Contact")
                             .font(.system(size: 16))
                             .onTapGesture { withAnimation { showContactDetails.toggle() } }
-                        if showContactDetails {
+                         if showContactDetails {
                              if let email = show.contactEmail {
                                 Text(email).font(.system(size: 14)).foregroundColor(.gray)
                             }
@@ -221,6 +221,14 @@ struct ShowDetailView: View {
                                 Text(phone).font(.system(size: 14)).foregroundColor(.gray)
                             }
                          }
+                    }
+                    if let scanCode = show.scanCode, !scanCode.isEmpty {
+                        HStack(spacing: 10) {
+                            Image(systemName: "qrcode.viewfinder").font(.system(size: 18))
+                            Text(scanCode)
+                                .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white) // --- THIS IS THE FIX ---
+                        }
                     }
                 }
                 Spacer()
@@ -259,7 +267,7 @@ struct ShowDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(timelineEvents) { event in
                         timingRow(event.label, event.time)
-                     }
+                    }
                 }
             }
             Spacer()
@@ -281,7 +289,7 @@ struct ShowDetailView: View {
                     formatter.dateFormat = "h:mm a"
                     if let timezoneIdentifier = show.timezone {
                         formatter.timeZone = TimeZone(identifier: timezoneIdentifier)
-                     } else {
+                    } else {
                         formatter.timeZone = .current
                     }
                     return formatter.string(from: time)
@@ -305,7 +313,7 @@ struct ShowDetailView: View {
                                 Text(guest.name).font(.headline)
                                  if let additional = guest.additionalGuests, !additional.isEmpty, additional != "0" {
                                     Text("+\(additional)").font(.subheadline).foregroundColor(.gray)
-                                }
+                                 }
                              }
                             if let note = guest.note, !note.isEmpty {
                                 Text(note).font(.subheadline).foregroundColor(.gray)
@@ -411,7 +419,7 @@ struct ShowDetailView: View {
         guard let showId = show.id else { return }
         let db = Firestore.firestore()
         
-         let eventListener = db.collection("ticketedEvents").whereField("showId", isEqualTo: showId).limit(to: 1)
+        let eventListener = db.collection("ticketedEvents").whereField("showId", isEqualTo: showId).limit(to: 1)
             .addSnapshotListener { querySnapshot, error in
                 guard let document = querySnapshot?.documents.first else {
                     self.ticketedEvent = nil
@@ -465,11 +473,18 @@ struct ShowDetailView: View {
     }
 
     private func loadGuestList() {
-        guard let showID = show.id, let tourId = tour.id else { return }
+        guard let showID = show.id else { return }
+        
+        guestListListener?.remove()
+        
         let db = Firestore.firestore()
-        db.collection("users").document(tour.ownerId).collection("tours").document(tourId).collection("shows").document(showID).collection("guestlist")
-            .getDocuments { snapshot, _ in
-                self.guestList = snapshot?.documents.compactMap { GuestListItemModel(from: $0) } ?? []
+        self.guestListListener = db.collection("shows").document(showID).collection("guestlist")
+            .addSnapshotListener { snapshot, error in
+                guard let documents = snapshot?.documents else {
+                    print("Error fetching guest list: \(error?.localizedDescription ?? "Unknown")")
+                    return
+                }
+                self.guestList = documents.compactMap { GuestListItemModel(from: $0) }
             }
     }
     
@@ -512,7 +527,7 @@ struct ShowDetailView: View {
                     self.showPublishSuccess(url: response.ticketSaleUrl)
                 case .failure(let error):
                     self.updateEventStatus(for: event, to: .draft)
-                     self.showPublishError(message: error.localizedDescription)
+                    self.showPublishError(message: error.localizedDescription)
                 }
             }
         }

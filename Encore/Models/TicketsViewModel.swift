@@ -13,6 +13,7 @@ class TicketsViewModel: ObservableObject {
     @Published var summaryStats = SummaryStats()
     @Published var primaryEvent: TicketedEvent?
     @Published var recentTicketSales: [TicketSale] = []
+    @Published var allTicketSales: [TicketSale] = []
     @Published var publishedEvents: [TicketedEvent] = []
     @Published var upcomingEvents: [TicketedEvent] = []
     @Published var ticketedTours: [Tour] = []
@@ -24,23 +25,22 @@ class TicketsViewModel: ObservableObject {
     
     var tour: Tour?
     
-    // Alert Properties
     @Published var showingAlert = false
     @Published var alertTitle = ""
     @Published var alertMessage = ""
     @Published var publishedURL = ""
     @Published var isPublishingToWeb = false
     
-    // Stripe Properties
     @Published var stripeBalance: Double = 0.0
     @Published var stripePendingBalance: Double = 0.0
     @Published var stripeCurrency: String = "NZD"
     @Published var hasStripeAccount: Bool = false
+    @Published var stripeAccountId: String? // --- THIS IS THE ADDITION (Part 1) ---
     @Published var isRequestingPayout: Bool = false
+    @Published var isRefunding: Bool = false
     
     // MARK: - Private Properties
     private var allTicketedEvents: [TicketedEvent] = []
-    private var allTicketSales: [TicketSale] = []
     private var listeners: [ListenerRegistration] = []
     private let db = Firestore.firestore()
     private let currentUserID: String?
@@ -51,6 +51,81 @@ class TicketsViewModel: ObservableObject {
     }
     
     deinit { listeners.forEach { $0.remove() } }
+    
+    struct TicketSale: Identifiable, Hashable {
+        let id = UUID()
+        let purchaseId: String
+        let stripePaymentIntentId: String?
+        let ticketedEventId: String
+        let showId: String
+        let tourId: String
+        let quantity: Int
+        let totalPrice: Double
+        let currency: String
+        let buyerName: String
+        let buyerEmail: String
+        let purchaseDate: Date
+        let ticketTypeName: String
+        var status: String
+        var saleType: String?
+        
+        init(from document: DocumentSnapshot) {
+            let data = document.data() ?? [:]
+            self.purchaseId = document.documentID
+            self.stripePaymentIntentId = data["stripePaymentIntentId"] as? String
+            self.ticketedEventId = data["ticketedEventId"] as? String ?? ""
+            self.showId = data["showId"] as? String ?? ""
+            self.tourId = data["tourId"] as? String ?? ""
+            self.quantity = data["quantity"] as? Int ?? 0
+            self.totalPrice = data["totalPrice"] as? Double ?? 0.0
+            self.currency = data["currency"] as? String ?? "NZD"
+            self.buyerName = data["buyerName"] as? String ?? ""
+            self.buyerEmail = data["buyerEmail"] as? String ?? ""
+            self.ticketTypeName = data["ticketTypeName"] as? String ?? ""
+            self.status = data["status"] as? String ?? "completed"
+            self.saleType = data["saleType"] as? String
+            self.purchaseDate = (data["purchaseDate"] as? Timestamp)?.dateValue() ?? Date()
+        }
+    }
+
+    func issueRefund(for saleID: String) async {
+        guard let user = Auth.auth().currentUser else {
+            showAlert(title: "Error", message: "You must be logged in to issue a refund.")
+            return
+        }
+        
+        isRefunding = true
+        
+        do {
+            let idToken = try await user.getIDToken()
+            guard let url = URL(string: "https://encoretickets.vercel.app/api/issue-refund") else {
+                throw APIError.invalidURL
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+            
+            let body = ["ticketSaleId": saleID]
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let message = errorData?["error"] as? String ?? "Refund failed with status code \( (response as? HTTPURLResponse)?.statusCode ?? 0)."
+                throw APIError.serverError(message)
+            }
+            
+            showAlert(title: "Success", message: "The ticket has been successfully refunded.")
+            
+        } catch {
+            showAlert(title: "Refund Failed", message: error.localizedDescription)
+        }
+        
+        isRefunding = false
+    }
     
     func fetchData() async {
         self.isLoading = true
@@ -195,6 +270,10 @@ class TicketsViewModel: ObservableObject {
             let userDoc = try await db.collection("users").document(userID).getDocument()
             let stripeId = userDoc.data()?["stripeAccountId"] as? String ?? userDoc.data()?["stripeLiveAccountId"] as? String
             
+            // --- THIS IS THE FIX (Part 2) ---
+            // Populate the new stripeAccountId property
+            self.stripeAccountId = stripeId
+            
             guard stripeId != nil else {
                 self.hasStripeAccount = false
                 return
@@ -231,13 +310,13 @@ class TicketsViewModel: ObservableObject {
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 let body: [String: Any] = ["userId": userID, "amount": amount, "currency": stripeCurrency.lowercased()]
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
-                 let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await URLSession.shared.data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                     let responseDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                     throw NSError(domain: "PayoutError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: responseDict?["error"] as? String ?? "Payout request failed."])
                 }
                 self.showAlert(title: "Payout Requested", message: "Your payout of \(self.stripeCurrency) \(String(format: "%.2f", amount)) has been requested.")
-                 self.isRequestingPayout = false
+                self.isRequestingPayout = false
                 await self.fetchStripeBalance()
             } catch {
                 self.showAlert(title: "Payout Failed", message: error.localizedDescription)
@@ -263,7 +342,7 @@ class TicketsViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self?.isPublishingToWeb = false
                 switch result {
-                 case .success(let response):
+                case .success(let response):
                     self?.showPublishSuccess(url: response.ticketSaleUrl)
                 case .failure(let error):
                     self?.showPublishError(message: error.localizedDescription)

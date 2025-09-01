@@ -144,6 +144,19 @@ class ConfigureTicketsViewModel: ObservableObject {
                  print("Error encoding tour defaults for save: \(error.localizedDescription)")
             }
         }
+        
+        // --- THIS IS THE FIX ---
+        // Save any changes made to the show objects (like their dates).
+        for show in self.shows {
+            guard let showId = show.id else { continue }
+            let showRef = db.collection("shows").document(showId)
+            do {
+                try batch.setData(from: show, forDocument: showRef, merge: true)
+            } catch {
+                print("Error encoding show \(showId) for save: \(error.localizedDescription)")
+            }
+        }
+        // --- END OF FIX ---
          
         for (_, var event) in eventMap {
             do {
