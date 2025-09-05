@@ -94,13 +94,11 @@ class EventsTabViewModel: ObservableObject {
     private func processData() {
         var processedEvents: [DisplayEvent] = []
 
-        // 1. Filter by the selected tour ID, if any
         let sourceEvents = allEvents.filter {
-            guard let tourId = selectedTourFilterID else { return true } // If no filter, include all
+            guard let tourId = selectedTourFilterID else { return true }
             return $0.tourId == tourId
         }
 
-        // 2. Map the raw data into our display-ready model
         for event in sourceEvents {
             guard let show = allShows.first(where: { $0.id == event.showId }),
                   let tour = allTours.first(where: { $0.id == event.tourId }) else { continue }
@@ -108,7 +106,12 @@ class EventsTabViewModel: ObservableObject {
             let salesForEvent = allSales.filter { $0.ticketedEventId == event.id }
             let ticketsSold = salesForEvent.reduce(0) { $0 + $1.quantity }
             let totalRevenue = salesForEvent.reduce(0.0) { $0 + $1.totalPrice }
-            let totalAllocation = event.ticketTypes.reduce(0) { $0 + $1.allocation } + ticketsSold
+            
+            // --- THIS IS THE FIX ---
+            // The logic now correctly sums the allocation from all releases within all ticket types.
+            let currentAllocation = event.ticketTypes.flatMap { $0.releases }.reduce(0) { $0 + $1.allocation }
+            let totalAllocation = currentAllocation + ticketsSold
+            // --- END OF FIX ---
 
             processedEvents.append(DisplayEvent(
                 id: event.id ?? UUID().uuidString, event: event, show: show, tour: tour,
@@ -116,7 +119,6 @@ class EventsTabViewModel: ObservableObject {
             ))
         }
         
-        // 3. Sort the resulting array based on the user's selection
         processedEvents.sort { lhs, rhs in
             switch selectedSortOption {
             case .dateDescending:

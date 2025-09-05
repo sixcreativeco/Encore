@@ -128,6 +128,7 @@
 				Models/ShowModel.swift,
 				Models/SupportAct.swift,
 				Models/SupportActModel.swift,
+				Models/TicketAvailability.swift,
 				Models/TicketedEvent.swift,
 				Models/TicketOrder.swift,
 				Models/TicketSale.swift,

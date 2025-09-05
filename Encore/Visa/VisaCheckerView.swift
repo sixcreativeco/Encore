@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 // A model to manage the state of a single passport check.
@@ -35,26 +36,18 @@ class VisaCheckViewModel: ObservableObject {
         
         Task {
             do {
-                // --- FIX & DEBUG START ---
                 let destinationCountryString = destinationAirport.country
-                print("🔵 VISA DEBUG: Attempting to find code for destination country string: '\(destinationCountryString)'")
-
                 var foundCode = CountryDataSource.findCode(forName: destinationCountryString)
 
-                // If the full name lookup fails, check if the string itself is a valid 2-letter code.
                 if foundCode == nil && destinationCountryString.count == 2 {
                     if CountryDataSource.countries.contains(where: { $0.code.uppercased() == destinationCountryString.uppercased() }) {
-                        print("🔵 VISA DEBUG: Direct name lookup failed. Using '\(destinationCountryString)' as a valid code.")
                         foundCode = destinationCountryString.uppercased()
                     }
                 }
                 
                 guard let destinationCode = foundCode else {
-                    print("🔴 VISA DEBUG: Failed to find a valid code for '\(destinationCountryString)'.")
                     throw URLError(.badURL, userInfo: [NSLocalizedDescriptionKey: "Could not find country code for destination."])
                 }
-                print("🟢 VISA DEBUG: Successfully found destination code: '\(destinationCode)'")
-                // --- FIX & DEBUG END ---
 
                 let info = try await VisaService.shared.fetchVisaRequirements(
                     passportCode: country.code,
@@ -105,15 +98,8 @@ struct VisaCheckerView: View {
             
             // Passport Input
             VStack(alignment: .leading) {
-                HStack {
-                    StyledInputField(placeholder: "Add Passport Country (e.g., USA)...", text: $viewModel.passportInputText)
-                    Button("Add") {
-                        if let country = CountryDataSource.countries.first(where: { $0.name.lowercased() == viewModel.passportInputText.lowercased() }) {
-                            viewModel.addAndCheckPassport(country: country)
-                        }
-                    }
-                    .disabled(viewModel.passportInputText.isEmpty)
-                }
+                // --- THIS IS THE FIX: The Add Button is now removed ---
+                StyledInputField(placeholder: "Add Passport Country (e.g., USA)...", text: $viewModel.passportInputText)
                 
                 if !suggestedCountries.isEmpty {
                     ScrollView {

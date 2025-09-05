@@ -181,54 +181,51 @@ struct AddHotelView: View {
         guard isFormValid, let tourID = tour.id else { errorMessage = "Please fill in all required fields."; return }
         isSaving = true
         
-        do {
-            let eventTimeZone: TimeZone
-            if let selectedTZ = selectedVenueTimeZone {
-                eventTimeZone = selectedTZ
-            } else {
-                let geocoder = CLGeocoder()
-                guard let placemark = try await geocoder.geocodeAddressString(address).first, let tz = placemark.timeZone else {
-                    self.errorMessage = "Could not determine timezone for the address provided. Please select from search results."; self.isSaving = false; return
-                }
+        // --- THIS IS THE FIX ---
+        // This logic now guarantees a timezone, falling back to the user's current timezone if needed.
+        let eventTimeZone: TimeZone
+        if let selectedTZ = selectedVenueTimeZone {
+            eventTimeZone = selectedTZ
+        } else {
+            let geocoder = CLGeocoder()
+            if let placemark = try? await geocoder.geocodeAddressString(address).first, let tz = placemark.timeZone {
                 eventTimeZone = tz
+            } else {
+                // Safe fallback to the user's current timezone
+                eventTimeZone = .current
             }
-            
-            func combine(date: Date, time: Date, in timezone: TimeZone) -> Timestamp {
-                let localCalendar = Calendar.current
-                let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: date)
-                let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
-                var eventCalendar = Calendar.current; eventCalendar.timeZone = timezone
-                var finalComponents = DateComponents(); finalComponents.year = dateComponents.year; finalComponents.month = dateComponents.month; finalComponents.day = dateComponents.day; finalComponents.hour = timeComponents.hour; finalComponents.minute = timeComponents.minute;
-                finalComponents.timeZone = timezone
-                guard let finalDate = eventCalendar.date(from: finalComponents) else { return Timestamp(date: Date()) }
-                return Timestamp(date: finalDate)
-            }
-            
-            // --- THIS IS THE FIX ---
-            // The `ownerId` is now correctly passed from the tour object.
-            let newHotel = Hotel(
-                tourId: tourID,
-                ownerId: tour.ownerId, // Added ownerId from tour
-                name: hotelName,
-                address: address,
-                city: city,
-                country: country,
-                timezone: eventTimeZone.identifier,
-                checkInDate: combine(date: checkInDate, time: checkInTime, in: eventTimeZone),
-                checkOutDate: combine(date: checkOutDate, time: checkOutTime, in: eventTimeZone),
-                bookingReference: bookingReference.isEmpty ? nil : bookingReference,
-                rooms: rooms
-            )
-            // --- END OF FIX ---
-            
-            FirebaseHotelService.shared.saveHotel(newHotel) { error in
-                isSaving = false
-                if let error = error { errorMessage = "Failed to save hotel: \(error.localizedDescription)" }
-                else { onHotelAdded(); dismiss() }
-            }
-        } catch {
-            errorMessage = "Failed to find location. Please check the address or select from search results."
+        }
+        // --- END OF FIX ---
+        
+        func combine(date: Date, time: Date, in timezone: TimeZone) -> Timestamp {
+            let localCalendar = Calendar.current
+            let dateComponents = localCalendar.dateComponents([.year, .month, .day], from: date)
+            let timeComponents = localCalendar.dateComponents([.hour, .minute], from: time)
+            var eventCalendar = Calendar.current; eventCalendar.timeZone = timezone
+            var finalComponents = DateComponents(); finalComponents.year = dateComponents.year; finalComponents.month = dateComponents.month; finalComponents.day = dateComponents.day; finalComponents.hour = timeComponents.hour; finalComponents.minute = timeComponents.minute;
+            finalComponents.timeZone = timezone
+            guard let finalDate = eventCalendar.date(from: finalComponents) else { return Timestamp(date: Date()) }
+            return Timestamp(date: finalDate)
+        }
+        
+        let newHotel = Hotel(
+            tourId: tourID,
+            ownerId: tour.ownerId,
+            name: hotelName,
+            address: address,
+            city: city,
+            country: country,
+            timezone: eventTimeZone.identifier,
+            checkInDate: combine(date: checkInDate, time: checkInTime, in: eventTimeZone),
+            checkOutDate: combine(date: checkOutDate, time: checkOutTime, in: eventTimeZone),
+            bookingReference: bookingReference.isEmpty ? nil : bookingReference,
+            rooms: rooms
+        )
+        
+        FirebaseHotelService.shared.saveHotel(newHotel) { error in
             isSaving = false
+            if let error = error { errorMessage = "Failed to save hotel: \(error.localizedDescription)" }
+            else { onHotelAdded(); dismiss() }
         }
     }
 }

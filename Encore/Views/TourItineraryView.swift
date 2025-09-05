@@ -7,7 +7,15 @@ struct TourItineraryView: View {
     
     let tour: Tour
     
-    // The view is now initialized with a Tour and creates its own ViewModel
+    /// Defines the different sheets that can be presented.
+    private enum ActiveSheet: Identifiable {
+        case itineraryItem, flight, hotel
+        var id: Int { self.hashValue }
+    }
+    
+    @State private var activeSheet: ActiveSheet?
+    @State private var isShowingAddOptionsPopover = false
+    
     init(tour: Tour) {
         self.tour = tour
         _viewModel = StateObject(wrappedValue: ItineraryViewModel(tour: tour))
@@ -52,13 +60,28 @@ struct TourItineraryView: View {
     private var mainContent: some View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
-                SectionHeader(title: "Itinerary", onAdd: { viewModel.isAddingItem = true })
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
+                // --- THIS IS THE FIX ---
+                // The SectionHeader has been replaced with a custom HStack,
+                // and the .popover is now attached directly to the Button.
+                HStack {
+                    Text("Itinerary").font(.headline)
+                    Spacer()
+                    Button(action: { isShowingAddOptionsPopover = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $isShowingAddOptionsPopover, arrowEdge: .bottom) {
+                        addOptionsPopover
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
                 #if os(iOS)
-                    .padding(.top, 8)
+                .padding(.top, 8)
                 #endif
-                
+                // --- END OF FIX ---
+            
                 if !viewModel.displayGroups.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
@@ -105,18 +128,44 @@ struct TourItineraryView: View {
             viewModel.cleanupListeners()
         }
         .sheet(item: $viewModel.itemToEdit) { item in
-            // The onSave closure is no longer needed as the view updates automatically.
-            ItineraryItemEditView(item: .constant(item), onSave: {})
-        }
-        .sheet(isPresented: $viewModel.isAddingItem) {
-            // The onSave closure is no longer needed as the view updates automatically.
-            ItineraryItemAddView(
-                tourID: tour.id ?? "",
-                userID: tour.ownerId,
-                onSave: {},
-                showForTimezone: viewModel.showForSelectedDate
+            ItineraryItemEditView(
+                viewModel: viewModel,
+                item: .constant(item),
+                onSave: {}
             )
         }
+        .sheet(item: $activeSheet) { sheetType in
+            switch sheetType {
+            case .itineraryItem:
+                ItineraryItemAddView(viewModel: viewModel, onSave: {})
+            case .flight:
+                AddFlightView(tour: tour, onFlightAdded: {})
+            case .hotel:
+                AddHotelView(tour: tour, onHotelAdded: {})
+            }
+        }
+    }
+    
+    /// The content view for the new popover menu.
+    private var addOptionsPopover: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            PopoverButton(title: "Add Event", icon: "calendar.badge.plus") {
+                activeSheet = .itineraryItem
+                isShowingAddOptionsPopover = false
+            }
+            Divider()
+            PopoverButton(title: "Add Flight", icon: "airplane") {
+                activeSheet = .flight
+                isShowingAddOptionsPopover = false
+            }
+            Divider()
+            PopoverButton(title: "Add Hotel", icon: "bed.double.fill") {
+                activeSheet = .hotel
+                isShowingAddOptionsPopover = false
+            }
+        }
+        .padding(.vertical, 8)
+        .frame(width: 200)
     }
         
     private struct DateButtonView: View {
@@ -163,6 +212,29 @@ struct TourItineraryView: View {
             let formatter = DateFormatter()
             formatter.dateFormat = "E, MMM d"
             return formatter.string(from: date)
+        }
+    }
+    
+    /// A helper view for styling the buttons inside the popover.
+    private struct PopoverButton: View {
+        let title: String
+        let icon: String
+        let action: () -> Void
+        
+        var body: some View {
+            Button(action: action) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.headline)
+                        .frame(width: 25)
+                    Text(title)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 }

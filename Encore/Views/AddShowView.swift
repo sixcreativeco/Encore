@@ -188,8 +188,6 @@ struct AddShowView: View {
         }
     }
     
-    // --- FIX IS HERE ---
-    // The logic inside this component has been rewritten to be more robust and avoid the crash.
     @ViewBuilder
     private func timingCell(label: String, selection: Binding<Date?>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -212,7 +210,6 @@ struct AddShowView: View {
             .frame(height: 16)
 
             if selection.wrappedValue != nil {
-                // This binding is now guaranteed to be non-nil, preventing the crash.
                 let dateBinding = Binding<Date>(
                     get: { selection.wrappedValue ?? Date() },
                     set: { selection.wrappedValue = $0 }
@@ -244,7 +241,6 @@ struct AddShowView: View {
             }
         }
     }
-    // --- END OF FIX ---
 
     @ViewBuilder
     private func durationCell(label: String, minutes: Binding<Int>) -> some View {
@@ -342,7 +338,9 @@ struct AddShowView: View {
             let allTimings: [ItineraryItemType: Date?] = [.venueAccess: venueAccess, .loadIn: loadIn, .soundcheck: soundCheck, .doors: doorsOpen, .headline: headline, .packOut: packOut]
             for (type, time) in allTimings {
                 guard let date = time, let timestamp = createOptionalTimestamp(for: date, on: self.showDate, in: eventTimeZone) else { continue }
-                let item = ItineraryItem(ownerId: self.userID, tourId: self.tourID, showId: showRef.documentID, title: type.displayName, type: type.rawValue, timeUTC: timestamp, isShowTiming: true)
+                // --- THIS IS THE FIX ---
+                // The `timezone` identifier is now correctly passed when creating the ItineraryItem.
+                let item = ItineraryItem(ownerId: self.userID, tourId: self.tourID, showId: showRef.documentID, title: type.displayName, type: type.rawValue, timeUTC: timestamp, timezone: eventTimeZone.identifier, isShowTiming: true)
                 let itemRef = db.collection("itineraryItems").document()
                 try batch.setData(from: item, forDocument: itemRef)
             }

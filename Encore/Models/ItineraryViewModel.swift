@@ -12,11 +12,13 @@ class ItineraryViewModel: ObservableObject {
     @Published var expandedItemID: String? = nil
     @Published var isAddingItem = false
     @Published var shows: [Show] = []
+    @Published var flights: [Flight] = []
+    @Published var hotels: [Hotel] = []
     
     // Internal state
     private var allItems: [ItineraryItem] = []
     private var listeners: [ListenerRegistration] = []
-    private let tour: Tour
+    let tour: Tour // --- THIS IS THE FIX: 'private' keyword removed ---
     private let db = Firestore.firestore()
 
     var itemsForSelectedDate: [ItineraryItem] {
@@ -24,15 +26,18 @@ class ItineraryViewModel: ObservableObject {
     }
     
     var showForSelectedDate: Show? {
-        guard let group = displayGroups.first(where: { $0.id == selectedGroupID }),
-              let firstItem = group.items.first else { return nil }
-        return shows.first { $0.id == firstItem.showId }
+        guard let group = displayGroups.first(where: { $0.id == selectedGroupID }) else { return nil }
+        
+        // Find a showId from any item in the selected day's group
+        let showIdForDay = group.items.compactMap { $0.showId }.first
+        
+        guard let showId = showIdForDay else { return nil }
+        return shows.first { $0.id == showId }
     }
 
     init(tour: Tour) {
         self.tour = tour
         setupListeners()
-        fetchShowsForTour()
     }
     
     // MARK: - Data Fetching and Processing
@@ -42,60 +47,46 @@ class ItineraryViewModel: ObservableObject {
         
         cleanupListeners()
         
-        let mainListener = db.collection("itineraryItems")
+        let itineraryListener = db.collection("itineraryItems")
             .whereField("tourId", isEqualTo: tourID)
-            .addSnapshotListener { snapshot, error in
-                if let error = error {
-                    print("❌ Error in itinerary listener: \(error.localizedDescription)")
-                    return
-                }
-                guard let documents = snapshot?.documents else {
-                    print("❌ No documents in snapshot")
-                    return
-                }
-                
-                let allFetchedItems = documents.compactMap { try? $0.data(as: ItineraryItem.self) }
-                
-                // Filter items based on visibility rules
+            .order(by: "timeUTC")
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self = self else { return }
+                let allFetchedItems = snapshot?.documents.compactMap { try? $0.data(as: ItineraryItem.self) } ?? []
                 let visibleItems = allFetchedItems.filter { item in
                     let visibility = item.visibility?.lowercased() ?? "everyone"
-                    if visibility == "everyone" || item.visibility == nil {
-                        return true
-                    } else if visibility == "custom" {
-                        return item.visibleTo?.contains(currentUserID) ?? false
-                    }
-                    return false
+                    if visibility == "everyone" || item.visibility == nil { return true }
+                    return item.visibleTo?.contains(currentUserID) ?? false
                 }
-                
                 self.allItems = visibleItems
                 self.processAndGroupItems(visibleItems)
             }
         
-        listeners.append(mainListener)
-    }
-
-    private func fetchShowsForTour() {
-        guard let tourID = tour.id else { return }
-        Task {
-            do {
-                self.shows = try await FirebaseTourService.fetchShows(forTour: tourID)
-            } catch {
-                print("❌ Error fetching shows for itinerary view: \(error.localizedDescription)")
-            }
+        let showsListener = db.collection("shows").whereField("tourId", isEqualTo: tourID).addSnapshotListener { [weak self] snapshot, _ in
+            self?.shows = snapshot?.documents.compactMap { try? $0.data(as: Show.self) } ?? []
         }
+        
+        let flightsListener = db.collection("flights").whereField("tourId", isEqualTo: tourID).addSnapshotListener { [weak self] snapshot, _ in
+            self?.flights = snapshot?.documents.compactMap { try? $0.data(as: Flight.self) } ?? []
+        }
+        
+        let hotelsListener = db.collection("hotels").whereField("tourId", isEqualTo: tourID).addSnapshotListener { [weak self] snapshot, _ in
+            self?.hotels = snapshot?.documents.compactMap { try? $0.data(as: Hotel.self) } ?? []
+        }
+        
+        listeners = [itineraryListener, showsListener, flightsListener, hotelsListener]
     }
 
     private func processAndGroupItems(_ items: [ItineraryItem]) {
-        let sortedItems = items.sorted { $0.timeUTC < $1.timeUTC }
         var newDisplayGroups: [TourItineraryView.ItineraryDisplayGroup] = []
         
-        guard !sortedItems.isEmpty else {
+        guard !items.isEmpty else {
             self.displayGroups = []
             self.selectedGroupID = nil
             return
         }
                 
-        for item in sortedItems {
+        for item in items {
             let itemDateComponents = dateComponents(for: item)
                         
             if let lastGroupIndex = newDisplayGroups.indices.last,
@@ -108,6 +99,10 @@ class ItineraryViewModel: ObservableObject {
                 )
                 newDisplayGroups.append(newGroup)
             }
+        }
+        
+        for i in 0..<newDisplayGroups.count {
+            newDisplayGroups[i].items.sort { $0.timeUTC < $1.timeUTC }
         }
                 
         let previousSelectedGroupID = self.selectedGroupID
@@ -133,6 +128,52 @@ class ItineraryViewModel: ObservableObject {
     func cleanupListeners() {
         listeners.forEach { $0.remove() }
         listeners.removeAll()
+    }
+    
+    func getAssumedTimezone(for date: Date) -> (identifier: String, name: String) {
+        
+        // 1. Check if there's a show on the selected date.
+        let calendar = Calendar.current
+        if let showOnDate = shows.first(where: { calendar.isDate(date, inSameDayAs: $0.date.dateValue()) }) {
+            if let tzIdentifier = showOnDate.timezone {
+                _ = tzIdentifier.split(separator: "/").last?.replacingOccurrences(of: "_", with: " ") ?? tzIdentifier
+                return (tzIdentifier, "\(showOnDate.city) Time")
+            }
+        }
+        
+        // 2. If not, find the most recent "anchor" event before this date.
+        
+        // Create a list of all possible anchors with their times and timezones
+        var anchors: [(date: Date, timezone: String, name: String)] = []
+        
+        for show in shows {
+            if let timezone = show.timezone {
+                anchors.append((show.date.dateValue(), timezone, "\(show.city) Time"))
+            }
+        }
+        for flight in flights {
+            if let destAirport = AirportService.shared.airports.first(where: { $0.iata == flight.destination }) {
+                anchors.append((flight.arrivalTimeUTC.dateValue(), destAirport.tz, "\(destAirport.city) Time"))
+            }
+        }
+        for hotel in hotels {
+            anchors.append((hotel.checkInDate.dateValue(), hotel.timezone, "\(hotel.city) Time"))
+        }
+
+        // Find the most recent anchor that happened on or before the target date
+        let mostRecentAnchor = anchors
+            .filter { $0.date <= date }
+            .sorted { $0.date > $1.date }
+            .first
+
+        if let anchor = mostRecentAnchor {
+            return (anchor.timezone, anchor.name)
+        }
+
+        // 3. As a final fallback, use the user's current timezone.
+        let currentID = TimeZone.current.identifier
+        let currentName = TimeZone.current.localizedName(for: .generic, locale: .current) ?? "Local Time"
+        return (currentID, currentName)
     }
     
     // MARK: - User Actions

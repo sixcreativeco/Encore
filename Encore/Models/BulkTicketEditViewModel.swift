@@ -7,7 +7,7 @@ class BulkTicketEditViewModel: ObservableObject {
     let showIDs: Set<String>
     private let db = Firestore.firestore()
 
-    @Published var ticketTypes: [TicketType] = [TicketType(name: "General Admission", allocation: 100, price: 0.0, currency: "NZD", availability: .init(type: .always))]
+    @Published var ticketTypes: [TicketType] = []
     @Published var description: String = ""
     @Published var importantInfo: String = ""
     @Published var complimentaryTickets: String = ""
@@ -23,7 +23,11 @@ class BulkTicketEditViewModel: ObservableObject {
         isSaving = true
         
         let batch = db.batch()
-        let validTicketTypes = ticketTypes.filter { !$0.name.isEmpty && $0.allocation > 0 }
+        
+        // --- THIS IS THE FIX: The logic now filters out empty types and releases ---
+        let validTicketTypes = ticketTypes.filter {
+            !$0.name.isEmpty && !$0.releases.isEmpty && $0.releases.allSatisfy { !$0.name.isEmpty && $0.allocation > 0 }
+        }
         
         // Fetch existing TicketedEvents for the selected shows in one query
         let eventsSnapshot = try await db.collection("ticketedEvents").whereField("showId", in: Array(showIDs)).getDocuments()

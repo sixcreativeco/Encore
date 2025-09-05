@@ -9,9 +9,8 @@ struct AddTicketsView: View {
     
     // Form State
     @State private var selectedShowID: String = ""
-    @State private var ticketTypes: [TicketType] = [TicketType(name: "General Admission", allocation: 100, price: 0.0, currency: "NZD", availability: .init(type: .always))]
+    @State private var ticketTypes: [TicketType] = []
     @State private var description: String = ""
-    // FIX: Replaced 'restriction' state with 'importantInfo'
     @State private var importantInfo: String = ""
     
     // Data for Picker
@@ -44,7 +43,6 @@ struct AddTicketsView: View {
                 
                 descriptionSection
                 
-                // FIX: Replaced restrictionsSection with importantInfoSection
                 importantInfoSection
                 
                 Spacer()
@@ -128,25 +126,15 @@ struct AddTicketsView: View {
             Text("Ticket Types").font(.headline)
             
             ForEach($ticketTypes) { $ticketType in
-                HStack {
-                    StyledInputField(placeholder: "Type Name (e.g. GA)", text: $ticketType.name)
-                    StyledInputField(placeholder: "Allocation", text: Binding(
-                        get: { ticketType.allocation > 0 ? "\(ticketType.allocation)" : "" },
-                        set: { ticketType.allocation = Int($0) ?? 0 }
-                    ))
-                    StyledInputField(placeholder: "Price", text: Binding(
-                        get: { ticketType.price > 0 ? "\(ticketType.price)" : "" },
-                        set: { ticketType.price = Double($0) ?? 0.0 }
-                    ))
-                    StyledInputField(placeholder: "NZD", text: $ticketType.currency).frame(width: 70)
-                }
+                TicketTypeCardView(ticketType: $ticketType, show: selectedShow ?? Show(tourId: "", date: Timestamp(), city: "", venueName: "", venueAddress: ""))
             }
             
-            Button {
-                 ticketTypes.append(TicketType(name: "", allocation: 0, price: 0.0, currency: "NZD"))
-            } label: {
-                HStack { Image(systemName: "plus"); Text("Add Type") }
-            }.buttonStyle(.borderless)
+            Button(action: {
+                let newRelease = TicketRelease(name: "Early Bird", allocation: 50, price: 25.0, availability: .init(type: .scheduled, startDate: Timestamp(date: selectedShow?.date.dateValue() ?? Date())))
+                ticketTypes.append(TicketType(name: "General Admission", releases: [newRelease]))
+            }) {
+                Label("Add Ticket Type", systemImage: "plus")
+            }.buttonStyle(SecondaryButtonStyle())
         }
     }
     
@@ -158,7 +146,6 @@ struct AddTicketsView: View {
         }
     }
     
-    // FIX: Renamed from restrictionsSection and changed to use CustomTextEditor
     private var importantInfoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Important Info").font(.headline)
@@ -193,7 +180,6 @@ struct AddTicketsView: View {
         var existingEventShowIDs = Set<String>()
         var fetchedTours: [Tour] = []
 
-        // 1. Fetch all tours owned by the user
         group.enter()
         db.collection("tours")
             .whereField("ownerId", isEqualTo: ownerId)
@@ -205,7 +191,6 @@ struct AddTicketsView: View {
                 }
             }
 
-        // 2. Fetch all ticketed events for the user to find which shows are already used
         group.enter()
         db.collection("ticketedEvents")
             .whereField("ownerId", isEqualTo: ownerId)
@@ -216,7 +201,6 @@ struct AddTicketsView: View {
                 }
             }
         
-        // 3. After fetching tours, fetch all shows associated with those tours
         group.notify(queue: .main) {
             let tourIDs = fetchedTours.compactMap { $0.id }
             if tourIDs.isEmpty {
@@ -231,7 +215,6 @@ struct AddTicketsView: View {
                     if let showDocs = showSnapshot?.documents {
                         allUpcomingShows = showDocs.compactMap { try? $0.data(as: Show.self) }
                         
-                        // Now filter out the shows that already have ticketed events
                         self.availableShows = allUpcomingShows.filter { show in
                             !existingEventShowIDs.contains(show.id ?? "")
                         }
@@ -250,9 +233,8 @@ struct AddTicketsView: View {
         
         isSaving = true
         
-        let validTicketTypes = ticketTypes.filter { !$0.name.isEmpty && $0.allocation > 0 }
+        let validTicketTypes = ticketTypes.filter { !$0.name.isEmpty && !$0.releases.isEmpty }
         
-        // FIX: Replaced 'restrictions' with 'importantInfo'
         let newEvent = TicketedEvent(
             ownerId: ownerId,
             tourId: tour.id!,
@@ -276,6 +258,122 @@ struct AddTicketsView: View {
         } catch {
             print("Error encoding TicketedEvent: \(error)")
             isSaving = false
+        }
+    }
+}
+
+// --- THIS IS THE FIX: The missing helper views are now included in this file ---
+
+fileprivate struct TicketTypeCardView: View {
+    @Binding var ticketType: TicketType
+    let show: Show
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            StyledInputField(placeholder: "Ticket Category (e.g., General Admission)", text: $ticketType.name)
+            
+            VStack {
+                ForEach($ticketType.releases) { $release in
+                    TicketReleaseRowView(release: $release, allReleases: ticketType.releases)
+                    if release.id != ticketType.releases.last?.id {
+                        Divider().padding(.vertical, 8)
+                    }
+                }
+            }
+            .padding()
+            .background(Color.black.opacity(0.1))
+            .cornerRadius(8)
+            
+            Button(action: {
+                let newRelease = TicketRelease(name: "New Release", allocation: 100, price: ticketType.releases.last?.price ?? 35.0, availability: .init(type: .onSaleImmediately))
+                ticketType.releases.append(newRelease)
+            }) {
+                Label("Add Release", systemImage: "plus")
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .padding(.top, 4)
+        }
+    }
+}
+
+fileprivate struct TicketReleaseRowView: View {
+    @Binding var release: TicketRelease
+    let allReleases: [TicketRelease]
+
+    var otherReleases: [TicketRelease] {
+        allReleases.filter { $0.id != release.id }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                StyledInputField(placeholder: "Release Name", text: $release.name)
+                StyledInputField(placeholder: "Qty", text: Binding(
+                    get: { release.allocation > 0 ? "\(release.allocation)" : "" },
+                    set: { release.allocation = Int($0) ?? 0 }
+                 ))
+                StyledInputField(placeholder: "Price", text: Binding(
+                    get: { release.price > 0 ? String(format: "%.2f", release.price) : "" },
+                    set: { release.price = Double($0) ?? 0.0 }
+                 ))
+            }
+
+            Menu {
+                ForEach(TicketAvailability.AvailabilityType.allCases, id: \.self) { type in
+                     Button(type.description) { release.availability.type = type }
+                }
+            } label: {
+                HStack {
+                    Text("Availability:").foregroundColor(.secondary)
+                    Text(release.availability.type.description).fontWeight(.medium)
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 10).background(Color.black.opacity(0.15)).cornerRadius(10)
+            }.buttonStyle(.plain)
+            
+            Text(release.availability.type.helperText)
+                .font(.caption).foregroundColor(.secondary).padding(.leading, 4)
+
+            if release.availability.type == .scheduled {
+                HStack {
+                    CustomDateField(date: Binding(
+                        get: { release.availability.startDate?.dateValue() ?? Date() },
+                        set: { release.availability.startDate = FirebaseFirestore.Timestamp(date: $0) }
+                    ))
+                    
+                    if release.availability.endDate != nil {
+                        CustomDateField(date: Binding(
+                            get: { release.availability.endDate?.dateValue() ?? Date() },
+                            set: { release.availability.endDate = FirebaseFirestore.Timestamp(date: $0) }
+                        ))
+                        Button(action: { release.availability.endDate = nil }) {
+                            Image(systemName: "xmark.circle.fill")
+                        }.buttonStyle(.plain)
+                    } else {
+                        Button("Add End Date") {
+                            let startDate = release.availability.startDate?.dateValue() ?? Date()
+                            release.availability.endDate = Timestamp(date: Calendar.current.date(byAdding: .day, value: 7, to: startDate) ?? startDate)
+                        }.buttonStyle(.plain)
+                    }
+                }
+            }
+            
+            if release.availability.type == .afterPreviousSellsOut {
+                Menu {
+                    ForEach(otherReleases) { other in
+                        Button(other.name) { release.availability.dependsOnReleaseID = other.id }
+                    }
+                } label: {
+                    HStack {
+                        Text("On sale after:").foregroundColor(.secondary)
+                        Text(allReleases.first { $0.id == release.availability.dependsOnReleaseID }?.name ?? "Select a release")
+                            .fontWeight(.medium)
+                        Spacer()
+                    }
+                }.buttonStyle(.plain)
+            }
         }
     }
 }

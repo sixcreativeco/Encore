@@ -1,9 +1,14 @@
 import SwiftUI
 import Kingfisher
-import FirebaseFirestore
 import FirebaseAuth
 
-// MARK: - Main View
+fileprivate enum TicketsTab: String, CaseIterable, Identifiable {
+    case dashboard = "Dashboard"
+    case events = "Events"
+    case payments = "Payments"
+    case marketing = "Marketing"
+    var id: String { self.rawValue }
+}
 
 struct EventsTabView: View {
     @StateObject private var viewModel = EventsTabViewModel()
@@ -12,19 +17,15 @@ struct EventsTabView: View {
     private let columns = [GridItem(.adaptive(minimum: 300), spacing: 20)]
 
     var body: some View {
-        // --- THIS IS THE FIX (Part 1) ---
-        // The main VStack now has no spacing to allow for precise control.
         VStack(alignment: .leading, spacing: 0) {
             
-            // The filter/sort bar has its own padding now.
             HStack(spacing: 12) {
                 tourFilterDropdown
                 Spacer(minLength: 0)
                 sortOrderDropdown
             }
-            .padding(.vertical, 12) // Adds padding above and below the bar
+            .padding(.vertical, 12)
 
-            // The content area is now structured to prevent the layout jump.
             if viewModel.isLoading {
                 VStack {
                     Spacer()
@@ -46,7 +47,7 @@ struct EventsTabView: View {
                             }
                         }
                     }
-                    .padding(.top, 8) // Reduced top padding for the grid
+                    .padding(.top, 8)
                 }
             }
         }
@@ -118,7 +119,9 @@ fileprivate struct EventGridCardView: View {
     private var currencyFormatter: NumberFormatter {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencyCode = event.event.ticketTypes.first?.currency ?? "NZD"
+        // --- THIS IS THE FIX ---
+        // It now correctly reads the currency from the parent TicketedEvent.
+        formatter.currencyCode = event.event.currency ?? "NZD"
         return formatter
     }
 

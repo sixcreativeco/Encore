@@ -57,7 +57,6 @@ struct BulkTicketEditView: View {
                         onSave()
                         dismiss()
                     } catch {
-                        // In a real app, you would show an alert for this error
                         print("Error saving bulk changes: \(error)")
                     }
                 }
@@ -71,6 +70,7 @@ struct BulkTicketEditView: View {
         .background(Material.bar)
     }
 
+    // --- THIS IS THE FIX: UI refactored for new models ---
     private var ticketTypesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Ticket Types").font(.headline)
@@ -79,12 +79,32 @@ struct BulkTicketEditView: View {
                 .foregroundColor(.secondary)
             
             ForEach($viewModel.ticketTypes) { $ticketType in
-                ticketTypeRow(ticketType: $ticketType)
-                Divider().padding(.vertical, 4)
+                // In a real app, we would build a reusable card view here.
+                // For simplicity, we'll embed the logic.
+                VStack(alignment: .leading) {
+                    StyledInputField(placeholder: "Category Name (e.g., GA)", text: $ticketType.name)
+                    ForEach($ticketType.releases) { $release in
+                        HStack {
+                            StyledInputField(placeholder: "Release Name", text: $release.name)
+                            StyledInputField(placeholder: "Qty", text: Binding(
+                                get: { $release.wrappedValue.allocation > 0 ? "\($release.wrappedValue.allocation)" : "" },
+                                set: { $release.wrappedValue.allocation = Int($0) ?? 0 }
+                            ))
+                            StyledInputField(placeholder: "Price", text: Binding(
+                                get: { $release.wrappedValue.price > 0 ? String(format: "%.2f", $release.wrappedValue.price) : "" },
+                                set: { $release.wrappedValue.price = Double($0) ?? 0.0 }
+                            ))
+                        }
+                    }
+                }
+                .padding()
+                .background(Color.black.opacity(0.1))
+                .cornerRadius(8)
             }
             
             Button(action: {
-                viewModel.ticketTypes.append(TicketType(name: "", allocation: 0, price: 0.0, currency: "NZD"))
+                let newRelease = TicketRelease(name: "Early Bird", allocation: 50, price: 25.0, availability: .init(type: .onSaleImmediately))
+                viewModel.ticketTypes.append(TicketType(name: "General Admission", releases: [newRelease]))
             }) {
                 Label("Add Ticket Type", systemImage: "plus")
             }
@@ -110,27 +130,6 @@ struct BulkTicketEditView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Complimentary Tickets").font(.headline)
             StyledInputField(placeholder: "Number of comps", text: $viewModel.complimentaryTickets)
-        }
-    }
-    
-    private func ticketTypeRow(ticketType: Binding<TicketType>) -> some View {
-        HStack(spacing: 8) {
-            StyledInputField(placeholder: "Name (e.g., GA)", text: ticketType.name)
-            StyledInputField(placeholder: "Allocation", text: Binding(
-                get: { ticketType.wrappedValue.allocation > 0 ? "\(ticketType.wrappedValue.allocation)" : "" },
-                set: { ticketType.wrappedValue.allocation = Int($0) ?? 0 }
-            ))
-            StyledInputField(placeholder: "Price", text: Binding(
-                get: { ticketType.wrappedValue.price > 0 ? String(format: "%.2f", ticketType.wrappedValue.price) : "" },
-                set: { ticketType.wrappedValue.price = Double($0) ?? 0.0 }
-            ))
-            StyledInputField(placeholder: "NZD", text: ticketType.currency).frame(width: 60)
-            Button(role: .destructive, action: {
-                viewModel.ticketTypes.removeAll { $0.id == ticketType.id }
-            }) {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.plain)
         }
     }
 }

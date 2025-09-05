@@ -14,7 +14,7 @@ struct ShowDetailView: View {
     
     // Guest List State
     @State private var guestList: [GuestListItemModel] = []
-    @State private var guestListListener: ListenerRegistration? // For real-time updates
+    @State private var guestListListener: ListenerRegistration?
     
     // Timeline State
     @State private var timelineEvents: [ShowTimelineEvent] = []
@@ -43,12 +43,12 @@ struct ShowDetailView: View {
     private var currencyFormatter: NumberFormatter {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencyCode = "NZD" // This could be dynamic in the future
+        formatter.currencyCode = "NZD"
         return formatter
     }
 
     private let progressGradient = LinearGradient(
-         gradient: Gradient(colors: [
+        gradient: Gradient(colors: [
             Color(red: 216/255, green: 122/255, blue: 239/255),
             Color(red: 191/255, green: 93/255, blue: 93/255)
         ]),
@@ -79,7 +79,7 @@ struct ShowDetailView: View {
                 
                 HStack(alignment: .top, spacing: 16) {
                      showTimingsPanel
-                    guestListPanel
+                     guestListPanel
                 }
                 
                 ticketingSection
@@ -91,12 +91,10 @@ struct ShowDetailView: View {
         }
          .onDisappear {
             ticketListeners.forEach { $0.remove() }
-            guestListListener?.remove() // Detach guest list listener
+            guestListListener?.remove()
         }
         .sheet(isPresented: $showAddGuest) {
-            AddGuestView(userID: tour.ownerId, tourID: tour.id ?? "", showID: show.id ?? "") {
-                // No longer need to call loadGuestList() here, it's automatic
-            }
+            AddGuestView(userID: tour.ownerId, tourID: tour.id ?? "", showID: show.id ?? "") {}
         }
         .sheet(isPresented: $showEditShow) {
             ShowEditView(tour: tour, show: $show)
@@ -142,7 +140,7 @@ struct ShowDetailView: View {
                 HStack(alignment: .top, spacing: dynamicSpacing) {
                      VStack(alignment: .leading, spacing: 8) {
                         Button(action: {
-                            appState.selectedShow = nil
+                             appState.selectedShow = nil
                         }) {
                              HStack(spacing: 4) {
                                 Image(systemName: "chevron.left")
@@ -154,7 +152,7 @@ struct ShowDetailView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
 
-                        Text(show.city.uppercased())
+                         Text(show.city.uppercased())
                               .font(.system(size: 55, weight: .bold)).lineLimit(1).minimumScaleFactor(0.5)
                         
                         HStack(alignment: .lastTextBaseline, spacing: 12) {
@@ -192,7 +190,7 @@ struct ShowDetailView: View {
                     
                     Map(position: $cameraPosition) {
                         if let item = mapItem {
-                            Marker(show.venueName, coordinate: item.placemark.coordinate)
+                             Marker(show.venueName, coordinate: item.placemark.coordinate)
                         }
                     }
                     .cornerRadius(12).frame(width: mapWidth, height: 180)
@@ -213,21 +211,21 @@ struct ShowDetailView: View {
                         Text(show.contactName ?? "Venue Contact")
                             .font(.system(size: 16))
                             .onTapGesture { withAnimation { showContactDetails.toggle() } }
-                         if showContactDetails {
+                        if showContactDetails {
                              if let email = show.contactEmail {
                                 Text(email).font(.system(size: 14)).foregroundColor(.gray)
                             }
                              if let phone = show.contactPhone {
-                                Text(phone).font(.system(size: 14)).foregroundColor(.gray)
+                                 Text(phone).font(.system(size: 14)).foregroundColor(.gray)
                             }
                          }
                     }
                     if let scanCode = show.scanCode, !scanCode.isEmpty {
                         HStack(spacing: 10) {
-                            Image(systemName: "qrcode.viewfinder").font(.system(size: 18))
+                             Image(systemName: "qrcode.viewfinder").font(.system(size: 18))
                             Text(scanCode)
                                 .font(.system(size: 18, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white) // --- THIS IS THE FIX ---
+                                .foregroundColor(.white)
                         }
                     }
                 }
@@ -243,7 +241,7 @@ struct ShowDetailView: View {
                             .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.black.opacity(0.15)).cornerRadius(10)
                      }.buttonStyle(.plain)
                     Button(action: { showEditShow = true }) {
-                        Label("Edit Show", systemImage: "pencil")
+                         Label("Edit Show", systemImage: "pencil")
                             .fontWeight(.semibold).frame(width: 220, height: 44).background(Color.black.opacity(0.15)).cornerRadius(10)
                      }.buttonStyle(.plain)
                 }
@@ -255,7 +253,7 @@ struct ShowDetailView: View {
 
     private var showTimingsPanel: some View {
         VStack(alignment: .leading) {
-             HStack {
+            HStack {
                 Text("Show Timings").font(.headline)
                 Spacer()
             }.padding(.bottom, 4)
@@ -288,7 +286,7 @@ struct ShowDetailView: View {
                      let formatter = DateFormatter()
                     formatter.dateFormat = "h:mm a"
                     if let timezoneIdentifier = show.timezone {
-                        formatter.timeZone = TimeZone(identifier: timezoneIdentifier)
+                         formatter.timeZone = TimeZone(identifier: timezoneIdentifier)
                     } else {
                         formatter.timeZone = .current
                     }
@@ -312,12 +310,12 @@ struct ShowDetailView: View {
                             HStack {
                                 Text(guest.name).font(.headline)
                                  if let additional = guest.additionalGuests, !additional.isEmpty, additional != "0" {
-                                    Text("+\(additional)").font(.subheadline).foregroundColor(.gray)
+                                     Text("+\(additional)").font(.subheadline).foregroundColor(.gray)
                                  }
                              }
                             if let note = guest.note, !note.isEmpty {
                                 Text(note).font(.subheadline).foregroundColor(.gray)
-                             }
+                            }
                         }
                     }
                 }
@@ -365,7 +363,11 @@ struct ShowDetailView: View {
     }
     
     private func ticketSummaryCard(event: TicketedEvent) -> some View {
-        let originalAllocation = event.ticketTypes.reduce(0) { $0 + $1.allocation } + ticketSummary.ticketsIssued
+        // --- THIS IS THE FIX ---
+        let currentAllocation = event.ticketTypes.flatMap { $0.releases }.reduce(0) { $0 + $1.allocation }
+        let originalAllocation = currentAllocation + ticketSummary.ticketsIssued
+        // --- END OF FIX ---
+        
         let ticketsSold = ticketSummary.ticketsIssued
         
         return VStack(alignment: .leading, spacing: 16) {
@@ -433,7 +435,7 @@ struct ShowDetailView: View {
                              guard let salesDocs = salesSnapshot?.documents else { return }
                             let sales = salesDocs.map { TicketSale(from: $0) }
                             self.ticketSales = sales
-                             self.updateTicketSummary()
+                            self.updateTicketSummary()
                             
                         }
                     self.ticketListeners.append(salesListener)

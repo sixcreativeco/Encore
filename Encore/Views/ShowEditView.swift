@@ -124,8 +124,6 @@ struct ShowEditView: View {
         }
     }
     
-    // --- FIX IS HERE ---
-    // The logic inside this component has been rewritten to be more robust and avoid the crash.
     @ViewBuilder
     private func timingCell(label: String, selection: Binding<Date?>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -148,7 +146,6 @@ struct ShowEditView: View {
             .frame(height: 16)
 
             if selection.wrappedValue != nil {
-                // This binding is now guaranteed to be non-nil, preventing the crash.
                 let dateBinding = Binding<Date>(
                     get: { selection.wrappedValue ?? Date() },
                     set: { selection.wrappedValue = $0 }
@@ -180,7 +177,6 @@ struct ShowEditView: View {
             }
         }
     }
-    // --- END OF FIX ---
 
     @ViewBuilder
     private func durationCell(label: String, minutes: Binding<Int>) -> some View {
@@ -268,6 +264,8 @@ struct ShowEditView: View {
                 for (type, time) in allTimings {
                     guard let date = time,
                           let timestamp = createOptionalTimestamp(for: date, on: self.date, in: eventTimeZone) else { continue }
+                    // --- THIS IS THE FIX ---
+                    // The `timezone` identifier is now correctly passed when creating the ItineraryItem.
                     let item = ItineraryItem(
                         ownerId: self.tour.ownerId,
                         tourId: self.tour.id!,
@@ -275,6 +273,7 @@ struct ShowEditView: View {
                         title: type.displayName,
                         type: type.rawValue,
                         timeUTC: timestamp,
+                        timezone: eventTimeZone.identifier,
                         isShowTiming: true
                     )
                     let itemRef = db.collection("itineraryItems").document()

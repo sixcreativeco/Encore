@@ -1,6 +1,7 @@
 import SwiftUI
 import Kingfisher
 import FirebaseAuth
+import FirebaseFirestore
 
 fileprivate enum TicketsTab: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
@@ -34,6 +35,7 @@ struct TicketsDashboardView: View {
         _viewModel = StateObject(wrappedValue: TicketsViewModel(userID: Auth.auth().currentUser?.uid))
     }
 
+    
     private var currencyFormatter: NumberFormatter {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
@@ -47,8 +49,6 @@ struct TicketsDashboardView: View {
             tabSelectorView
             Divider()
 
-            // --- THIS IS THE FIX ---
-            // This padding adds the requested space between the divider and the content of each tab.
             Group {
                 switch selectedTab {
                 case .dashboard:
@@ -62,7 +62,6 @@ struct TicketsDashboardView: View {
                 }
             }
             .padding(.top, 30)
-            // --- END OF FIX ---
         }
         .padding(30)
         .sheet(isPresented: $showingSelectTourSheet) {
@@ -117,7 +116,7 @@ struct TicketsDashboardView: View {
             }) {
                 Image(systemName: "plus")
                      .font(.title3.weight(.medium))
-                    .foregroundColor(.black)
+                     .foregroundColor(.black)
             }
             .frame(width: 40, height: 40)
             .background(Circle().fill(Color.white))
@@ -231,7 +230,7 @@ struct TicketsDashboardView: View {
                     Button(showAllLiveEvents ? "Show Less" : "Show All") {
                         withAnimation(.easeInOut) {
                             showAllLiveEvents.toggle()
-                        }
+                         }
                     }
                     .buttonStyle(.plain)
                     .font(.subheadline)
@@ -305,7 +304,7 @@ struct TicketsDashboardView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "clock").font(.title2)
                     Text("No recent ticket sales").font(.subheadline)
-                 }
+                }
                  .foregroundColor(.secondary)
                  .frame(maxWidth: .infinity, minHeight: 100)
                  .padding()
@@ -324,7 +323,7 @@ struct TicketsDashboardView: View {
                                  Text(currencyFormatter.string(from: NSNumber(value: sale.totalPrice)) ?? "$0.00").font(.subheadline).bold()
                                  Text(sale.purchaseDate.formatted(.relative(presentation: .named))).font(.caption).foregroundColor(.secondary)
                             }
-                         }
+                        }
                         if index < viewModel.recentTicketSales.prefix(5).count - 1 { Divider().padding(.vertical, 4) }
                     }
                 }
@@ -362,7 +361,9 @@ struct TicketsDashboardView: View {
     
     private func getOriginalAllocation(for event: TicketedEvent) -> Int {
         let ticketsSold = viewModel.getTicketsSoldForEvent(event.id ?? "")
-        let currentAllocation = event.ticketTypes.reduce(0) { $0 + $1.allocation }
+        // --- THIS IS THE FIX ---
+        // Correctly sum the allocation from all nested releases.
+        let currentAllocation = event.ticketTypes.flatMap { $0.releases }.reduce(0) { $0 + $1.allocation }
         return ticketsSold + currentAllocation
     }
     
@@ -417,7 +418,8 @@ fileprivate struct MainEventCardView: View {
     private var compsIssued: Int { viewModel.getCompTicketsIssued(for: event.id ?? "") }
     private var originalAllocation: Int {
         let sold = viewModel.getTicketsSoldForEvent(event.id ?? "")
-        let allocation = event.ticketTypes.reduce(0) { $0 + $1.allocation }
+        // --- THIS IS THE FIX ---
+        let allocation = event.ticketTypes.flatMap { $0.releases }.reduce(0) { $0 + $1.allocation }
         return sold + allocation
     }
 
@@ -567,7 +569,8 @@ fileprivate struct EventSummaryCard: View {
 
             if let event = event {
                 let ticketsSold = viewModel.getTicketsSoldForEvent(event.id ?? "")
-                let totalAllocation = (event.ticketTypes.reduce(0) { $0 + $1.allocation }) + ticketsSold
+                // --- THIS IS THE FIX ---
+                let totalAllocation = (event.ticketTypes.flatMap { $0.releases }.reduce(0) { $0 + $1.allocation }) + ticketsSold
                 let revenue = viewModel.getRevenueForEvent(event.id ?? "")
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -580,7 +583,7 @@ fileprivate struct EventSummaryCard: View {
                     Text("Revenue:")
                         .font(.subheadline).foregroundColor(.secondary)
                     Text(currencyFormatter.string(from: NSNumber(value: revenue)) ?? "$0.00")
-                        .font(.subheadline).bold()
+                         .font(.subheadline).bold()
                     Spacer()
                 }
             } else {

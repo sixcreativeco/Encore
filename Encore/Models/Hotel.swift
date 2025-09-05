@@ -21,7 +21,7 @@ struct Hotel: Codable, Identifiable, Hashable {
     var address: String
     var city: String
     var country: String
-    var timezone: String?
+    var timezone: String // --- THIS WAS THE FIX --- (Changed from String?)
     
     var checkInDate: Timestamp
     var checkOutDate: Timestamp

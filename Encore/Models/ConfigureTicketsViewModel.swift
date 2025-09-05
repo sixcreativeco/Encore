@@ -17,6 +17,7 @@ class ConfigureTicketsViewModel: ObservableObject {
     @Published var showToExpandId: String?
     
     @Published var isPublishing: [String: Bool] = [:]
+    @Published var isRefreshing: [String: Bool] = [:] // --- THIS IS THE ADDITION ---
     @Published var showingAlert = false
     @Published var alertTitle = ""
     @Published var alertMessage = ""
@@ -58,10 +59,13 @@ class ConfigureTicketsViewModel: ObservableObject {
                 if let existingEvent = existingEvents.first(where: { $0.showId == showId }) {
                     tempMap[showId] = existingEvent
                 } else {
+                    let defaultRelease = TicketRelease(name: "General Admission", allocation: 100, price: 0.0, availability: .init(type: .onSaleImmediately))
+                    let defaultTicketType = TicketType(name: "General Admission", releases: [defaultRelease])
+                    
                     tempMap[showId] = TicketedEvent(
                         ownerId: tour.ownerId, tourId: tourId, showId: showId, status: .draft,
                         onSaleDate: nil, description: nil, importantInfo: nil, complimentaryTickets: nil, externalTicketsUrl: nil,
-                        ticketTypes: tour.defaultTicketTypes ?? [TicketType(name: "General Admission", allocation: 100, price: 0.0, currency: "NZD", availability: .init(type: .always))]
+                        ticketTypes: tour.defaultTicketTypes ?? [defaultTicketType]
                     )
                 }
             }
@@ -72,6 +76,24 @@ class ConfigureTicketsViewModel: ObservableObject {
             self.isLoading = false
         }
     }
+    
+    // --- THIS IS THE NEW FUNCTION ---
+    func refreshPublishedPage(for event: TicketedEvent) {
+        guard let eventId = event.id else { return }
+        isRefreshing[eventId] = true
+        TicketingAPI.shared.refreshEventPage(eventId: eventId) { [weak self] result in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { // Add a slight delay for user feedback
+                self?.isRefreshing[eventId] = false
+                switch result {
+                case .success:
+                    self?.showAlert(title: "Success", message: "A refresh request has been sent to the event page.")
+                case .failure(let error):
+                    self?.showAlert(title: "Refresh Failed", message: "Could not refresh page: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    // --- END OF NEW FUNCTION ---
     
     func getTicketsSold(for eventId: String) -> Int {
         return ticketSales.filter { $0.ticketedEventId == eventId }.reduce(0) { $0 + $1.quantity }
@@ -145,8 +167,6 @@ class ConfigureTicketsViewModel: ObservableObject {
             }
         }
         
-        // --- THIS IS THE FIX ---
-        // Save any changes made to the show objects (like their dates).
         for show in self.shows {
             guard let showId = show.id else { continue }
             let showRef = db.collection("shows").document(showId)
@@ -156,14 +176,13 @@ class ConfigureTicketsViewModel: ObservableObject {
                 print("Error encoding show \(showId) for save: \(error.localizedDescription)")
             }
         }
-        // --- END OF FIX ---
          
         for (_, var event) in eventMap {
             do {
                 if let eventId = event.id {
                     let docRef = db.collection("ticketedEvents").document(eventId)
                     try batch.setData(from: event, forDocument: docRef, merge: true)
-                 } else {
+                } else {
                     let docRef = db.collection("ticketedEvents").document()
                     event.id = docRef.documentID
                     try batch.setData(from: event, forDocument: docRef)

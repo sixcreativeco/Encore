@@ -9,7 +9,6 @@ import UIKit
 class TicketingAPI {
     static let shared = TicketingAPI()
     
-    // Use the working Vercel URL first
     private let possibleBaseURLs = [
         "https://encoretickets.vercel.app"
     ]
@@ -24,6 +23,31 @@ class TicketingAPI {
     }
     
     // --- THIS IS THE NEW FUNCTION ---
+    func refreshEventPage(eventId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(possibleBaseURLs[0])/api/refresh-event/\(eventId)") else {
+            completion(.failure(APIError.invalidURL))
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                    completion(.failure(APIError.invalidResponse))
+                    return
+                }
+                completion(.success(()))
+            }
+        }.resume()
+    }
+    // --- END OF NEW FUNCTION ---
+
     func issueCompTickets(showId: String, name: String, email: String, quantity: Int, note: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(possibleBaseURLs[0])/api/create-comp-tickets") else {
             completion(.failure(APIError.invalidURL))
@@ -33,7 +57,6 @@ class TicketingAPI {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Note: For enhanced security, an authentication token should be added to this request in a future update.
 
         let body: [String: Any] = [
             "showId": showId,
@@ -72,7 +95,6 @@ class TicketingAPI {
             }
         }.resume()
     }
-    // --- END OF NEW FUNCTION ---
 
     func publishTickets(ticketedEventId: String, completion: @escaping (Result<PublishResponse, Error>) -> Void) {
         tryPublishWithURLs(ticketedEventId: ticketedEventId, urls: possibleBaseURLs, completion: completion)
