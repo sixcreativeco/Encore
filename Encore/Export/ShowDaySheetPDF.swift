@@ -32,7 +32,7 @@ struct ShowDaySheetPDF: View {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(.secondary)
             Text(tour.tourName.uppercased())
-                .font(.system(size: 20, weight: .bold))
+                 .font(.system(size: 20, weight: .bold))
 
             // Main Info Card
             HStack(alignment: .top, spacing: 20) {
@@ -40,15 +40,19 @@ struct ShowDaySheetPDF: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(dateFormatter.string(from: show.date.dateValue()))
                         .font(.system(size: 14, weight: .bold))
+                    
+                    // --- THIS IS THE FIX ---
+                    // The text will now scale down to 50% of its original size to prevent clipping.
                     Text(show.city.uppercased())
                         .font(.system(size: 40, weight: .black))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+
                     Text(show.venueName)
                         .font(.system(size: 18, weight: .bold))
                     
                     Spacer()
-                    
+
                     if let loadInTime = show.loadIn {
                         Text("Load In Time: \(timeFormatter.string(from: loadInTime.dateValue()).lowercased())")
                             .font(.system(size: 12, weight: .semibold))
@@ -61,7 +65,7 @@ struct ShowDaySheetPDF: View {
                         Label(show.venueAddress, systemImage: "mappin.and.ellipse")
                         if let phone = show.contactPhone, !phone.isEmpty {
                             Label(phone, systemImage: "phone.fill")
-                        }
+                         }
                         if let contact = show.contactName, !contact.isEmpty {
                             Label(contact, systemImage: "person.fill")
                         }
@@ -94,6 +98,7 @@ struct ShowDaySheetPDF: View {
             .cornerRadius(16)
             .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
 
+            
             // Lower Section
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -115,6 +120,7 @@ struct ShowDaySheetPDF: View {
                         timingRow(label: "Pack Out", time: time)
                     }
                 }
+                
                 
                 VStack(alignment: .leading, spacing: 16) {
                     if config.includeNotesSection {

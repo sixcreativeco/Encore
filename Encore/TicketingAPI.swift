@@ -24,6 +24,7 @@ class TicketingAPI {
     
     // --- THIS IS THE NEW FUNCTION ---
     func refreshEventPage(eventId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        // NOTE: The API endpoint uses 'event' as a generic term, but we're passing the Tour ID to refresh the tour landing page.
         guard let url = URL(string: "\(possibleBaseURLs[0])/api/refresh-event/\(eventId)") else {
             completion(.failure(APIError.invalidURL))
             return
@@ -160,7 +161,6 @@ class TicketingAPI {
             print("✅ Got response from \(currentURL) - Status: \(httpResponse.statusCode)")
             
             guard let data = data else {
-                print("❌ No data from \(currentURL)")
                 DispatchQueue.main.async {
                     completion(.failure(APIError.noData))
                 }

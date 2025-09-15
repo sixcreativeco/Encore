@@ -1,6 +1,6 @@
 import SwiftUI
-import FirebaseFirestore
 import Kingfisher
+import FirebaseFirestore
 
 struct ConfigureTicketsView: View {
     @StateObject private var viewModel: ConfigureTicketsViewModel
@@ -27,7 +27,7 @@ struct ConfigureTicketsView: View {
             await viewModel.fetchData()
         }
         .sheet(isPresented: $showLandingPageConfig) {
-             LandingPageConfigView(tour: viewModel.tour)
+             LandingPageConfigView(tour: $viewModel.tour)
         }
         .alert(viewModel.alertTitle, isPresented: $viewModel.showingAlert) {
             Button("OK") {}
@@ -39,7 +39,7 @@ struct ConfigureTicketsView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
              HStack {
-                Text("Configure Tickets")
+                 Text("Configure Tickets")
                     .font(.largeTitle.bold())
                 Spacer()
                 Button(action: { dismiss() }) {
@@ -49,7 +49,7 @@ struct ConfigureTicketsView: View {
             }
 
             Text("Set up ticket types, pricing, and availability for each show on the tour.")
-                .foregroundColor(.secondary)
+                 .foregroundColor(.secondary)
         }
         .padding(30)
     }
@@ -70,10 +70,12 @@ struct ConfigureTicketsView: View {
         VStack(alignment: .leading, spacing: 20) {
             TourDefaultsSection(tour: $viewModel.tour)
 
-            ForEach(viewModel.shows) { show in
-                 if let showId = show.id, let showIndex = viewModel.shows.firstIndex(where: { $0.id == showId }) {
+            // --- FIX START: Iterate over indices to allow for bindings ---
+            ForEach($viewModel.shows.indices, id: \.self) { showIndex in
+                let show = viewModel.shows[showIndex]
+                if let showId = show.id {
                     ShowConfigurationCard(
-                        show: $viewModel.shows[showIndex],
+                        show: $viewModel.shows[showIndex], // This binding is now valid
                         tour: viewModel.tour,
                         event: Binding(
                             get: { viewModel.eventMap[showId] ?? placeholderEvent(for: showId) },
@@ -108,8 +110,9 @@ struct ConfigureTicketsView: View {
                         isRefreshing: viewModel.isRefreshing[viewModel.eventMap[showId]?.id ?? ""] ?? false,
                         isFirstShow: showIndex == 0
                     )
-                 }
+                }
             }
+            // --- FIX END ---
         }
         .padding(.horizontal, 30)
         .padding(.bottom, 30)
@@ -124,7 +127,6 @@ struct ConfigureTicketsView: View {
 
             Spacer()
 
-            // --- THIS IS THE FIX (Part 1): Button text changed, dismiss action removed ---
             Button(action: {
                 Task {
                     await viewModel.saveAllChanges()
@@ -141,7 +143,7 @@ struct ConfigureTicketsView: View {
     
     private func placeholderEvent(for showId: String) -> TicketedEvent {
         return TicketedEvent(
-             ownerId: viewModel.tour.ownerId,
+            ownerId: viewModel.tour.ownerId,
             tourId: viewModel.tour.id ?? "",
             showId: showId,
             status: .draft,
@@ -231,7 +233,7 @@ fileprivate struct ShowConfigurationCard: View {
                 }
                 Spacer()
                  Image(systemName: "chevron.right")
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                   .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }
             .contentShape(Rectangle())
             .onTapGesture {
@@ -317,7 +319,6 @@ fileprivate struct ShowConfigurationCard: View {
                         
                         Spacer()
                         
-                        // --- THIS IS THE FIX (Part 3): New Refresh Button ---
                         Button(action: onRefresh) {
                             if isRefreshing {
                                 ProgressView().scaleEffect(0.8)
@@ -327,7 +328,6 @@ fileprivate struct ShowConfigurationCard: View {
                         }
                         .buttonStyle(SecondaryButtonStyle())
                         .disabled(isRefreshing)
-                        // --- END OF FIX ---
                     }
                 }
             }
@@ -383,7 +383,7 @@ fileprivate struct ShowConfigurationCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Description (About This Event)").font(.headline)
             CustomTextEditor(placeholder: "Enter details about the event for the ticket page...", text: Binding(
-                get: { event.description ?? "" },
+                 get: { event.description ?? "" },
                 set: { event.description = $0.isEmpty ? nil : $0 }
             ))
         }
